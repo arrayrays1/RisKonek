@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f8f9fa; }
+        .login-card {
+            max-width: 420px;
+            margin: 80px auto;
+            border: none;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+            border-radius: 12px;
+        }
+        .login-header {
+            background: #dc3545;
+            color: white;
+            border-radius: 12px 12px 0 0;
+            padding: 28px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-card card">
+        <div class="login-header">
+            <h3 class="fw-bold mb-1">RisKonek</h3>
+            <small>San Pedro CDRRMO</small>
+        </div>
+        <div class="card-body p-4">
+            <h5 class="mb-4 text-center text-muted">Sign in to your account</h5>
+
+            {% if error %}
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                {{ error }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            {% endif %}
+
+            <form method="POST" action="/login">
+                <div class="mb-3">
+                    <label class="form-label fw-medium">Username</label>
+                    <input
+                        type="text"
+                        name="username"
+                        class="form-control form-control-lg"
+                        placeholder="Enter your username"
+                        required
+                        autofocus
+                    >
+                </div>
+                <div class="mb-4">
+                    <label class="form-label fw-medium">Password</label>
+                    <input
+                        type="password"
+                        name="password"
+                        class="form-control form-control-lg"
+                        placeholder="Enter your password"
+                        required
+                    >
+                </div>
+                <button type="submit" class="btn btn-danger btn-lg w-100">
+                    Sign In
+                </button>
+            </form>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

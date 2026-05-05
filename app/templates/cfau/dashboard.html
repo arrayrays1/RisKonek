@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>CFAU OIC Dashboard — RisKonek</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+<nav class="navbar navbar-dark bg-danger px-4">
+    <span class="navbar-brand fw-bold">RisKonek — CFAU</span>
+    <span class="text-white me-3">{{ user.username }}</span>
+    <a href="/logout" class="btn btn-outline-light btn-sm">Logout</a>
+</nav>
+<div class="container mt-4">
+    <h4>CFAU OIC Dashboard</h4>
+    <p class="text-muted">Welcome, {{ user.username }}. Dashboard.</p>
+</div>
+</body>
+</html>

@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>User Management — RisKonek</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+<nav class="navbar navbar-dark bg-danger px-4">
+    <span class="navbar-brand fw-bold">RisKonek — Admin</span>
+    <div>
+        <a href="/admin/dashboard" class="btn btn-outline-light btn-sm me-2">Dashboard</a>
+        <span class="text-white me-3">{{ user.username }}</span>
+        <a href="/logout" class="btn btn-outline-light btn-sm">Logout</a>
+    </div>
+</nav>
+
+<div class="container mt-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="mb-0">User Management</h4>
+        <a href="/admin/users/create" class="btn btn-danger btn-sm">
+            + Create New User
+        </a>
+    </div>
+
+    {% if request.query_params.get('success') %}
+    <div class="alert alert-success alert-dismissible fade show">
+        {{ request.query_params.get('success') }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endif %}
+
+    {% if request.query_params.get('error') %}
+    <div class="alert alert-danger alert-dismissible fade show">
+        {{ request.query_params.get('error') }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endif %}
+
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <table class="table table-hover mb-0">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Username</th>
+                        <th>Email</th>
+                        <th>Role</th>
+                        <th>Barangay</th>
+                        <th>Contact</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for u in all_users %}
+                    <tr>
+                        <td class="fw-medium">{{ u.username }}</td>
+                        <td>{{ u.email }}</td>
+                        <td>
+                            {% if u.role.value == 'admin' %}
+                                <span class="badge bg-danger">Admin</span>
+                            {% elif u.role.value == 'cfau_oic' %}
+                                <span class="badge bg-warning text-dark">CFAU OIC</span>
+                            {% elif u.role.value == 'bdrrmo' %}
+                                <span class="badge bg-success">BDRRMO</span>
+                            {% elif u.role.value == 'cdrrmo_staff' %}
+                                <span class="badge bg-primary">CDRRMO Staff</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ u.barangay.name if u.barangay else '—' }}</td>
+                        <td>{{ u.contact_number or '—' }}</td>
+                        <td>
+                            {% if u.is_active %}
+                                <span class="badge bg-success">Active</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Inactive</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="/admin/users/{{ u.id }}/edit"
+                               class="btn btn-outline-secondary btn-sm me-1">
+                                Edit
+                            </a>
+                            {% if u.id != user.id %}
+                            <form method="POST" action="/admin/users/{{ u.id }}/toggle"
+                                  style="display:inline"
+                                  onsubmit="return confirm('Are you sure?')">
+                                <button type="submit"
+                                    class="btn btn-sm {{ 'btn-outline-danger' if u.is_active else 'btn-outline-success' }}">
+                                    {{ 'Deactivate' if u.is_active else 'Activate' }}
+                                </button>
+                            </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="text-center text-muted py-4">
+                            No users found. Create one using the button above.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
