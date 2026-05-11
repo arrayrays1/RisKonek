@@ -2,8 +2,9 @@ from fastapi import APIRouter, Request, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
+from datetime import datetime
 from app.database import get_db
-from app.models import User
+from app.models import User, AuditLog
 from app.auth import verify_password
 
 router = APIRouter()
@@ -65,6 +66,17 @@ async def login_submit(request: Request, db: Session = Depends(get_db)):
             }
         )
 
+    # Record last login + audit trail
+    user.last_login = datetime.utcnow()
+    db.add(AuditLog(
+        user_id=user.id,
+        action="login",
+        target_table="users",
+        target_id=user.id,
+        description=f"User '{user.username}' logged in"
+    ))
+    db.commit()
+
     # Store user info in session
     request.session["user"] = {
         "id": user.id,
@@ -90,6 +102,16 @@ async def login_submit(request: Request, db: Session = Depends(get_db)):
 # ─── LOGOUT ───────────────────────────────────────────
 
 @router.get("/logout")
-def logout(request: Request):
+def logout(request: Request, db: Session = Depends(get_db)):
+    current = request.session.get("user")
+    if current:
+        db.add(AuditLog(
+            user_id=current["id"],
+            action="logout",
+            target_table="users",
+            target_id=current["id"],
+            description=f"User '{current['username']}' logged out"
+        ))
+        db.commit()
     request.session.clear()
     return RedirectResponse(url="/login", status_code=302)

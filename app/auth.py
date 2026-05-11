@@ -38,3 +38,16 @@ def require_role(request: Request, allowed_roles: list):
     if user["role"] not in allowed_roles:
         return RedirectResponse(url="/unauthorized", status_code=302)
     return user
+
+def require_barangay_access(request: Request, barangay_id: int):
+    """
+    For TR-BDR-10: a BDRRMO Chairperson may only access data for their own
+    barangay. Admin, CFAU OIC, and CDRRMO Staff are not scoped this way.
+    Returns the user dict if access is allowed, or a RedirectResponse if not.
+    """
+    user = request.session.get("user")
+    if not user:
+        return RedirectResponse(url="/login", status_code=302)
+    if user["role"] == "bdrrmo" and user.get("barangay_id") != barangay_id:
+        return RedirectResponse(url="/unauthorized", status_code=302)
+    return user

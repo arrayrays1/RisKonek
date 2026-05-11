@@ -1,0 +1,98 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Barangay Management — RisKonek{% endblock %}
+
+{% set active_nav = 'barangays' %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Barangay Management</h1>
+    <p>Monitor and manage barangay-level disaster preparedness data</p>
+</div>
+
+<!-- ── Search + filter card ───────────────────────────────────── -->
+<div class="dash-card mb-4">
+    <form method="GET" action="/admin/barangays" class="row g-2 align-items-center">
+        <div class="col-md-8">
+            <div class="input-group">
+                <span class="input-group-text bg-white">
+                    <i class="bi bi-search text-muted"></i>
+                </span>
+                <input type="text" name="q" value="{{ q }}"
+                       class="form-control border-start-0"
+                       placeholder="Search barangay...">
+            </div>
+        </div>
+        <div class="col-md-3">
+            <select name="risk" class="form-select">
+                <option value="">All Risk Levels</option>
+                {% for r in risk_levels %}
+                <option value="{{ r }}" {{ 'selected' if risk_filter == r else '' }}>
+                    {{ r.title() }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-1 d-grid">
+            <button type="submit" class="btn btn-rk">
+                <i class="bi bi-funnel"></i>
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- ── Barangay table ─────────────────────────────────────────── -->
+<div class="dash-card p-0">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead style="background:#f9fafb">
+                <tr style="font-size:12px;color:var(--rk-muted);text-transform:uppercase;letter-spacing:0.04em">
+                    <th class="px-3 py-3">Barangay</th>
+                    <th class="py-3 text-end">Population</th>
+                    <th class="py-3 text-end">Vulnerable %</th>
+                    <th class="py-3">Risk Level</th>
+                    <th class="py-3 text-end px-3">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in rows %}
+                <tr style="font-size:13px">
+                    <td class="px-3">
+                        <i class="bi bi-geo-alt-fill me-2" style="color:var(--rk-green)"></i>
+                        <span class="fw-semibold">{{ r.name }}</span>
+                    </td>
+                    <td class="text-end">{{ "{:,}".format(r.population) }}</td>
+                    <td class="text-end">{{ r.vulnerable_pct }}%</td>
+                    <td>
+                        <span class="risk-badge risk-{{ r.risk_level }}">
+                            {{ r.risk_level.title() }}
+                        </span>
+                    </td>
+                    <td class="text-end px-3">
+                        <a href="/admin/barangays/{{ r.id }}"
+                           class="btn btn-outline-secondary btn-sm">
+                            View Profile <i class="bi bi-chevron-right"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="text-center text-muted py-4">
+                        No barangays match your search.
+                        {% if q or risk_filter %}
+                        <a href="/admin/barangays" class="ms-2">Clear filters</a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% if total_count > 0 %}
+<div class="text-muted mt-3" style="font-size:12px">
+    Showing {{ total_count }} barangay{{ 's' if total_count != 1 else '' }}.
+</div>
+{% endif %}
+{% endblock %}

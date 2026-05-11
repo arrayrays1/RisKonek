@@ -1,25 +1,445 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Admin Dashboard — RisKonek</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body>
-<nav class="navbar navbar-dark bg-danger px-4">
-    <span class="navbar-brand fw-bold">RisKonek — Admin</span>
-    <span class="text-white me-3">{{ user.username }}</span>
-    <a href="/logout" class="btn btn-outline-light btn-sm">Logout</a>
-</nav>
-<div class="container mt-4">
-    <h4>Admin Dashboard</h4>
-    <p class="text-muted">Welcome, {{ user.username }}. Dashboard.</p>
+{% extends "admin/base.html" %}
+
+{% block title %}Analytics Overview — RisKonek{% endblock %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+    .brgy-item {
+        padding: 12px 0;
+        border-bottom: 1px solid #f0f0f0;
+    }
+    .brgy-item:last-child { border-bottom: none; }
+    .brgy-rank {
+        width: 24px; height: 24px; background: var(--rk-green);
+        border-radius: 50%; color: white; font-size: 11px;
+        font-weight: 700; display: flex; align-items: center;
+        justify-content: center; flex-shrink: 0;
+    }
+    .brgy-name { font-size: 14px; font-weight: 600; color: var(--rk-text); }
+    .brgy-sub { font-size: 11px; color: var(--rk-muted); }
+    .score-bar-track {
+        height: 6px; background: #f0f0f0; border-radius: 3px;
+        overflow: hidden; margin-top: 6px;
+    }
+    .score-bar-fill {
+        height: 100%; border-radius: 3px;
+        transition: width 0.6s ease;
+    }
+
+    .feed-item {
+        display: flex; gap: 12px; align-items: flex-start;
+        padding: 10px 0; border-bottom: 1px solid #f0f0f0;
+    }
+    .feed-item:last-child { border-bottom: none; }
+    .feed-icon {
+        width: 34px; height: 34px; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 14px; flex-shrink: 0;
+    }
+    .feed-text { font-size: 13px; color: var(--rk-text); }
+    .feed-time { font-size: 11px; color: #aaa; margin-top: 2px; }
+
+    #dashMap { height: 320px; border-radius: 8px; }
+
+    .prep-table th { font-size: 12px; color: var(--rk-muted); font-weight: 500; border: none; }
+    .prep-table td { font-size: 13px; vertical-align: middle; border-color: #f5f5f5; }
+
+    .alert-banner {
+        background: #fff8e1; border-left: 4px solid #ffc107;
+        border-radius: 6px; padding: 10px 14px;
+        font-size: 13px; color: #856404; margin-bottom: 16px;
+        display: flex; align-items: center; gap: 8px;
+    }
+</style>
+{% endblock %}
+
+{% set active_nav = 'analytics' %}
+
+{% block content %}
+<!-- Page header -->
+<div class="d-flex justify-content-between align-items-start page-header">
+    <div>
+        <h1>Analytics Overview Dashboard</h1>
+        <p>City-wide disaster preparedness, readiness scores, and resource adequacy status</p>
+    </div>
+    <div class="last-updated">
+        Last updated<br>
+        <strong id="currentDateTime"></strong>
+    </div>
 </div>
 
-<div class="container mt-3">
-    <a href="/admin/users" class="btn btn-outline-danger btn-sm">
-        Manage Users
-    </a>
+<!-- Alert banner — only shows if there are active alerts -->
+{% if active_alerts > 0 %}
+<div class="alert-banner">
+    <i class="bi bi-exclamation-triangle-fill" style="font-size:16px"></i>
+    <span>
+        <strong>{{ active_alerts }} active alert{{ 's' if active_alerts > 1 else '' }}:</strong>
+        {{ low_stock_count }} item{{ 's' if low_stock_count != 1 else '' }} below restock threshold,
+        {{ expiring_count }} item{{ 's' if expiring_count != 1 else '' }} expiring within 30 days.
+        <a href="/admin/resources" class="fw-medium text-decoration-none" style="color:#856404">
+            View Resources <i class="bi bi-arrow-right"></i>
+        </a>
+    </span>
 </div>
-</body>
-</html>
+{% endif %}
+
+<!-- ── STAT CARDS ─────────────────────────────────────────────── -->
+<div class="row g-3 mb-4">
+
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-start">
+                <div class="stat-label">Overall System Status</div>
+                <div class="stat-icon" style="background:#eafaf1;color:#1a6b47">
+                    <i class="bi bi-shield-check"></i>
+                </div>
+            </div>
+            <div class="stat-value" style="color:#1a6b47">Operational</div>
+            <div class="stat-change text-success">
+                {{ total_barangays }} barangays monitored
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-start">
+                <div class="stat-label">Overall Readiness Score</div>
+                <div class="stat-icon" style="background:#e8f4fd;color:#2980b9">
+                    <i class="bi bi-graph-up-arrow"></i>
+                </div>
+            </div>
+            <div class="stat-value">{{ readiness_score }}%</div>
+            <div class="stat-change text-muted">
+                {{ serviceable_count }}/{{ total_equip }} equipment serviceable
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-start">
+                <div class="stat-label">Data Relevance Score</div>
+                <div class="stat-icon" style="background:#f3e8fd;color:#8e44ad">
+                    <i class="bi bi-database-check"></i>
+                </div>
+            </div>
+            <div class="stat-value">{{ data_relevance }}%</div>
+            <div class="stat-change text-muted">
+                Barangays updated within 6 months
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-start">
+                <div class="stat-label">Active Alerts Count</div>
+                <div class="stat-icon" style="background:#fde8e8;color:#c0392b">
+                    <i class="bi bi-bell-fill"></i>
+                </div>
+            </div>
+            <div class="stat-value" style="color:{{ '#c0392b' if active_alerts > 0 else '#1a6b47' }}">
+                {{ active_alerts }}
+            </div>
+            <div class="stat-change text-muted">
+                Resource and expiry alerts
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- ── ROW 2: Insights feed + Mini map ────────────────────────── -->
+<div class="row g-3 mb-4">
+
+    <div class="col-md-7">
+        <div class="dash-card">
+            <div class="card-title-row">
+                <i class="bi bi-bell text-warning"></i>
+                <h6>Insights & Latest Updates</h6>
+            </div>
+
+            {% if recent_logs %}
+                {% for log in recent_logs %}
+                <div class="feed-item">
+                    <div class="feed-icon"
+                         style="background:
+                         {% if log.action == 'created' %}#eafaf1;color:#1a6b47
+                         {% elif log.action == 'updated' %}#e8f4fd;color:#2980b9
+                         {% elif log.action == 'deleted' %}#fde8e8;color:#c0392b
+                         {% elif log.action == 'deactivated' %}#fef3e2;color:#d35400
+                         {% elif log.action == 'login' %}#f3e8fd;color:#8e44ad
+                         {% else %}#f4f6f9;color:#6c757d{% endif %}">
+                        {% if log.action == 'created' %}<i class="bi bi-check-circle-fill"></i>
+                        {% elif log.action == 'updated' %}<i class="bi bi-pencil-fill"></i>
+                        {% elif log.action == 'deleted' %}<i class="bi bi-trash-fill"></i>
+                        {% elif log.action == 'deactivated' %}<i class="bi bi-slash-circle-fill"></i>
+                        {% elif log.action == 'login' %}<i class="bi bi-person-fill"></i>
+                        {% elif log.action == 'logout' %}<i class="bi bi-box-arrow-right"></i>
+                        {% elif log.action == 'activated' %}<i class="bi bi-check-circle-fill"></i>
+                        {% else %}<i class="bi bi-file-text-fill"></i>{% endif %}
+                    </div>
+                    <div>
+                        <div class="feed-text">{{ log.description }}</div>
+                        <div class="feed-time">
+                            {{ log.timestamp | pht if log.timestamp else 'Just now' }}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="text-center text-muted py-4" style="font-size:13px">
+                    No recent activity yet. Actions taken in the system will appear here.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="col-md-5">
+        <div class="dash-card">
+            <div class="card-title-row">
+                <i class="bi bi-map-fill" style="color:var(--rk-green)"></i>
+                <h6>Barangay Risk Map</h6>
+                <a href="/admin/map" class="ms-auto"
+                   style="font-size:12px;color:var(--rk-green);text-decoration:none">
+                    View Full Map <i class="bi bi-arrow-right"></i>
+                </a>
+            </div>
+            <div id="dashMap"></div>
+            <div class="d-flex gap-3 mt-2 flex-wrap" style="font-size:11px">
+                <span><i class="bi bi-circle-fill" style="color:#c0392b"></i> Critical</span>
+                <span><i class="bi bi-circle-fill" style="color:#d35400"></i> High</span>
+                <span><i class="bi bi-circle-fill" style="color:#b7950b"></i> Moderate</span>
+                <span><i class="bi bi-circle-fill" style="color:#1a6b47"></i> Low</span>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- ── ROW 3: Charts ──────────────────────────────────────────── -->
+<div class="row g-3 mb-4">
+
+    <div class="col-md-6">
+        <div class="dash-card">
+            <div class="card-title-row">
+                <i class="bi bi-bar-chart-fill" style="color:#2980b9"></i>
+                <h6>Disaster Incidents by Type</h6>
+            </div>
+            <canvas id="disasterChart" height="180"></canvas>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="dash-card">
+            <div class="card-title-row">
+                <i class="bi bi-graph-up" style="color:var(--rk-green)"></i>
+                <h6>Incidents Trend (Last 6 Years)</h6>
+            </div>
+            <canvas id="trendChart" height="180"></canvas>
+        </div>
+    </div>
+
+</div>
+
+<!-- ── ROW 4: Top 5 + Preparedness table ─────────────────────── -->
+<div class="row g-3 mb-4">
+
+    <div class="col-md-6">
+        <div class="dash-card">
+            <div class="card-title-row">
+                <i class="bi bi-exclamation-triangle-fill text-danger"></i>
+                <h6>Top 5 Most At-Risk Barangays</h6>
+            </div>
+
+            {% for brgy in top5 %}
+            <div class="brgy-item">
+                <div class="d-flex align-items-center gap-2 mb-1">
+                    <div class="brgy-rank">{{ loop.index }}</div>
+                    <div class="flex-grow-1">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div class="brgy-name">{{ brgy.name }}</div>
+                            <span class="risk-badge risk-{{ brgy.level }}">
+                                {{ brgy.level.title() }}
+                            </span>
+                        </div>
+                        <div class="brgy-sub">
+                            Hazards: {{ brgy.hazard_types.replace(',', ', ').title() if brgy.hazard_types else '—' }}
+                            &nbsp;·&nbsp; Population: {{ "{:,}".format(brgy.population) }}
+                        </div>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <div class="score-bar-track flex-grow-1">
+                        <div class="score-bar-fill"
+                             style="width:{{ brgy.score }}%;
+                             background:{% if brgy.level == 'critical' %}#c0392b{% elif brgy.level == 'high' %}#d35400{% elif brgy.level == 'moderate' %}#f39c12{% else %}#1a6b47{% endif %}">
+                        </div>
+                    </div>
+                    <span style="font-size:12px;color:var(--rk-muted);white-space:nowrap">
+                        Score: {{ brgy.score }}
+                    </span>
+                </div>
+                <a href="/admin/barangays/{{ brgy.id }}"
+                   style="font-size:12px;color:var(--rk-green);text-decoration:none">
+                    View Barangay Profile <i class="bi bi-arrow-right"></i>
+                </a>
+            </div>
+            {% endfor %}
+
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="dash-card">
+            <div class="card-title-row">
+                <i class="bi bi-shield-fill-check" style="color:var(--rk-green)"></i>
+                <h6>Preparedness Index Overview</h6>
+            </div>
+
+            <table class="table prep-table">
+                <thead>
+                    <tr>
+                        <th>Barangay</th>
+                        <th>Score</th>
+                        <th>Risk Level</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for brgy in all_scores[:10] %}
+                    <tr>
+                        <td>{{ brgy.name }}</td>
+                        <td class="fw-medium">{{ brgy.score }}</td>
+                        <td>
+                            <span class="risk-badge risk-{{ brgy.level }}">
+                                {{ brgy.level.title() }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <a href="/admin/barangays"
+               class="d-flex align-items-center justify-content-center gap-1 mt-2"
+               style="font-size:13px;color:var(--rk-green);text-decoration:none;
+                      border:1px solid #e0e0e0;border-radius:6px;padding:8px">
+                View All Barangays <i class="bi bi-arrow-right"></i>
+            </a>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ── Current date/time ─────────────────────────────────────────────
+function updateDateTime() {
+    const now = new Date();
+    document.getElementById('currentDateTime').textContent =
+        now.toLocaleDateString('en-PH', {
+            year: 'numeric', month: 'long', day: 'numeric'
+        }) + ' · ' + now.toLocaleTimeString('en-PH', {
+            hour: '2-digit', minute: '2-digit'
+        });
+}
+updateDateTime();
+
+// ── Disaster type chart ───────────────────────────────────────────
+const disasterData = {{ disaster_counts | safe }};
+new Chart(document.getElementById('disasterChart'), {
+    type: 'bar',
+    data: {
+        labels: Object.keys(disasterData).map(k => k.charAt(0).toUpperCase() + k.slice(1)),
+        datasets: [{
+            label: 'Incidents',
+            data: Object.values(disasterData),
+            backgroundColor: [
+                '#3498db','#e74c3c','#f39c12','#8e44ad','#1abc9c','#e67e22'
+            ],
+            borderRadius: 6,
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+            y: { beginAtZero: true, grid: { color: '#f5f5f5' } },
+            x: { grid: { display: false } }
+        }
+    }
+});
+
+// ── Trend line chart ─────────────────────────────────────────────
+const yearlyData = {{ yearly_data | safe }};
+new Chart(document.getElementById('trendChart'), {
+    type: 'line',
+    data: {
+        labels: Object.keys(yearlyData),
+        datasets: [{
+            label: 'Total Incidents',
+            data: Object.values(yearlyData),
+            borderColor: '#1a6b47',
+            backgroundColor: 'rgba(26,107,71,0.08)',
+            borderWidth: 2,
+            pointBackgroundColor: '#1a6b47',
+            pointRadius: 4,
+            fill: true,
+            tension: 0.4,
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+            y: { beginAtZero: true, grid: { color: '#f5f5f5' } },
+            x: { grid: { display: false } }
+        }
+    }
+});
+
+// ── Leaflet map ───────────────────────────────────────────────────
+const map = L.map('dashMap').setView([14.356, 121.052], 13);
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors',
+    maxZoom: 17
+}).addTo(map);
+
+const markerColors = {
+    critical: '#c0392b',
+    high:     '#d35400',
+    moderate: '#f39c12',
+    low:      '#1a6b47'
+};
+
+const markers = {{ map_markers | safe }};
+markers.forEach(m => {
+    const color = markerColors[m.level] || '#888';
+    const icon = L.divIcon({
+        className: '',
+        html: `<div style="
+            width:12px;height:12px;
+            background:${color};
+            border:2px solid white;
+            border-radius:50%;
+            box-shadow:0 1px 3px rgba(0,0,0,0.4)
+        "></div>`,
+        iconSize: [12, 12],
+        iconAnchor: [6, 6]
+    });
+    L.marker([m.lat, m.lng], { icon })
+        .addTo(map)
+        .bindPopup(`
+            <strong>${m.name}</strong><br>
+            Risk Score: ${m.score}<br>
+            Level: <span style="color:${color};font-weight:600">${m.level.charAt(0).toUpperCase() + m.level.slice(1)}</span>
+        `);
+});
+</script>
+{% endblock %}
