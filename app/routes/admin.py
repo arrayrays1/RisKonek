@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Request, Depends, Form
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -575,3 +575,82 @@ def barangay_profile(
             "hazard_types": [h.strip() for h in (brgy.hazard_types or "").split(",") if h.strip()],
         },
     )
+
+
+# ─────────────────────────────────────────────────────────────────────
+# GIS MAP — TR-ADM-10, TR-ADM-16, TR-ADM-17
+# Official hazard polygon layers (TR-ADM-11) are deferred until valid
+# GeoJSON / shapefile sources are confirmed by the client.
+# ─────────────────────────────────────────────────────────────────────
+
+@router.get("/map", response_class=HTMLResponse)
+def gis_map(request: Request, db: Session = Depends(get_db)):
+    user = require_role(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
+
+    barangays = db.query(Barangay).order_by(Barangay.name).all()
+    facility_types = [t.value for t in FacilityType]
+    statuses = ["Permanent", "Temporary", "Under Construction"]
+
+    return templates.TemplateResponse(
+        request=request,
+        name="admin/map.html",
+        context={
+            "user": user,
+            "active_nav": "map",
+            "barangays": barangays,
+            "facility_types": facility_types,
+            "statuses": statuses,
+        },
+    )
+
+
+@router.get("/api/facilities-map-data")
+def facilities_map_data(request: Request, db: Session = Depends(get_db)):
+    """JSON feed for the Leaflet map. Admin-only.
+
+    Returns one record per facility with all popup fields pre-formatted.
+    """
+    user = require_role(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
+
+    facilities = (
+        db.query(Facility)
+        .join(Barangay, Facility.barangay_id == Barangay.id)
+        .order_by(Barangay.name, Facility.name)
+        .all()
+    )
+
+    payload = []
+    for f in facilities:
+        payload.append({
+            "id": f.id,
+            "name": f.name,
+            "barangay": f.barangay.name if f.barangay else None,
+            "facility_type": f.facility_type.value if f.facility_type else None,
+            "facility_type_label": (
+                f.facility_type.value.replace("_", " ").title()
+                if f.facility_type else None
+            ),
+            "lat": f.latitude,
+            "lng": f.longitude,
+            "status": f.status,
+            "floor_area_sqm": f.floor_area_sqm,
+            "capacity_families": f.capacity_families,
+            "capacity_individuals": f.capacity_individuals,
+            "ereid_capacity_families": f.ereid_capacity_families,
+            "ereid_capacity_individuals": f.ereid_capacity_individuals,
+            "supports_tropical_cyclone": bool(f.supports_tropical_cyclone),
+            "supports_flooding": bool(f.supports_flooding),
+            "supports_landslide": bool(f.supports_landslide),
+            "supports_fire": bool(f.supports_fire),
+            "vulnerability_risk": f.vulnerability_risk,
+            "eo_moa_mou": f.eo_moa_mou,
+            "is_approximate_location": bool(f.is_approximate_location),
+            "is_city_level": bool(f.is_city_level),
+            "is_active": bool(f.is_active),
+        })
+
+    return JSONResponse(payload)

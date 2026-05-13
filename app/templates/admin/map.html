@@ -1,0 +1,435 @@
+{% extends "admin/base.html" %}
+
+{% block title %}GIS Risk Map — RisKonek{% endblock %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+    .map-wrap {
+        display: grid;
+        grid-template-columns: 280px 1fr;
+        gap: 16px;
+        height: calc(100vh - 200px);
+        min-height: 520px;
+    }
+    .filter-panel {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+        padding: 18px;
+        overflow-y: auto;
+    }
+    .filter-panel h6 {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--rk-muted);
+        margin: 0 0 8px;
+        font-weight: 600;
+    }
+    .filter-section { margin-bottom: 18px; }
+    .filter-section .form-check-label { font-size: 13px; }
+    .filter-section .form-check { margin-bottom: 4px; }
+    .filter-section select,
+    .filter-section input[type="search"] {
+        font-size: 13px;
+    }
+
+    .map-area {
+        position: relative;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+        background: white;
+    }
+    #facilityMap { height: 100%; width: 100%; }
+
+    .map-overlay {
+        position: absolute;
+        top: 12px; right: 12px;
+        background: rgba(255,255,255,0.95);
+        border-radius: 8px;
+        padding: 10px 12px;
+        box-shadow: 0 1px 6px rgba(0,0,0,0.12);
+        font-size: 12px;
+        max-width: 260px;
+        z-index: 500;
+    }
+    .map-overlay .legend-title {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--rk-muted);
+        margin-bottom: 6px;
+        font-weight: 600;
+    }
+    .legend-row {
+        display: flex; align-items: center; gap: 8px;
+        margin: 3px 0;
+    }
+    .legend-dot {
+        width: 12px; height: 12px;
+        border-radius: 50%;
+        border: 2px solid white;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.4);
+        flex-shrink: 0;
+    }
+
+    .hazard-notice {
+        background: #e8f4fd;
+        border-left: 4px solid #2980b9;
+        border-radius: 6px;
+        padding: 10px 14px;
+        font-size: 13px;
+        color: #1d4d6c;
+        margin-bottom: 16px;
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    .hazard-notice i { font-size: 16px; margin-top: 1px; }
+
+    .stat-row {
+        display: flex; gap: 12px;
+        margin-bottom: 16px; flex-wrap: wrap;
+    }
+    .stat-pill {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+        padding: 8px 14px;
+        font-size: 13px;
+        display: flex; align-items: center; gap: 8px;
+    }
+    .stat-pill .stat-pill-value { font-weight: 700; color: var(--rk-green); }
+
+    .popup-table { font-size: 12px; }
+    .popup-table th {
+        text-align: left;
+        color: var(--rk-muted);
+        font-weight: 500;
+        padding-right: 8px;
+        vertical-align: top;
+    }
+    .popup-table td { padding: 1px 0; vertical-align: top; }
+    .popup-name { font-size: 14px; font-weight: 700; color: var(--rk-text); margin-bottom: 2px; }
+    .popup-sub  { font-size: 11px; color: var(--rk-muted); margin-bottom: 8px; }
+    .popup-badges { margin: 6px 0 8px; display: flex; flex-wrap: wrap; gap: 4px; }
+    .popup-badge {
+        font-size: 10px; font-weight: 600;
+        padding: 2px 8px; border-radius: 12px;
+        background: #eafaf1; color: #1a6b47;
+    }
+    .popup-badge.approx { background: #fef3cd; color: #856404; }
+    .popup-badge.city   { background: #e8f0fe; color: #1a4fb0; }
+</style>
+{% endblock %}
+
+{% set active_nav = 'map' %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-end">
+    <div>
+        <h1><i class="bi bi-map-fill me-2"></i>GIS Risk Map</h1>
+        <p>Critical facilities of San Pedro, Laguna — sourced from the CDRRMO master list.</p>
+    </div>
+    <div class="last-updated">San Pedro, Laguna</div>
+</div>
+
+<!-- <div class="hazard-notice">
+    <i class="bi bi-info-circle-fill"></i>
+    <div>
+        <strong>Official hazard zone layers pending.</strong>
+        Flood, landslide, and ground-shaking polygons will be integrated once
+        valid GeoJSON / shapefile-derived layers are received from MGB, PHIVOLCS,
+        or CDRRMO. Until then, the map shows only facility points and the
+        per-facility risk notes recorded in the master list.
+    </div>
+</div> -->
+
+<div class="stat-row">
+    <div class="stat-pill">
+        <i class="bi bi-building text-success"></i>
+        <span>Total facilities: <span id="statTotal" class="stat-pill-value">—</span></span>
+    </div>
+    <div class="stat-pill">
+        <i class="bi bi-funnel-fill text-success"></i>
+        <span>Visible: <span id="statVisible" class="stat-pill-value">—</span></span>
+    </div>
+    <div class="stat-pill">
+        <i class="bi bi-exclamation-triangle-fill text-warning"></i>
+        <span>Approximate location: <span id="statApprox" class="stat-pill-value">—</span></span>
+    </div>
+</div>
+
+<div class="map-wrap">
+    <!-- ── FILTERS ─────────────────────────────────────────────── -->
+    <aside class="filter-panel">
+        <div class="filter-section">
+            <h6>Search</h6>
+            <input type="search" id="filterSearch" class="form-control form-control-sm"
+                   placeholder="Facility name…">
+        </div>
+
+        <div class="filter-section">
+            <h6>Barangay</h6>
+            <select id="filterBarangay" class="form-select form-select-sm">
+                <option value="">All barangays</option>
+                {% for b in barangays %}
+                <option value="{{ b.name }}">{{ b.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="filter-section">
+            <h6>Facility type</h6>
+            {% for t in facility_types %}
+            <div class="form-check">
+                <input class="form-check-input filter-type" type="checkbox"
+                       id="ft-{{ t }}" value="{{ t }}" checked>
+                <label class="form-check-label" for="ft-{{ t }}">
+                    {{ t.replace('_', ' ').title() }}
+                </label>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="filter-section">
+            <h6>Status</h6>
+            {% for s in statuses %}
+            <div class="form-check">
+                <input class="form-check-input filter-status" type="checkbox"
+                       id="st-{{ loop.index }}" value="{{ s }}" checked>
+                <label class="form-check-label" for="st-{{ loop.index }}">{{ s }}</label>
+            </div>
+            {% endfor %}
+            <div class="form-check">
+                <input class="form-check-input filter-status" type="checkbox"
+                       id="st-unknown" value="__unknown__" checked>
+                <label class="form-check-label" for="st-unknown">Unspecified</label>
+            </div>
+        </div>
+
+        <div class="filter-section">
+            <h6>Supports incident</h6>
+            <div class="form-check">
+                <input class="form-check-input filter-incident" type="checkbox"
+                       id="inc-tc" value="tropical_cyclone">
+                <label class="form-check-label" for="inc-tc">Tropical Cyclone</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input filter-incident" type="checkbox"
+                       id="inc-fl" value="flooding">
+                <label class="form-check-label" for="inc-fl">Flooding</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input filter-incident" type="checkbox"
+                       id="inc-ls" value="landslide">
+                <label class="form-check-label" for="inc-ls">Landslide</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input filter-incident" type="checkbox"
+                       id="inc-fr" value="fire">
+                <label class="form-check-label" for="inc-fr">Fire</label>
+            </div>
+            <small class="text-muted">Unchecked = no incident restriction.</small>
+        </div>
+
+        <button type="button" id="resetFilters" class="btn btn-sm btn-outline-secondary w-100 mt-2">
+            <i class="bi bi-arrow-counterclockwise me-1"></i>Reset filters
+        </button>
+    </aside>
+
+    <!-- ── MAP + LEGEND ────────────────────────────────────────── -->
+    <div class="map-area">
+        <div id="facilityMap"></div>
+        <div class="map-overlay">
+            <div class="legend-title">Legend</div>
+            <div class="legend-row">
+                <span class="legend-dot" style="background:#1a6b47"></span>
+                <span>Evacuation Center</span>
+            </div>
+            <div class="legend-row">
+                <span class="legend-dot" style="background:#2980b9"></span>
+                <span>School</span>
+            </div>
+            <div class="legend-row">
+                <span class="legend-dot" style="background:#c0392b"></span>
+                <span>Hospital</span>
+            </div>
+            <div class="legend-row">
+                <span class="legend-dot" style="background:#8e44ad"></span>
+                <span>Health Clinic</span>
+            </div>
+            <div class="legend-row">
+                <span class="legend-dot" style="background:#d35400"></span>
+                <span>Staging Area</span>
+            </div>
+            <div class="legend-row mt-2" style="border-top:1px solid #eee; padding-top:6px;">
+                <span class="legend-dot" style="background:#f1c40f"></span>
+                <span>Approximate location (fallback)</span>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ── Map initialization ─────────────────────────────────────────────
+const map = L.map('facilityMap').setView([14.356, 121.052], 13);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors',
+    maxZoom: 18
+}).addTo(map);
+
+// Future hazard layers will be added here, e.g.:
+//   L.geoJSON(floodPolygons, {...}).addTo(map);
+// Kept as a plain comment for now — no fake polygons.
+
+const TYPE_COLORS = {
+    evacuation_center: '#1a6b47',
+    school:            '#2980b9',
+    hospital:          '#c0392b',
+    health_clinic:     '#8e44ad',
+    staging_area:      '#d35400',
+};
+
+function markerIcon(facility) {
+    const color = facility.is_approximate_location
+        ? '#f1c40f'
+        : (TYPE_COLORS[facility.facility_type] || '#888');
+    const ring = facility.is_city_level ? '3px solid #1a4fb0' : '2px solid white';
+    return L.divIcon({
+        className: '',
+        html: `<div style="
+            width:14px;height:14px;background:${color};
+            border:${ring};border-radius:50%;
+            box-shadow:0 1px 3px rgba(0,0,0,0.4)"></div>`,
+        iconSize: [14, 14],
+        iconAnchor: [7, 7],
+    });
+}
+
+function popupHtml(f) {
+    const incidents = [];
+    if (f.supports_tropical_cyclone) incidents.push('Tropical Cyclone');
+    if (f.supports_flooding)         incidents.push('Flooding');
+    if (f.supports_landslide)        incidents.push('Landslide');
+    if (f.supports_fire)             incidents.push('Fire');
+
+    const badges = [];
+    if (f.is_city_level)
+        badges.push('<span class="popup-badge city">City-level</span>');
+    if (f.is_approximate_location)
+        badges.push('<span class="popup-badge approx">Approximate location</span>');
+    if (f.status)
+        badges.push(`<span class="popup-badge">${f.status}</span>`);
+
+    function row(label, value) {
+        if (value === null || value === undefined || value === '') return '';
+        return `<tr><th>${label}</th><td>${value}</td></tr>`;
+    }
+
+    return `
+        <div class="popup-name">${f.name}</div>
+        <div class="popup-sub">${f.barangay || ''} · ${f.facility_type_label || ''}</div>
+        ${badges.length ? `<div class="popup-badges">${badges.join('')}</div>` : ''}
+        <table class="popup-table">
+            ${row('Floor area',          f.floor_area_sqm ? f.floor_area_sqm + ' sqm' : null)}
+            ${row('Capacity (families)', f.capacity_families)}
+            ${row('Capacity (indiv.)',   f.capacity_individuals)}
+            ${row('EREID (families)',    f.ereid_capacity_families)}
+            ${row('EREID (indiv.)',      f.ereid_capacity_individuals)}
+            ${row('Supports',            incidents.join(', ') || null)}
+            ${row('Risk note',           f.vulnerability_risk)}
+            ${row('EO / MOA / MOU',      f.eo_moa_mou)}
+            ${row('Coordinates',         f.lat.toFixed(6) + ', ' + f.lng.toFixed(6))}
+        </table>
+    `;
+}
+
+// ── Marker layer + filtering ───────────────────────────────────────
+let allFacilities = [];
+const markerLayer = L.layerGroup().addTo(map);
+
+function applyFilters() {
+    const search   = document.getElementById('filterSearch').value.trim().toLowerCase();
+    const brgy     = document.getElementById('filterBarangay').value;
+    const types    = Array.from(document.querySelectorAll('.filter-type:checked'))
+                          .map(el => el.value);
+    const statuses = Array.from(document.querySelectorAll('.filter-status:checked'))
+                          .map(el => el.value);
+    const incidents = Array.from(document.querySelectorAll('.filter-incident:checked'))
+                          .map(el => el.value);
+
+    markerLayer.clearLayers();
+    let visible = 0;
+    let approx = 0;
+
+    allFacilities.forEach(f => {
+        if (search && !f.name.toLowerCase().includes(search)) return;
+        if (brgy && f.barangay !== brgy) return;
+        if (!types.includes(f.facility_type)) return;
+
+        const statusKey = f.status || '__unknown__';
+        if (!statuses.includes(statusKey)) return;
+
+        // Incident filter is additive — a checked box requires that
+        // support flag to be true. No boxes checked = no restriction.
+        if (incidents.length > 0) {
+            const ok = incidents.every(k => {
+                if (k === 'tropical_cyclone') return f.supports_tropical_cyclone;
+                if (k === 'flooding')         return f.supports_flooding;
+                if (k === 'landslide')        return f.supports_landslide;
+                if (k === 'fire')             return f.supports_fire;
+                return true;
+            });
+            if (!ok) return;
+        }
+
+        L.marker([f.lat, f.lng], { icon: markerIcon(f) })
+            .addTo(markerLayer)
+            .bindPopup(popupHtml(f), { maxWidth: 320 });
+
+        visible++;
+        if (f.is_approximate_location) approx++;
+    });
+
+    document.getElementById('statVisible').textContent = visible;
+    document.getElementById('statApprox').textContent = approx;
+}
+
+function bindFilterEvents() {
+    document.getElementById('filterSearch').addEventListener('input', applyFilters);
+    document.getElementById('filterBarangay').addEventListener('change', applyFilters);
+    document.querySelectorAll('.filter-type, .filter-status, .filter-incident')
+        .forEach(el => el.addEventListener('change', applyFilters));
+
+    document.getElementById('resetFilters').addEventListener('click', () => {
+        document.getElementById('filterSearch').value = '';
+        document.getElementById('filterBarangay').value = '';
+        document.querySelectorAll('.filter-type, .filter-status')
+            .forEach(el => el.checked = true);
+        document.querySelectorAll('.filter-incident')
+            .forEach(el => el.checked = false);
+        applyFilters();
+    });
+}
+
+// ── Load data ──────────────────────────────────────────────────────
+fetch('/admin/api/facilities-map-data')
+    .then(r => r.json())
+    .then(data => {
+        allFacilities = data;
+        document.getElementById('statTotal').textContent = data.length;
+        bindFilterEvents();
+        applyFilters();
+    })
+    .catch(err => {
+        console.error('Failed to load facilities:', err);
+        document.getElementById('statTotal').textContent = '0';
+    });
+</script>
+{% endblock %}

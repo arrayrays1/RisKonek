@@ -285,12 +285,28 @@ print(f"✓ {equip_count} equipment items seeded")
 
 # ─────────────────────────────────────────
 # 6. CRITICAL FACILITIES
-# Count scales with population. Coordinates are jittered around each
-# barangay's centroid (~50–200 m offset) so the Leaflet preview can plot them.
-# Demonstration data — replace with actual BDRRMO facility records.
+# Week 5: prefer the actual CDRRMO Excel dataset when it is present.
+# The jittered demo seeding below is kept only as a fallback for
+# environments where the Excel file is missing.
 # ─────────────────────────────────────────
 
 from app.utils.geo import BARANGAY_COORDS
+from app.utils.facility_importer import (
+    import_facilities, DEFAULT_EXCEL_PATH,
+)
+import os
+
+if os.path.exists(DEFAULT_EXCEL_PATH):
+    result = import_facilities(db)
+    print(f"✓ {result['inserted']} facilities imported from {DEFAULT_EXCEL_PATH}")
+    if result["skipped_existing"]:
+        print(f"  ({result['skipped_existing']} already existed — left untouched)")
+    if result["problematic_rows"]:
+        print(f"  ⚠ {len(result['problematic_rows'])} row(s) needed review:")
+        for excel_row, reason in result["problematic_rows"]:
+            print(f"    - Excel row {excel_row + 1}: {reason}")
+else:
+    print(f"⚠ {DEFAULT_EXCEL_PATH} not found — using demo/jittered facility seeding.")
 
 def facility_quota(population: int) -> dict:
     """Return how many of each facility type to create for a given population.
@@ -338,57 +354,58 @@ FACILITY_CAPACITY = {
     FacilityType.staging_area:      (0, 0),
 }
 
-facility_count = 0
-for brgy in all_barangays:
-    pop = pop_lookup.get(brgy.name, 5000)
-    quota = facility_quota(pop)
-    coords = BARANGAY_COORDS.get(brgy.name, {"lat": 14.350, "lng": 121.045})
+if not os.path.exists(DEFAULT_EXCEL_PATH):
+    facility_count = 0
+    for brgy in all_barangays:
+        pop = pop_lookup.get(brgy.name, 5000)
+        quota = facility_quota(pop)
+        coords = BARANGAY_COORDS.get(brgy.name, {"lat": 14.350, "lng": 121.045})
 
-    type_map = [
-        (FacilityType.evacuation_center, quota["evac"]),
-        (FacilityType.health_clinic,     quota["clinic"]),
-        (FacilityType.school,            quota["school"]),
-        (FacilityType.hospital,          quota["hospital"]),
-        (FacilityType.staging_area,      quota["staging"]),
-    ]
+        type_map = [
+            (FacilityType.evacuation_center, quota["evac"]),
+            (FacilityType.health_clinic,     quota["clinic"]),
+            (FacilityType.school,            quota["school"]),
+            (FacilityType.hospital,          quota["hospital"]),
+            (FacilityType.staging_area,      quota["staging"]),
+        ]
 
-    for ftype, count in type_map:
-        templates = FACILITY_NAME_TEMPLATES[ftype]
-        for i in range(count):
-            template = templates[i % len(templates)]
-            # Disambiguate when we create multiple of the same type
-            suffix = f" {i + 1}" if count > 1 and i >= len(templates) else ""
-            name = template.format(brgy=brgy.name) + suffix
+        for ftype, count in type_map:
+            templates = FACILITY_NAME_TEMPLATES[ftype]
+            for i in range(count):
+                template = templates[i % len(templates)]
+                # Disambiguate when we create multiple of the same type
+                suffix = f" {i + 1}" if count > 1 and i >= len(templates) else ""
+                name = template.format(brgy=brgy.name) + suffix
 
-            existing = db.query(Facility).filter(
-                Facility.barangay_id == brgy.id,
-                Facility.name == name,
-            ).first()
-            if existing:
-                continue
+                existing = db.query(Facility).filter(
+                    Facility.barangay_id == brgy.id,
+                    Facility.name == name,
+                ).first()
+                if existing:
+                    continue
 
-            # ~0.0015° ≈ 165 m jitter
-            lat = coords["lat"] + random.uniform(-0.0015, 0.0015)
-            lng = coords["lng"] + random.uniform(-0.0015, 0.0015)
+                # ~0.0015° ≈ 165 m jitter
+                lat = coords["lat"] + random.uniform(-0.0015, 0.0015)
+                lng = coords["lng"] + random.uniform(-0.0015, 0.0015)
 
-            cap_lo, cap_hi = FACILITY_CAPACITY[ftype]
-            capacity = random.randint(cap_lo, cap_hi) if cap_hi > 0 else None
+                cap_lo, cap_hi = FACILITY_CAPACITY[ftype]
+                capacity = random.randint(cap_lo, cap_hi) if cap_hi > 0 else None
 
-            facility = Facility(
-                barangay_id=brgy.id,
-                name=name,
-                facility_type=ftype,
-                latitude=round(lat, 6),
-                longitude=round(lng, 6),
-                capacity=capacity,
-                address=f"{brgy.name}, San Pedro, Laguna",
-                is_active=random.random() > 0.05,  # ~5% under maintenance
-            )
-            db.add(facility)
-            facility_count += 1
+                facility = Facility(
+                    barangay_id=brgy.id,
+                    name=name,
+                    facility_type=ftype,
+                    latitude=round(lat, 6),
+                    longitude=round(lng, 6),
+                    capacity=capacity,
+                    address=f"{brgy.name}, San Pedro, Laguna",
+                    is_active=random.random() > 0.05,  # ~5% under maintenance
+                )
+                db.add(facility)
+                facility_count += 1
 
-db.commit()
-print(f"✓ {facility_count} critical facilities seeded (demonstration data)")
+    db.commit()
+    print(f"✓ {facility_count} critical facilities seeded (demonstration data — fallback)")
 
 # ─────────────────────────────────────────
 # 7. TEST USERS — one per role

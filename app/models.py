@@ -165,10 +165,28 @@ class Facility(Base):
     facility_type = Column(Enum(FacilityType), nullable=False)
     latitude = Column(Float, nullable=False)
     longitude = Column(Float, nullable=False)
-    capacity = Column(Integer)  # for evacuation centers
+    capacity = Column(Integer)  # legacy: kept for backward compatibility
     address = Column(String(255))
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, server_default=func.now())
+
+    # Week 5 — fields sourced from san_pedro_critical_facilities.xlsx.
+    # Capacity fields are String because the source file uses ranges
+    # (e.g. "40-80", "200-400") that cannot be coerced to Integer.
+    status = Column(String(30))                       # Permanent / Temporary / Under Construction
+    floor_area_sqm = Column(Float)
+    capacity_families = Column(String(30))
+    capacity_individuals = Column(String(30))
+    ereid_capacity_families = Column(String(30))
+    ereid_capacity_individuals = Column(String(30))
+    supports_tropical_cyclone = Column(Boolean, default=False)
+    supports_flooding = Column(Boolean, default=False)
+    supports_landslide = Column(Boolean, default=False)
+    supports_fire = Column(Boolean, default=False)
+    vulnerability_risk = Column(Text)
+    eo_moa_mou = Column(Text)
+    is_approximate_location = Column(Boolean, default=False)
+    is_city_level = Column(Boolean, default=False)
 
     # relationships
     barangay = relationship("Barangay", back_populates="facilities")

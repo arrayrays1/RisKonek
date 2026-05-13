@@ -17,6 +17,17 @@ instance/
 # Uploaded files / data lake local storage
 uploads/
 
+# Local seed/import data
+data/*.xlsx
+data/*.xls
+data/*.csv
+
+# Keep data folder structure, but exclude actual data files
+!data/.gitkeep
+
+# Claude/Cursor local files
+.claude/
+
 # Logs
 *.log
 
