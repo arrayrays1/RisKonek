@@ -8,7 +8,7 @@
 <div class="d-flex justify-content-between align-items-start page-header">
     <div>
         <h1>User Management</h1>
-        <p>Manage Admin, CFAU OIC, BDRRMO Chairperson, and CDRRMO Staff accounts</p>
+        <p>Manage CDRRMO Admin, CFAU / Operations Personnel, BDRRMO / Barangay Focal, and CDRRMO Logistics Staff accounts</p>
     </div>
     <a href="/admin/users/create" class="btn btn-rk">
         <i class="bi bi-plus-circle"></i> Create New User
@@ -52,13 +52,13 @@
                     <td>{{ u.email or '—' }}</td>
                     <td>
                         {% if u.role.value == 'admin' %}
-                            <span class="badge bg-danger">Admin</span>
+                            <span class="badge bg-danger">CDRRMO Admin</span>
                         {% elif u.role.value == 'cfau_oic' %}
-                            <span class="badge bg-warning text-dark">CFAU OIC</span>
+                            <span class="badge bg-warning text-dark">CFAU / Operations Personnel</span>
                         {% elif u.role.value == 'bdrrmo' %}
-                            <span class="badge bg-success">BDRRMO</span>
+                            <span class="badge bg-success">BDRRMO / Barangay Focal</span>
                         {% elif u.role.value == 'cdrrmo_staff' %}
-                            <span class="badge bg-primary">CDRRMO Staff</span>
+                            <span class="badge bg-primary">CDRRMO Logistics Staff</span>
                         {% endif %}
                     </td>
                     <td>{{ u.barangay.name if u.barangay else '—' }}</td>

@@ -60,7 +60,7 @@
             <div class="profile-header">
                 <h1>{{ barangay.name }}</h1>
                 <span class="risk-badge risk-{{ risk_level }}">
-                    {{ risk_level.title() }} Risk
+                    {{ risk_level.title() }} Planning Priority
                 </span>
             </div>
             <p class="text-muted mb-0" style="font-size:13px">
@@ -329,11 +329,11 @@
 
 </div>
 
-<!-- ── Footer: risk score breakdown ────────────────────────────── -->
+<!-- ── Footer: planning priority breakdown ─────────────────────── -->
 <div class="dash-card mt-4">
     <div class="card-title-row">
         <i class="bi bi-speedometer2" style="color:var(--rk-green)"></i>
-        <h6>Risk Score Breakdown</h6>
+        <h6>Planning Priority Breakdown</h6>
     </div>
     <div class="row g-3" style="font-size:13px">
         <div class="col-md-3">
@@ -352,6 +352,13 @@
             <div class="text-muted">Population Size (20%)</div>
             <div class="fw-semibold">{{ risk_breakdown['population_score'] }}</div>
         </div>
+    </div>
+    <div class="text-muted mt-3" style="font-size:11px">
+        <i class="bi bi-info-circle"></i>
+        This score is system-generated for planning support only and is not an
+        official hazard or risk classification. Official hazard and risk levels
+        are based on valid external sources (e.g. HazardHunter, CLUP / CDRA /
+        CIDRA maps, technical-agency data).
     </div>
 </div>
 {% endblock %}

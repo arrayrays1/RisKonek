@@ -13,7 +13,7 @@
 </nav>
 <div class="container mt-4">
     <h4>BDRRMO Dashboard</h4>
-    <p class="text-muted">Welcome, {{ user.username }} (BDRRMO Chairperson).</p>
+    <p class="text-muted">Welcome, {{ user.username }} (BDRRMO / Barangay Focal).</p>
     {% if barangay %}
     <div class="alert alert-info">
         You are assigned to <strong>Barangay {{ barangay.name }}</strong>.
@@ -21,9 +21,13 @@
     </div>
     {% else %}
     <div class="alert alert-warning">
-        No barangay is currently assigned to your account. Please contact the Admin.
+        No barangay is currently assigned to your account. Please contact the CDRRMO Admin.
     </div>
     {% endif %}
+    <p class="text-muted small">
+        Focus: barangay population data, critical facility data, barangay reports, and
+        hazard/incident history — scoped to your assigned or pilot barangay only.
+    </p>
 </div>
 </body>
 </html>

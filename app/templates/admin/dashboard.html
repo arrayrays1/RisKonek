@@ -201,7 +201,7 @@
         <div class="dash-card">
             <div class="card-title-row">
                 <i class="bi bi-map-fill" style="color:var(--rk-green)"></i>
-                <h6>Barangay Risk Map</h6>
+                <h6>Barangay-Level Hazard and Priority Map</h6>
                 <a href="/admin/map" class="ms-auto"
                    style="font-size:12px;color:var(--rk-green);text-decoration:none">
                     View Full Map <i class="bi bi-arrow-right"></i>
@@ -251,7 +251,13 @@
         <div class="dash-card">
             <div class="card-title-row">
                 <i class="bi bi-exclamation-triangle-fill text-danger"></i>
-                <h6>Top 5 Most At-Risk Barangays</h6>
+                <h6>Priority Barangays (Frequently Affected)</h6>
+            </div>
+
+            <div class="text-muted mb-2" style="font-size:11px">
+                <i class="bi bi-info-circle"></i>
+                This score is system-generated for planning support only and is
+                not an official hazard or risk classification.
             </div>
 
             {% for brgy in top5 %}
@@ -304,7 +310,7 @@
                     <tr>
                         <th>Barangay</th>
                         <th>Score</th>
-                        <th>Risk Level</th>
+                        <th>Planning Priority</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -437,8 +443,9 @@ markers.forEach(m => {
         .addTo(map)
         .bindPopup(`
             <strong>${m.name}</strong><br>
-            Risk Score: ${m.score}<br>
-            Level: <span style="color:${color};font-weight:600">${m.level.charAt(0).toUpperCase() + m.level.slice(1)}</span>
+            Planning Priority Score: ${m.score}<br>
+            Priority: <span style="color:${color};font-weight:600">${m.level.charAt(0).toUpperCase() + m.level.slice(1)}</span><br>
+            <span style="font-size:10px;color:#666">System-generated for planning support only; not an official hazard or risk classification.</span>
         `);
 });
 </script>

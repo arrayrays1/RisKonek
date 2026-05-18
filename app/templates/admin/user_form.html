@@ -74,13 +74,19 @@
                     <label class="form-label fw-medium">
                         Role <span class="text-danger">*</span>
                     </label>
+                    {% set role_display = {
+                        'admin': 'CDRRMO Admin',
+                        'cfau_oic': 'CFAU / Operations Personnel',
+                        'bdrrmo': 'BDRRMO / Barangay Focal',
+                        'cdrrmo_staff': 'CDRRMO Logistics Staff'
+                    } %}
                     <select name="role" class="form-select" required id="roleSelect"
                             onchange="toggleBarangayField()">
                         <option value="">-- Select role --</option>
                         {% for r in roles %}
                         <option value="{{ r }}"
                             {{ 'selected' if edit_mode and target_user.role.value == r else '' }}>
-                            {{ r.replace('_', ' ').title() }}
+                            {{ role_display.get(r, r.replace('_', ' ').title()) }}
                         </option>
                         {% endfor %}
                     </select>
@@ -98,7 +104,7 @@
                         </option>
                         {% endfor %}
                     </select>
-                    <div class="form-text">Required for BDRRMO Chairperson role.</div>
+                    <div class="form-text">Required for BDRRMO / Barangay Focal role.</div>
                 </div>
 
                 <div class="mb-4">

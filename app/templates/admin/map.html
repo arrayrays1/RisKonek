@@ -1,6 +1,6 @@
 {% extends "admin/base.html" %}
 
-{% block title %}GIS Risk Map — RisKonek{% endblock %}
+{% block title %}Hazard Reference & Facility Map — RisKonek{% endblock %}
 
 {% block head_extra %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
@@ -130,22 +130,23 @@
 {% block content %}
 <div class="page-header d-flex justify-content-between align-items-end">
     <div>
-        <h1><i class="bi bi-map-fill me-2"></i>GIS Risk Map</h1>
+        <h1><i class="bi bi-map-fill me-2"></i>Hazard Reference &amp; Facility Map</h1>
         <p>Critical facilities of San Pedro, Laguna — sourced from the CDRRMO master list.</p>
     </div>
     <div class="last-updated">San Pedro, Laguna</div>
 </div>
 
-<!-- <div class="hazard-notice">
+<div class="hazard-notice">
     <i class="bi bi-info-circle-fill"></i>
     <div>
-        <strong>Official hazard zone layers pending.</strong>
-        Flood, landslide, and ground-shaking polygons will be integrated once
-        valid GeoJSON / shapefile-derived layers are received from MGB, PHIVOLCS,
-        or CDRRMO. Until then, the map shows only facility points and the
-        per-facility risk notes recorded in the master list.
+        <strong>No official GeoJSON / shapefile hazard layers are currently available.</strong>
+        CDRRMO references hazard information from external sources such as HazardHunter,
+        available hazard maps, CLUP / CDRA / CIDRA maps, and other technical-agency data.
+        This map currently focuses on critical facilities and barangay-level hazard
+        references. Official hazard layers can be integrated later if valid GIS files
+        are provided.
     </div>
-</div> -->
+</div>
 
 <div class="stat-row">
     <div class="stat-pill">
@@ -343,7 +344,7 @@ function popupHtml(f) {
             ${row('EREID (families)',    f.ereid_capacity_families)}
             ${row('EREID (indiv.)',      f.ereid_capacity_individuals)}
             ${row('Supports',            incidents.join(', ') || null)}
-            ${row('Risk note',           f.vulnerability_risk)}
+            ${row('Hazard reference (master list)', f.vulnerability_risk)}
             ${row('EO / MOA / MOU',      f.eo_moa_mou)}
             ${row('Coordinates',         f.lat.toFixed(6) + ', ' + f.lng.toFixed(6))}
         </table>

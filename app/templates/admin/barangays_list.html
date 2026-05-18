@@ -25,7 +25,7 @@
         </div>
         <div class="col-md-3">
             <select name="risk" class="form-select">
-                <option value="">All Risk Levels</option>
+                <option value="">All Priority Levels</option>
                 {% for r in risk_levels %}
                 <option value="{{ r }}" {{ 'selected' if risk_filter == r else '' }}>
                     {{ r.title() }}
@@ -50,7 +50,7 @@
                     <th class="px-3 py-3">Barangay</th>
                     <th class="py-3 text-end">Population</th>
                     <th class="py-3 text-end">Vulnerable %</th>
-                    <th class="py-3">Risk Level</th>
+                    <th class="py-3">Planning Priority</th>
                     <th class="py-3 text-end px-3">Action</th>
                 </tr>
             </thead>
