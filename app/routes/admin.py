@@ -7,13 +7,16 @@ from app.database import get_db
 from app.models import (
     User, UserRole, Barangay, AuditLog, Incident,
     Resource, Equipment, Population, EquipmentStatus,
-    DisasterType, RiskLevel, Facility, FacilityType
+    DisasterType, RiskLevel, Facility, FacilityType,
+    UploadedReport, UploadHistory, UploadEvent,
+    ResourceCategory, EquipmentType, log_action,
 )
 from app.auth import require_role, hash_password
 from app.analytics.simulator import compute_risk_score
 from app.utils.geo import BARANGAY_COORDS
 from typing import Optional
 from datetime import date, datetime, timedelta, timezone
+from urllib.parse import urlencode
 import json
 
 router = APIRouter(prefix="/admin")
@@ -404,6 +407,215 @@ def toggle_user_status(user_id: int, request: Request, db: Session = Depends(get
 
 
 # ─────────────────────────────────────────────────────────────────────
+# AUDIT TRAIL MODULE — admin-only system activity log
+# Aggregates from AuditLog (the same source as the dashboard feed).
+# ─────────────────────────────────────────────────────────────────────
+
+AUDIT_CATEGORIES = [
+    "Authentication", "User Management", "Uploads", "Incident Reports",
+    "Barangay Data", "Resources", "Vehicle & Equipment", "System Actions",
+]
+
+_AUDIT_PER_PAGE = 25
+
+
+def _audit_category(action: str, target_table: str) -> str:
+    """Rule-based category for an audit entry, from its action + target
+    table. Explainable and future-proof for tables not yet logged."""
+    a = (action or "").lower()
+    t = (target_table or "").lower()
+    if t == "users":
+        return "Authentication" if a in ("login", "logout") else "User Management"
+    if t == "uploaded_reports":
+        return "Uploads"
+    if t in ("incidents", "incident_reports"):
+        return "Incident Reports"
+    if t in ("barangays", "populations", "facilities"):
+        return "Barangay Data"
+    if t == "resources":
+        return "Resources"
+    if t in ("equipment", "equipment_reports"):
+        return "Vehicle & Equipment"
+    return "System Actions"
+
+
+def _parse_audit_date(s):
+    if not s:
+        return None
+    try:
+        return datetime.strptime(s.strip(), "%Y-%m-%d")
+    except ValueError:
+        return None
+
+
+def _audit_day_label(dt) -> str:
+    """PHT date heading used to group the trail chronologically."""
+    if dt is None:
+        return "Unknown date"
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(_PHT).strftime("%B %d, %Y")
+
+
+@router.get("/audit", response_class=HTMLResponse)
+def audit_trail(
+    request: Request,
+    db: Session = Depends(get_db),
+    q: Optional[str] = None,
+    user_id: Optional[str] = None,
+    action: Optional[str] = None,
+    category: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    page: int = 1,
+):
+    user = require_role(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
+
+    # Empty form values arrive as "" (selects/inputs left blank). Treat them
+    # as None and coerce the numeric user filter safely — never parse "" as int.
+    uid = int(user_id) if (user_id or "").strip().isdigit() else None
+
+    query = db.query(AuditLog).outerjoin(User, AuditLog.user_id == User.id)
+
+    if uid:
+        query = query.filter(AuditLog.user_id == uid)
+    if action:
+        query = query.filter(AuditLog.action == action)
+    if q:
+        like = f"%{q.strip()}%"
+        query = query.filter(
+            (AuditLog.description.ilike(like)) | (User.username.ilike(like))
+        )
+    df = _parse_audit_date(date_from)
+    if df:
+        query = query.filter(AuditLog.timestamp >= df)
+    dt_to = _parse_audit_date(date_to)
+    if dt_to:
+        query = query.filter(AuditLog.timestamp < dt_to + timedelta(days=1))
+
+    query = query.order_by(AuditLog.timestamp.desc(), AuditLog.id.desc())
+    rows = query.all()
+
+    # Category is derived, so apply it in Python after the SQL filters.
+    if category and category in AUDIT_CATEGORIES:
+        rows = [r for r in rows if _audit_category(r.action, r.target_table) == category]
+
+    total = len(rows)
+    total_pages = max(1, (total + _AUDIT_PER_PAGE - 1) // _AUDIT_PER_PAGE)
+    page = max(1, min(page, total_pages))
+    start = (page - 1) * _AUDIT_PER_PAGE
+    page_rows = rows[start:start + _AUDIT_PER_PAGE]
+
+    # Build view items grouped by PHT day, preserving newest-first order.
+    grouped = []
+    current_label, current_items = None, None
+    for log in page_rows:
+        item = {
+            "id": log.id,
+            "timestamp": log.timestamp,
+            "username": log.user.username if log.user else "—",
+            "action": log.action,
+            "category": _audit_category(log.action, log.target_table),
+            "target_table": log.target_table,
+            "target_id": log.target_id,
+            "description": log.description,
+        }
+        label = _audit_day_label(log.timestamp)
+        if label != current_label:
+            current_label, current_items = label, []
+            grouped.append((label, current_items))
+        current_items.append(item)
+
+    actions = [a[0] for a in db.query(AuditLog.action).distinct().all() if a[0]]
+    users = db.query(User).order_by(User.username).all()
+    focus_user = db.query(User).filter(User.id == uid).first() if uid else None
+
+    # Query string (filters minus page) for building pagination links.
+    filter_params = {
+        k: v for k, v in {
+            "q": q or "", "user_id": uid or "", "action": action or "",
+            "category": category or "", "date_from": date_from or "",
+            "date_to": date_to or "",
+        }.items() if v not in ("", None)
+    }
+    base_query = urlencode(filter_params)
+
+    return templates.TemplateResponse(
+        request=request,
+        name="admin/audit_list.html",
+        context={
+            "user": user,
+            "active_nav": "audit",
+            "grouped": grouped,
+            "total": total,
+            "page": page,
+            "total_pages": total_pages,
+            "per_page": _AUDIT_PER_PAGE,
+            "categories": AUDIT_CATEGORIES,
+            "actions": sorted(actions),
+            "users": users,
+            "focus_user": focus_user,
+            "base_query": base_query,
+            # Echo current filters back into the form.
+            "f_q": q or "",
+            "f_user_id": uid or "",
+            "f_action": action or "",
+            "f_category": category or "",
+            "f_date_from": date_from or "",
+            "f_date_to": date_to or "",
+        },
+    )
+
+
+@router.get("/audit/{log_id}", response_class=HTMLResponse)
+def audit_detail(log_id: int, request: Request, db: Session = Depends(get_db)):
+    user = require_role(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
+
+    log = db.query(AuditLog).filter(AuditLog.id == log_id).first()
+    if not log:
+        return RedirectResponse(url="/admin/audit", status_code=302)
+
+    actor = db.query(User).filter(User.id == log.user_id).first()
+    category = _audit_category(log.action, log.target_table)
+
+    # Surface before/after diffs + a link when the entry targets an upload.
+    related_upload = None
+    upload_changes = []
+    if log.target_table == "uploaded_reports" and log.target_id:
+        related_upload = db.query(UploadedReport).filter(
+            UploadedReport.id == log.target_id
+        ).first()
+        if related_upload:
+            upload_changes = (
+                db.query(UploadHistory)
+                .filter(
+                    UploadHistory.report_id == related_upload.id,
+                    UploadHistory.event_type == UploadEvent.edited,
+                )
+                .order_by(UploadHistory.timestamp.desc(), UploadHistory.id.desc())
+                .all()
+            )
+
+    return templates.TemplateResponse(
+        request=request,
+        name="admin/audit_detail.html",
+        context={
+            "user": user,
+            "active_nav": "audit",
+            "log": log,
+            "actor": actor,
+            "category": category,
+            "related_upload": related_upload,
+            "upload_changes": upload_changes,
+        },
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────
 # BARANGAY FIELD DATA — list + profile
 # TR-ADM-22, TR-ADM-23
 # ─────────────────────────────────────────────────────────────────────
@@ -654,3 +866,742 @@ def facilities_map_data(request: Request, db: Session = Depends(get_db)):
         })
 
     return JSONResponse(payload)
+
+
+# ─────────────────────────────────────────────────────────────────────
+# WEEK 7 — RESOURCE GOODS INVENTORY (Module A)
+# Roles: admin, cdrrmo_staff
+# Tracks consumable disaster-response resources (food packs, water,
+# medicine, hygiene kits, blankets, tarpaulins, sleeping kits, …).
+# ─────────────────────────────────────────────────────────────────────
+
+RESOURCE_ROLES = ["admin", "cdrrmo_staff"]
+EQUIPMENT_ROLES = ["admin", "cdrrmo_staff", "cfau_oic"]
+
+_NEAR_EXPIRY_DAYS = 30
+
+
+def _resource_alert(r: Resource) -> str:
+    """Rule-based alert tier for a resource. Order matters: expired
+    beats near-expiry, and stock alerts are reported alongside expiry.
+    Returns one of: 'expired', 'near_expiry', 'low_stock', 'ok'.
+    """
+    today = date.today()
+    if r.is_perishable and r.expiry_date:
+        if r.expiry_date < today:
+            return "expired"
+        if r.expiry_date <= today + timedelta(days=_NEAR_EXPIRY_DAYS):
+            return "near_expiry"
+    if (r.quantity or 0) <= (r.restock_threshold or 0):
+        return "low_stock"
+    return "ok"
+
+
+def _resource_summary(resources):
+    """Counts for the dashboard cards at the top of the list page."""
+    total = len(resources)
+    low = sum(1 for r in resources if _resource_alert(r) == "low_stock")
+    near = sum(1 for r in resources if _resource_alert(r) == "near_expiry")
+    exp = sum(1 for r in resources if _resource_alert(r) == "expired")
+    return {"total": total, "low_stock": low, "near_expiry": near, "expired": exp}
+
+
+@router.get("/resources", response_class=HTMLResponse)
+def resources_list(
+    request: Request,
+    db: Session = Depends(get_db),
+    q: Optional[str] = None,
+    category: Optional[str] = None,
+    alert: Optional[str] = None,
+    archived: Optional[str] = None,
+):
+    user = require_role(request, RESOURCE_ROLES)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    query = db.query(Resource)
+    show_archived = (archived == "1")
+    query = query.filter(Resource.is_archived == show_archived)
+
+    if q:
+        like = f"%{q.strip()}%"
+        query = query.filter(
+            (Resource.name.ilike(like)) | (Resource.storage_location.ilike(like))
+        )
+    if category and category in {c.value for c in ResourceCategory}:
+        query = query.filter(Resource.category == ResourceCategory(category))
+
+    rows = query.order_by(Resource.name).all()
+
+    # Alert filter is derived, so apply after SQL filtering.
+    if alert in ("low_stock", "near_expiry", "expired"):
+        rows = [r for r in rows if _resource_alert(r) == alert]
+
+    # Summary cards always reflect the full *active* inventory, not the
+    # filtered view — so users see the real backlog of issues.
+    active_inventory = db.query(Resource).filter(Resource.is_archived == False).all()
+    summary = _resource_summary(active_inventory)
+
+    view_rows = []
+    for r in rows:
+        view_rows.append({
+            "id": r.id,
+            "name": r.name,
+            "category": r.category.value if r.category else "",
+            "category_label": r.category.value.title() if r.category else "—",
+            "is_perishable": r.is_perishable,
+            "quantity": r.quantity or 0,
+            "unit": r.unit or "",
+            "storage_location": r.storage_location or "—",
+            "restock_threshold": r.restock_threshold or 0,
+            "expiry_date": r.expiry_date,
+            "is_archived": r.is_archived,
+            "alert": _resource_alert(r),
+            "last_updated": r.last_updated,
+        })
+
+    return templates.TemplateResponse(
+        request=request,
+        name="admin/resources_list.html",
+        context={
+            "user": user,
+            "active_nav": "resources",
+            "rows": view_rows,
+            "summary": summary,
+            "categories": [c.value for c in ResourceCategory],
+            "f_q": q or "",
+            "f_category": category or "",
+            "f_alert": alert or "",
+            "f_archived": "1" if show_archived else "",
+            "show_archived": show_archived,
+        },
+    )
+
+
+@router.get("/resources/new", response_class=HTMLResponse)
+def resource_new_form(request: Request, db: Session = Depends(get_db)):
+    user = require_role(request, RESOURCE_ROLES)
+    if isinstance(user, RedirectResponse):
+        return user
+    return templates.TemplateResponse(
+        request=request,
+        name="admin/resource_form.html",
+        context={
+            "user": user,
+            "active_nav": "resources",
+            "edit_mode": False,
+            "target": None,
+            "categories": [c.value for c in ResourceCategory],
+            "error": None,
+        },
+    )
+
+
+def _parse_date_or_none(s: Optional[str]):
+    if not s:
+        return None
+    try:
+        return datetime.strptime(s.strip(), "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+
+@router.post("/resources/new")
+def resource_create(
+    request: Request,
+    db: Session = Depends(get_db),
+    name: str = Form(...),
+    category: str = Form(...),
+    is_perishable: Optional[str] = Form(None),
+    quantity: int = Form(0),
+    unit: str = Form(""),
+    storage_location: str = Form(""),
+    restock_threshold: int = Form(0),
+    expiry_date: str = Form(""),
+):
+    user = require_role(request, RESOURCE_ROLES)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    def render_error(msg):
+        return templates.TemplateResponse(
+            request=request,
+            name="admin/resource_form.html",
+            context={
+                "user": user,
+                "active_nav": "resources",
+                "edit_mode": False,
+                "target": None,
+                "categories": [c.value for c in ResourceCategory],
+                "error": msg,
+            },
+        )
+
+    name = name.strip()
+    if not name:
+        return render_error("Resource name is required.")
+    if category not in {c.value for c in ResourceCategory}:
+        return render_error("Invalid category.")
+
+    perish = bool(is_perishable)
+    exp = _parse_date_or_none(expiry_date) if perish else None
+
+    r = Resource(
+        name=name,
+        category=ResourceCategory(category),
+        is_perishable=perish,
+        quantity=max(0, quantity or 0),
+        unit=unit.strip() or None,
+        storage_location=storage_location.strip() or None,
+        restock_threshold=max(0, restock_threshold or 0),
+        expiry_date=exp,
+        is_archived=False,
+        updated_by=user["id"],
+    )
+    db.add(r)
+    db.commit()
+    db.refresh(r)
+
+    log_action(
+        db, user["id"], "created", "resources", r.id,
+        f"Created resource '{r.name}' ({r.category.value}, qty={r.quantity} {r.unit or ''})".strip(),
+    )
+
+    return RedirectResponse(
+        url="/admin/resources?success=Resource+created+successfully",
+        status_code=302,
+    )
+
+
+@router.get("/resources/{resource_id}/edit", response_class=HTMLResponse)
+def resource_edit_form(resource_id: int, request: Request, db: Session = Depends(get_db)):
+    user = require_role(request, RESOURCE_ROLES)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    r = db.query(Resource).filter(Resource.id == resource_id).first()
+    if not r:
+        return RedirectResponse(url="/admin/resources", status_code=302)
+
+    return templates.TemplateResponse(
+        request=request,
+        name="admin/resource_form.html",
+        context={
+            "user": user,
+            "active_nav": "resources",
+            "edit_mode": True,
+            "target": r,
+            "categories": [c.value for c in ResourceCategory],
+            "error": None,
+        },
+    )
+
+
+@router.post("/resources/{resource_id}/edit")
+def resource_edit(
+    resource_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    name: str = Form(...),
+    category: str = Form(...),
+    is_perishable: Optional[str] = Form(None),
+    unit: str = Form(""),
+    storage_location: str = Form(""),
+    restock_threshold: int = Form(0),
+    expiry_date: str = Form(""),
+):
+    user = require_role(request, RESOURCE_ROLES)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    r = db.query(Resource).filter(Resource.id == resource_id).first()
+    if not r:
+        return RedirectResponse(url="/admin/resources", status_code=302)
+
+    # Quantity is intentionally not editable here — use Add/Deduct Stock so
+    # every quantity change is auditable with before/after numbers.
+    changes = []
+    new_name = name.strip()
+    if new_name and new_name != r.name:
+        changes.append(f"name: '{r.name}' → '{new_name}'")
+        r.name = new_name
+
+    if category in {c.value for c in ResourceCategory} and r.category.value != category:
+        changes.append(f"category: {r.category.value} → {category}")
+        r.category = ResourceCategory(category)
+
+    perish = bool(is_perishable)
+    if perish != bool(r.is_perishable):
+        changes.append(f"is_perishable: {bool(r.is_perishable)} → {perish}")
+        r.is_perishable = perish
+
+    new_unit = unit.strip() or None
+    if new_unit != r.unit:
+        changes.append(f"unit: '{r.unit or ''}' → '{new_unit or ''}'")
+        r.unit = new_unit
+
+    new_loc = storage_location.strip() or None
+    if new_loc != r.storage_location:
+        changes.append(f"storage_location: '{r.storage_location or ''}' → '{new_loc or ''}'")
+        r.storage_location = new_loc
+
+    new_thr = max(0, restock_threshold or 0)
+    if new_thr != (r.restock_threshold or 0):
+        changes.append(f"restock_threshold: {r.restock_threshold or 0} → {new_thr}")
+        r.restock_threshold = new_thr
+
+    new_exp = _parse_date_or_none(expiry_date) if perish else None
+    if new_exp != r.expiry_date:
+        changes.append(f"expiry_date: {r.expiry_date} → {new_exp}")
+        r.expiry_date = new_exp
+
+    r.updated_by = user["id"]
+    db.commit()
+
+    if changes:
+        log_action(
+            db, user["id"], "updated", "resources", r.id,
+            f"Updated resource '{r.name}': " + "; ".join(changes),
+        )
+
+    return RedirectResponse(
+        url="/admin/resources?success=Resource+updated+successfully",
+        status_code=302,
+    )
+
+
+@router.post("/resources/{resource_id}/stock")
+def resource_stock_change(
+    resource_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    action: str = Form(...),       # "add" or "deduct"
+    amount: int = Form(...),
+    reason: str = Form(""),
+):
+    user = require_role(request, RESOURCE_ROLES)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    r = db.query(Resource).filter(Resource.id == resource_id).first()
+    if not r:
+        return RedirectResponse(url="/admin/resources", status_code=302)
+
+    if action not in ("add", "deduct"):
+        return RedirectResponse(
+            url="/admin/resources?error=Invalid+stock+action", status_code=302
+        )
+    if not amount or amount <= 0:
+        return RedirectResponse(
+            url=f"/admin/resources/{resource_id}/edit?error=Amount+must+be+positive",
+            status_code=302,
+        )
+
+    before = r.quantity or 0
+    if action == "add":
+        after = before + amount
+        verb = "stock_added"
+    else:
+        if amount > before:
+            return RedirectResponse(
+                url=f"/admin/resources/{resource_id}/edit?error=Cannot+deduct+more+than+current+stock",
+                status_code=302,
+            )
+        after = before - amount
+        verb = "stock_deducted"
+
+    r.quantity = after
+    r.updated_by = user["id"]
+    db.commit()
+
+    note = f" — reason: {reason.strip()}" if reason.strip() else ""
+    log_action(
+        db, user["id"], verb, "resources", r.id,
+        f"Resource '{r.name}' quantity {before} → {after} ({'+' if action == 'add' else '-'}{amount} {r.unit or ''}){note}",
+    )
+
+    return RedirectResponse(
+        url=f"/admin/resources?success=Stock+{'added' if action == 'add' else 'deducted'}+successfully",
+        status_code=302,
+    )
+
+
+@router.post("/resources/{resource_id}/archive")
+def resource_archive_toggle(
+    resource_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    user = require_role(request, RESOURCE_ROLES)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    r = db.query(Resource).filter(Resource.id == resource_id).first()
+    if not r:
+        return RedirectResponse(url="/admin/resources", status_code=302)
+
+    r.is_archived = not bool(r.is_archived)
+    r.updated_by = user["id"]
+    db.commit()
+
+    verb = "archived" if r.is_archived else "restored"
+    log_action(
+        db, user["id"], verb, "resources", r.id,
+        f"Resource '{r.name}' {verb}.",
+    )
+
+    url = (
+        f"/admin/resources?archived=1&success=Resource+{verb}"
+        if r.is_archived
+        else f"/admin/resources?success=Resource+{verb}"
+    )
+    return RedirectResponse(url=url, status_code=302)
+
+
+# ─────────────────────────────────────────────────────────────────────
+# WEEK 7 — VEHICLE & EQUIPMENT MONITORING (Module B)
+# Roles: admin, cdrrmo_staff, cfau_oic
+# Tracks operational disaster-response equipment.
+# ─────────────────────────────────────────────────────────────────────
+
+# Client-aligned status labels for the UI (maps enum value → display).
+EQUIPMENT_STATUS_LABELS = {
+    "available": "Available",
+    "deployed": "Deployed",
+    "under_repair": "Under Repair",
+    "unserviceable": "Unserviceable",
+    # Legacy values — mapped to the closest client term so old rows still
+    # display sensibly without us mutating data.
+    "serviceable": "Available (legacy)",
+    "not_serviceable": "Unserviceable (legacy)",
+}
+
+# Statuses exposed in the *change-status* dropdown. Legacy values are
+# intentionally omitted to steer users onto client-aligned terms.
+EQUIPMENT_STATUS_CHOICES = ["available", "deployed", "under_repair", "unserviceable"]
+
+EQUIPMENT_TYPE_LABELS = {
+    "fire_truck": "Fire Truck",
+    "ambulance": "Ambulance",
+    "rescue_vehicle": "Rescue Vehicle",
+    "generator": "Generator",
+    "chainsaw": "Chainsaw",
+    "rescue_boat": "Rescue Boat",
+    "radio": "Radio",
+    "flashlight": "Flashlight",
+    "life_vest": "Life Vest",
+    "other": "Other",
+}
+
+
+@router.get("/equipment", response_class=HTMLResponse)
+def equipment_list(
+    request: Request,
+    db: Session = Depends(get_db),
+    q: Optional[str] = None,
+    equipment_type: Optional[str] = None,
+    status: Optional[str] = None,
+    archived: Optional[str] = None,
+):
+    user = require_role(request, EQUIPMENT_ROLES)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    query = db.query(Equipment)
+    show_archived = (archived == "1")
+    query = query.filter(Equipment.is_archived == show_archived)
+
+    if q:
+        like = f"%{q.strip()}%"
+        query = query.filter(
+            (Equipment.name.ilike(like)) | (Equipment.plate_or_serial.ilike(like))
+        )
+    if equipment_type and equipment_type in {t.value for t in EquipmentType}:
+        query = query.filter(Equipment.equipment_type == EquipmentType(equipment_type))
+    if status and status in {s.value for s in EquipmentStatus}:
+        query = query.filter(Equipment.status == EquipmentStatus(status))
+
+    rows = query.order_by(Equipment.name).all()
+
+    view_rows = []
+    for e in rows:
+        view_rows.append({
+            "id": e.id,
+            "name": e.name,
+            "type_value": e.equipment_type.value if e.equipment_type else "",
+            "type_label": EQUIPMENT_TYPE_LABELS.get(
+                e.equipment_type.value if e.equipment_type else "", "—"
+            ),
+            "status_value": e.status.value if e.status else "",
+            "status_label": EQUIPMENT_STATUS_LABELS.get(
+                e.status.value if e.status else "", "—"
+            ),
+            "plate_or_serial": e.plate_or_serial or "—",
+            "assigned": e.assigned_to_user.username if e.assigned_to_user else "—",
+            "last_inspected": e.last_inspected,
+            "is_archived": e.is_archived,
+        })
+
+    # Summary cards for at-a-glance fleet readiness.
+    active = db.query(Equipment).filter(Equipment.is_archived == False).all()
+    summary = {
+        "total": len(active),
+        "available": sum(
+            1 for x in active
+            if x.status and x.status.value in ("available", "serviceable")
+        ),
+        "deployed": sum(1 for x in active if x.status and x.status.value == "deployed"),
+        "under_repair": sum(1 for x in active if x.status and x.status.value == "under_repair"),
+        "unserviceable": sum(
+            1 for x in active
+            if x.status and x.status.value in ("unserviceable", "not_serviceable")
+        ),
+    }
+
+    return templates.TemplateResponse(
+        request=request,
+        name="admin/equipment_list.html",
+        context={
+            "user": user,
+            "active_nav": "equipment",
+            "rows": view_rows,
+            "summary": summary,
+            "types": [(t.value, EQUIPMENT_TYPE_LABELS.get(t.value, t.value.title()))
+                      for t in EquipmentType],
+            "statuses": [(s.value, EQUIPMENT_STATUS_LABELS.get(s.value, s.value.title()))
+                         for s in EquipmentStatus],
+            "status_choices": [(v, EQUIPMENT_STATUS_LABELS[v]) for v in EQUIPMENT_STATUS_CHOICES],
+            "f_q": q or "",
+            "f_type": equipment_type or "",
+            "f_status": status or "",
+            "f_archived": "1" if show_archived else "",
+            "show_archived": show_archived,
+        },
+    )
+
+
+@router.get("/equipment/new", response_class=HTMLResponse)
+def equipment_new_form(request: Request, db: Session = Depends(get_db)):
+    user = require_role(request, EQUIPMENT_ROLES)
+    if isinstance(user, RedirectResponse):
+        return user
+    return templates.TemplateResponse(
+        request=request,
+        name="admin/equipment_form.html",
+        context={
+            "user": user,
+            "active_nav": "equipment",
+            "edit_mode": False,
+            "target": None,
+            "types": [(t.value, EQUIPMENT_TYPE_LABELS.get(t.value, t.value.title()))
+                      for t in EquipmentType],
+            "status_choices": [(v, EQUIPMENT_STATUS_LABELS[v]) for v in EQUIPMENT_STATUS_CHOICES],
+            "error": None,
+        },
+    )
+
+
+@router.post("/equipment/new")
+def equipment_create(
+    request: Request,
+    db: Session = Depends(get_db),
+    name: str = Form(...),
+    equipment_type: str = Form(...),
+    status: str = Form("available"),
+    plate_or_serial: str = Form(""),
+    last_inspected: str = Form(""),
+):
+    user = require_role(request, EQUIPMENT_ROLES)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    def render_error(msg):
+        return templates.TemplateResponse(
+            request=request,
+            name="admin/equipment_form.html",
+            context={
+                "user": user,
+                "active_nav": "equipment",
+                "edit_mode": False,
+                "target": None,
+                "types": [(t.value, EQUIPMENT_TYPE_LABELS.get(t.value, t.value.title()))
+                          for t in EquipmentType],
+                "status_choices": [(v, EQUIPMENT_STATUS_LABELS[v]) for v in EQUIPMENT_STATUS_CHOICES],
+                "error": msg,
+            },
+        )
+
+    name = name.strip()
+    if not name:
+        return render_error("Equipment name is required.")
+    if equipment_type not in {t.value for t in EquipmentType}:
+        return render_error("Invalid equipment type.")
+    if status not in {s.value for s in EquipmentStatus}:
+        status = "available"
+
+    e = Equipment(
+        name=name,
+        equipment_type=EquipmentType(equipment_type),
+        status=EquipmentStatus(status),
+        plate_or_serial=plate_or_serial.strip() or None,
+        last_inspected=_parse_date_or_none(last_inspected),
+        is_archived=False,
+    )
+    db.add(e)
+    db.commit()
+    db.refresh(e)
+
+    log_action(
+        db, user["id"], "created", "equipment", e.id,
+        f"Created equipment '{e.name}' ({e.equipment_type.value}, status={e.status.value})",
+    )
+
+    return RedirectResponse(
+        url="/admin/equipment?success=Equipment+created+successfully",
+        status_code=302,
+    )
+
+
+@router.get("/equipment/{equipment_id}/edit", response_class=HTMLResponse)
+def equipment_edit_form(equipment_id: int, request: Request, db: Session = Depends(get_db)):
+    user = require_role(request, EQUIPMENT_ROLES)
+    if isinstance(user, RedirectResponse):
+        return user
+    e = db.query(Equipment).filter(Equipment.id == equipment_id).first()
+    if not e:
+        return RedirectResponse(url="/admin/equipment", status_code=302)
+    return templates.TemplateResponse(
+        request=request,
+        name="admin/equipment_form.html",
+        context={
+            "user": user,
+            "active_nav": "equipment",
+            "edit_mode": True,
+            "target": e,
+            "types": [(t.value, EQUIPMENT_TYPE_LABELS.get(t.value, t.value.title()))
+                      for t in EquipmentType],
+            "status_choices": [(v, EQUIPMENT_STATUS_LABELS[v]) for v in EQUIPMENT_STATUS_CHOICES],
+            "error": None,
+        },
+    )
+
+
+@router.post("/equipment/{equipment_id}/edit")
+def equipment_edit(
+    equipment_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    name: str = Form(...),
+    equipment_type: str = Form(...),
+    plate_or_serial: str = Form(""),
+    last_inspected: str = Form(""),
+):
+    user = require_role(request, EQUIPMENT_ROLES)
+    if isinstance(user, RedirectResponse):
+        return user
+    e = db.query(Equipment).filter(Equipment.id == equipment_id).first()
+    if not e:
+        return RedirectResponse(url="/admin/equipment", status_code=302)
+
+    # Status is changed via the dedicated status-change action so the
+    # audit log captures it as a status transition, not a generic edit.
+    changes = []
+    new_name = name.strip()
+    if new_name and new_name != e.name:
+        changes.append(f"name: '{e.name}' → '{new_name}'")
+        e.name = new_name
+
+    if equipment_type in {t.value for t in EquipmentType} and e.equipment_type.value != equipment_type:
+        changes.append(f"type: {e.equipment_type.value} → {equipment_type}")
+        e.equipment_type = EquipmentType(equipment_type)
+
+    new_ps = plate_or_serial.strip() or None
+    if new_ps != e.plate_or_serial:
+        changes.append(f"plate_or_serial: '{e.plate_or_serial or ''}' → '{new_ps or ''}'")
+        e.plate_or_serial = new_ps
+
+    new_insp = _parse_date_or_none(last_inspected)
+    if new_insp != e.last_inspected:
+        changes.append(f"last_inspected: {e.last_inspected} → {new_insp}")
+        e.last_inspected = new_insp
+
+    db.commit()
+
+    if changes:
+        log_action(
+            db, user["id"], "updated", "equipment", e.id,
+            f"Updated equipment '{e.name}': " + "; ".join(changes),
+        )
+
+    return RedirectResponse(
+        url="/admin/equipment?success=Equipment+updated+successfully",
+        status_code=302,
+    )
+
+
+@router.post("/equipment/{equipment_id}/status")
+def equipment_status_change(
+    equipment_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    status: str = Form(...),
+    reason: str = Form(""),
+):
+    user = require_role(request, EQUIPMENT_ROLES)
+    if isinstance(user, RedirectResponse):
+        return user
+    e = db.query(Equipment).filter(Equipment.id == equipment_id).first()
+    if not e:
+        return RedirectResponse(url="/admin/equipment", status_code=302)
+
+    if status not in EQUIPMENT_STATUS_CHOICES:
+        return RedirectResponse(
+            url="/admin/equipment?error=Invalid+status", status_code=302
+        )
+
+    old = e.status.value if e.status else "—"
+    if status == old:
+        return RedirectResponse(
+            url="/admin/equipment?success=Status+unchanged", status_code=302
+        )
+
+    e.status = EquipmentStatus(status)
+    db.commit()
+
+    note = f" — reason: {reason.strip()}" if reason.strip() else ""
+    log_action(
+        db, user["id"], "status_changed", "equipment", e.id,
+        f"Equipment '{e.name}' status {old} → {status}{note}",
+    )
+
+    return RedirectResponse(
+        url="/admin/equipment?success=Status+updated+successfully",
+        status_code=302,
+    )
+
+
+@router.post("/equipment/{equipment_id}/archive")
+def equipment_archive_toggle(
+    equipment_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    user = require_role(request, EQUIPMENT_ROLES)
+    if isinstance(user, RedirectResponse):
+        return user
+    e = db.query(Equipment).filter(Equipment.id == equipment_id).first()
+    if not e:
+        return RedirectResponse(url="/admin/equipment", status_code=302)
+
+    e.is_archived = not bool(e.is_archived)
+    db.commit()
+
+    verb = "archived" if e.is_archived else "restored"
+    log_action(
+        db, user["id"], verb, "equipment", e.id,
+        f"Equipment '{e.name}' {verb}.",
+    )
+
+    url = "/admin/equipment?archived=1&success=" + verb.title() if e.is_archived \
+        else "/admin/equipment?success=" + verb.title()
+    return RedirectResponse(url=url, status_code=302)

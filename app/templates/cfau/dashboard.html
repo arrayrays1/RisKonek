@@ -1,23 +1,49 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>CFAU / Operations Personnel Dashboard — RisKonek</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body>
-<nav class="navbar navbar-dark bg-danger px-4">
-    <span class="navbar-brand fw-bold">RisKonek — CFAU</span>
-    <span class="text-white me-3">{{ user.username }}</span>
-    <a href="/logout" class="btn btn-outline-light btn-sm">Logout</a>
-</nav>
-<div class="container mt-4">
-    <h4>CFAU / Operations Personnel Dashboard</h4>
-    <p class="text-muted">
-        Welcome, {{ user.username }}. Focus: shared access to the Vehicle &amp; Equipment Module
-        together with CDRRMO Logistics Staff (vehicles, generators, chainsaws, flashlights,
-        rescue tools, boats, ambulances, and other operational equipment), plus post-incident reports.
-    </p>
+{% extends "admin/base.html" %}
+
+{% block title %}CFAU / Operations — RisKonek{% endblock %}
+
+{% set active_nav = 'cfau_dashboard' %}
+
+{% block content %}
+<div class="page-header">
+    <h1>CFAU / Operations Dashboard</h1>
+    <p>Welcome, {{ user.username }}. You share the Vehicle &amp; Equipment module with CDRRMO Logistics Staff.</p>
 </div>
-</body>
-</html>
+
+<div class="row g-3">
+    <div class="col-md-8">
+        <div class="dash-card h-100">
+            <div class="card-title-row">
+                <i class="bi bi-wrench-adjustable" style="color:var(--rk-green);font-size:18px"></i>
+                <h6>Vehicle &amp; Equipment Monitoring</h6>
+            </div>
+            <p class="text-muted small mb-3">
+                Operational disaster-response equipment: rescue trucks, ambulances, rescue boats,
+                generators, chainsaws, radios, flashlights, and life vests. Change unit status to
+                Available, Deployed, Under Repair, or Unserviceable — every change is audited.
+            </p>
+            <div class="d-flex gap-2">
+                <a href="/admin/equipment" class="btn btn-rk">
+                    <i class="bi bi-list-ul"></i> Open Equipment Monitoring
+                </a>
+                <a href="/admin/equipment/new" class="btn btn-outline-secondary">
+                    <i class="bi bi-plus-lg"></i> Add Equipment
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="dash-card h-100">
+            <div class="card-title-row">
+                <i class="bi bi-info-circle-fill" style="color:var(--rk-muted);font-size:18px"></i>
+                <h6>Access Notice</h6>
+            </div>
+            <p class="text-muted small mb-0">
+                Resource Goods Inventory is managed by CDRRMO Logistics Staff and is not part of your
+                module. Post-incident reports will be added in a later sprint.
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,74 @@
+{% extends "admin/base.html" %}
+
+{% block title %}{{ 'Edit' if edit_mode else 'Add' }} Equipment — RisKonek{% endblock %}
+
+{% set active_nav = 'equipment' %}
+
+{% block content %}
+<div class="page-header">
+    <h1>{{ 'Edit Equipment' if edit_mode else 'Add Equipment' }}</h1>
+    <p>{{ 'Update equipment details. Use Status from the list view to log status changes individually.' if edit_mode else 'Register a new equipment unit. Status defaults to Available.' }}</p>
+</div>
+
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+
+<div class="dash-card">
+    <form method="POST"
+          action="{{ '/admin/equipment/' ~ target.id ~ '/edit' if edit_mode else '/admin/equipment/new' }}"
+          class="row g-3">
+
+        <div class="col-md-8">
+            <label class="form-label small fw-semibold">Equipment Name *</label>
+            <input type="text" name="name" required class="form-control"
+                   value="{{ target.name if target else '' }}"
+                   placeholder="e.g. Rescue Truck 02">
+        </div>
+
+        <div class="col-md-4">
+            <label class="form-label small fw-semibold">Type *</label>
+            <select name="equipment_type" required class="form-select">
+                {% for v, label in types %}
+                <option value="{{ v }}"
+                  {% if target and target.equipment_type.value == v %}selected{% endif %}>
+                    {{ label }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        {% if not edit_mode %}
+        <div class="col-md-4">
+            <label class="form-label small fw-semibold">Initial Status</label>
+            <select name="status" class="form-select">
+                {% for v, label in status_choices %}
+                <option value="{{ v }}" {% if v == 'available' %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+            <div class="form-text small">After creation, status changes go through the dedicated action so they are audited.</div>
+        </div>
+        {% endif %}
+
+        <div class="col-md-4">
+            <label class="form-label small fw-semibold">Plate / Serial Number</label>
+            <input type="text" name="plate_or_serial" class="form-control"
+                   value="{{ target.plate_or_serial if target else '' }}"
+                   placeholder="e.g. SAA-1234 or SN-EQUIP-001">
+        </div>
+
+        <div class="col-md-4">
+            <label class="form-label small fw-semibold">Last Inspected</label>
+            <input type="date" name="last_inspected" class="form-control"
+                   value="{{ target.last_inspected.strftime('%Y-%m-%d') if (target and target.last_inspected) else '' }}">
+        </div>
+
+        <div class="col-12 d-flex justify-content-end gap-2 pt-2">
+            <a href="/admin/equipment" class="btn btn-outline-secondary">Cancel</a>
+            <button type="submit" class="btn btn-rk">
+                <i class="bi bi-check2"></i> {{ 'Save Changes' if edit_mode else 'Create Equipment' }}
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

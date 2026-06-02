@@ -1,0 +1,779 @@
+"""Week 6 — Admin Data Upload & ETL Pipeline (Bronze → Silver → Gold).
+
+Bronze: raw uploaded file saved unchanged under uploads/incident_reports/.
+Silver: extracted text/rows + rule-based structured fields cached in
+        UploadedReport.extracted_data JSON, shown on the review screen.
+Gold:   only after Admin clicks Confirm Save — validated rows become
+        Incident records and UploadedReport.status = confirmed.
+
+Re-process, BDRRMO upload access, CFAU post-incident, OCR, and the
+disaster simulator are intentionally out of scope for Week 6.
+"""
+
+from fastapi import APIRouter, Request, Depends, UploadFile, File, Form
+from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
+from fastapi.templating import Jinja2Templates
+from sqlalchemy.orm import Session
+from typing import Optional, List
+from datetime import datetime, date, timezone, timedelta
+import os
+import re
+import uuid
+import json
+
+from app.database import get_db
+from app.auth import require_role
+from app.models import (
+    UploadedReport, UploadHistory, ReportStatus, FileType,
+    LifecycleStatus, UploadEvent,
+    Incident, DisasterType, Barangay, log_action, add_upload_history,
+)
+from app.etl.extract_pdf import extract_pdf
+from app.etl.extract_excel import extract_excel, extract_csv
+from app.etl.structure import (
+    structure_rows, structure_row, empty_field_row,
+)
+from app.etl.ai_pipeline import summarize as ai_summarize, is_available as ai_available
+
+
+router = APIRouter(prefix="/admin/uploads")
+templates = Jinja2Templates(directory="app/templates")
+
+_PHT = timezone(timedelta(hours=8))
+
+
+def _to_pht(dt):
+    if dt is None:
+        return ""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(_PHT).strftime("%b %d, %Y %I:%M %p")
+
+
+templates.env.filters["pht"] = _to_pht
+
+
+# ─────────────────────────────────────────────────────────────────────
+# File-type handling (Bronze layer)
+# ─────────────────────────────────────────────────────────────────────
+
+ALLOWED_EXTS = {
+    ".pdf":  FileType.pdf,
+    ".xlsx": FileType.excel,
+    ".xls":  FileType.excel,
+    ".csv":  FileType.csv,
+}
+
+UPLOAD_SUBDIR = os.path.join("uploads", "incident_reports")
+
+
+def _safe_filename(original: str) -> str:
+    base = os.path.basename(original or "report")
+    base = re.sub(r"[^A-Za-z0-9._-]+", "_", base).strip("_") or "report"
+    ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    return f"{ts}_{uuid.uuid4().hex[:8]}_{base}"
+
+
+def _ext_of(name: str) -> str:
+    return os.path.splitext(name or "")[1].lower()
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Structured-field helpers (shared by save-draft and confirm)
+# ─────────────────────────────────────────────────────────────────────
+
+# Order matters only for display; keys mirror app.etl.structure field rows.
+FIELD_KEYS = [
+    "barangay", "disaster_type", "date_occurred",
+    "affected_families", "affected_individuals", "casualties",
+    "description", "resources_used",
+]
+
+
+def _read_field_rows(form) -> List[dict]:
+    """Rebuild the structured-field rows from the parallel form arrays.
+
+    Returns every row in the form (regardless of include flag), in the
+    same dict shape used by app.etl.structure, so it can be cached back
+    into extracted_data['fields'] for a draft.
+    """
+    cols = {k: form.getlist(k) for k in FIELD_KEYS}
+    total = max((len(v) for v in cols.values()), default=0)
+    rows: List[dict] = []
+    for i in range(total):
+        rows.append({k: (cols[k][i].strip() if i < len(cols[k]) else "") for k in FIELD_KEYS})
+    return rows
+
+
+def _ensure_original_snapshot(data: dict) -> dict:
+    """Preserve a one-time copy of the originally extracted rows before the
+    first manual edit, for traceability. Idempotent."""
+    if "original_fields" not in data:
+        data["original_fields"] = [dict(r) for r in (data.get("fields") or [])]
+    return data
+
+
+def _diff_field_rows(old_rows: List[dict], new_rows: List[dict]):
+    """Yield (row_index, field, old, new) for each changed cell."""
+    n = max(len(old_rows), len(new_rows))
+    for i in range(n):
+        old = old_rows[i] if i < len(old_rows) else {}
+        new = new_rows[i] if i < len(new_rows) else {}
+        for k in FIELD_KEYS:
+            ov = str(old.get(k, "") or "")
+            nv = str(new.get(k, "") or "")
+            if ov != nv:
+                yield (i, k, ov, nv)
+
+
+# ─────────────────────────────────────────────────────────────────────
+# LIST — upload history (TR-ADM-12..15)
+# ─────────────────────────────────────────────────────────────────────
+
+@router.get("", response_class=HTMLResponse)
+@router.get("/", response_class=HTMLResponse)
+def upload_list(request: Request, db: Session = Depends(get_db)):
+    user = require_role(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
+
+    show_archived = request.query_params.get("show_archived") == "1"
+
+    reports = (
+        db.query(UploadedReport)
+        .order_by(UploadedReport.uploaded_at.desc())
+        .all()
+    )
+
+    # Split by lifecycle. Drafts always get their own section; archived and
+    # discarded uploads stay hidden until the admin opts to show them.
+    drafts, active, hidden = [], [], []
+    for r in reports:
+        ls = r.lifecycle_status
+        if ls == LifecycleStatus.draft:
+            drafts.append(r)
+        elif ls == LifecycleStatus.confirmed:
+            active.append(r)
+        else:  # archived or discarded
+            hidden.append(r)
+
+    return templates.TemplateResponse(
+        request=request,
+        name="admin/uploads_list.html",
+        context={
+            "user": user,
+            "active_nav": "uploads",
+            "drafts": drafts,
+            "active_reports": active,
+            "hidden_reports": hidden,
+            "hidden_count": len(hidden),
+            "show_archived": show_archived,
+            "ai_available": ai_available(),
+        },
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────
+# UPLOAD FORM
+# ─────────────────────────────────────────────────────────────────────
+
+@router.get("/new", response_class=HTMLResponse)
+def upload_form(request: Request, db: Session = Depends(get_db)):
+    user = require_role(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
+
+    return templates.TemplateResponse(
+        request=request,
+        name="admin/upload_form.html",
+        context={
+            "user": user,
+            "active_nav": "uploads",
+            "error": request.query_params.get("error"),
+            "ai_available": ai_available(),
+        },
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────
+# UPLOAD POST — Bronze + Silver in one request
+# ─────────────────────────────────────────────────────────────────────
+
+@router.post("/new")
+async def upload_submit(
+    request: Request,
+    db: Session = Depends(get_db),
+    file: UploadFile = File(...),
+):
+    user = require_role(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
+
+    original_name = file.filename or "report"
+    ext = _ext_of(original_name)
+    if ext not in ALLOWED_EXTS:
+        return RedirectResponse(
+            url="/admin/uploads/new?error=Unsupported+file+type.+Allowed:+PDF,+XLSX,+XLS,+CSV.",
+            status_code=302,
+        )
+
+    os.makedirs(UPLOAD_SUBDIR, exist_ok=True)
+    stored_name = _safe_filename(original_name)
+    stored_path = os.path.join(UPLOAD_SUBDIR, stored_name)
+
+    try:
+        contents = await file.read()
+        with open(stored_path, "wb") as f:
+            f.write(contents)
+    except Exception as e:
+        return RedirectResponse(
+            url=f"/admin/uploads/new?error=Failed+to+save+file:+{e}",
+            status_code=302,
+        )
+
+    file_type_enum = ALLOWED_EXTS[ext]
+    report = UploadedReport(
+        uploaded_by=user["id"],
+        file_name=original_name,
+        file_path=stored_path.replace("\\", "/"),
+        file_type=file_type_enum,
+        status=ReportStatus.processing,
+        lifecycle_status=LifecycleStatus.draft,
+    )
+    db.add(report)
+    db.commit()
+    db.refresh(report)
+
+    add_upload_history(
+        db, report_id=report.id, user_id=user["id"],
+        event_type=UploadEvent.created,
+        new_value=f"Uploaded '{original_name}' ({file_type_enum.value.upper()})",
+    )
+    db.commit()
+
+    # ── Silver layer: extract + structure ────────────────────────────
+    extracted = {"raw_text": "", "rows": [], "columns": [], "fields": [], "error": None}
+    try:
+        if file_type_enum == FileType.pdf:
+            out = extract_pdf(stored_path)
+            extracted["raw_text"] = out.get("text", "")
+            extracted["fields"] = [empty_field_row()]
+        elif file_type_enum == FileType.excel:
+            out = extract_excel(stored_path)
+            extracted["columns"] = out["columns"]
+            extracted["rows"] = out["rows"]
+            extracted["fields"] = structure_rows(out["rows"]) or [empty_field_row()]
+        elif file_type_enum == FileType.csv:
+            out = extract_csv(stored_path)
+            extracted["columns"] = out["columns"]
+            extracted["rows"] = out["rows"]
+            extracted["fields"] = structure_rows(out["rows"]) or [empty_field_row()]
+        report.status = ReportStatus.reviewed
+    except Exception as e:
+        extracted["error"] = str(e)
+        extracted["fields"] = [empty_field_row()]
+        report.status = ReportStatus.failed
+
+    # Optional AI summary — never blocks the flow
+    ai_text = None
+    if extracted.get("raw_text"):
+        ai_text = ai_summarize(extracted["raw_text"])
+    elif extracted.get("rows"):
+        preview = "\n".join(
+            ", ".join(f"{k}={v}" for k, v in row.items())
+            for row in extracted["rows"][:25]
+        )
+        ai_text = ai_summarize(preview) if preview else None
+    if ai_text:
+        report.ai_summary = ai_text
+
+    report.extracted_data = extracted
+    db.commit()
+
+    if extracted.get("error"):
+        extract_note = f"Extraction failed: {extracted['error']}"
+    else:
+        n_rows = len(extracted.get("fields") or [])
+        extract_note = f"Extraction completed — {n_rows} structured row(s) ready for review."
+    add_upload_history(
+        db, report_id=report.id, user_id=user["id"],
+        event_type=UploadEvent.extracted, new_value=extract_note,
+    )
+    db.commit()
+
+    return RedirectResponse(url=f"/admin/uploads/{report.id}/review", status_code=302)
+
+
+# ─────────────────────────────────────────────────────────────────────
+# REVIEW SCREEN (Silver) — edit + confirm
+# ─────────────────────────────────────────────────────────────────────
+
+@router.get("/{report_id}/review", response_class=HTMLResponse)
+def review(report_id: int, request: Request, db: Session = Depends(get_db)):
+    user = require_role(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
+
+    report = db.query(UploadedReport).filter(UploadedReport.id == report_id).first()
+    if not report:
+        return RedirectResponse(url="/admin/uploads", status_code=302)
+
+    barangays = db.query(Barangay).order_by(Barangay.name).all()
+    data = report.extracted_data or {}
+    fields = data.get("fields") or [empty_field_row()]
+
+    # Only drafts are editable / confirmable. Confirmed and archived
+    # uploads are read-only; discarded uploads are terminal.
+    is_draft = report.lifecycle_status == LifecycleStatus.draft
+    editable = is_draft
+
+    return templates.TemplateResponse(
+        request=request,
+        name="admin/upload_review.html",
+        context={
+            "user": user,
+            "active_nav": "uploads",
+            "report": report,
+            "data": data,
+            "fields": fields,
+            "barangays": barangays,
+            "disaster_types": [dt.value for dt in DisasterType],
+            "editable": editable,
+            "is_draft": is_draft,
+            "lifecycle_status": report.lifecycle_status.value,
+            "is_confirmed": report.lifecycle_status == LifecycleStatus.confirmed,
+            "is_archived": report.lifecycle_status == LifecycleStatus.archived,
+            "is_discarded": report.lifecycle_status == LifecycleStatus.discarded,
+            "ai_available": ai_available(),
+            "rows_preview": (data.get("rows") or [])[:10],
+            "columns_preview": data.get("columns") or [],
+            "raw_text_preview": (data.get("raw_text") or "")[:4000],
+            "extraction_error": data.get("error"),
+        },
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────
+# SAVE DRAFT — persist edits without confirming; append history rows
+# ─────────────────────────────────────────────────────────────────────
+
+@router.post("/{report_id}/save-draft")
+async def save_draft(report_id: int, request: Request, db: Session = Depends(get_db)):
+    user = require_role(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
+
+    report = db.query(UploadedReport).filter(UploadedReport.id == report_id).first()
+    if not report:
+        return RedirectResponse(url="/admin/uploads", status_code=302)
+
+    if report.lifecycle_status != LifecycleStatus.draft:
+        return RedirectResponse(
+            url=f"/admin/uploads/{report.id}/review?error=Only+draft+uploads+can+be+edited",
+            status_code=302,
+        )
+
+    form = await request.form()
+    reason = (form.get("edit_reason") or "").strip() or None
+
+    data = dict(report.extracted_data or {})
+    old_rows = data.get("fields") or []
+    new_rows = _read_field_rows(form)
+
+    # Preserve the original extracted rows once, before the first edit.
+    _ensure_original_snapshot(data)
+
+    change_count = 0
+    for (row_i, key, ov, nv) in _diff_field_rows(old_rows, new_rows):
+        label = key.replace("_", " ").title()
+        add_upload_history(
+            db, report_id=report.id, user_id=user["id"],
+            event_type=UploadEvent.edited,
+            field_changed=f"Row {row_i + 1} · {label}",
+            old_value=ov, new_value=nv, reason=reason,
+        )
+        change_count += 1
+
+    # Editable upload metadata: the display file name.
+    new_name = (form.get("file_name") or "").strip()
+    if new_name and new_name != report.file_name:
+        add_upload_history(
+            db, report_id=report.id, user_id=user["id"],
+            event_type=UploadEvent.edited, field_changed="File Name",
+            old_value=report.file_name, new_value=new_name, reason=reason,
+        )
+        report.file_name = new_name
+        change_count += 1
+
+    data["fields"] = new_rows
+    data["validation_errors"] = None  # stale errors no longer apply
+    report.extracted_data = data
+    db.commit()
+
+    if change_count:
+        log_action(
+            db, user_id=user["id"], action="edited",
+            target_table="uploaded_reports", target_id=report.id,
+            description=(
+                f"Admin edited draft upload '{report.file_name}' "
+                f"({change_count} field change(s))."
+            ),
+        )
+        msg = f"Draft+saved+—+{change_count}+change(s)+recorded"
+    else:
+        msg = "Draft+saved+—+no+changes+detected"
+
+    return RedirectResponse(
+        url=f"/admin/uploads/{report.id}/review?success={msg}",
+        status_code=302,
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────
+# CONFIRM SAVE (Gold) — write Incident rows + audit log
+# ─────────────────────────────────────────────────────────────────────
+
+def _parse_date(s: str) -> Optional[date]:
+    if not s:
+        return None
+    s = s.strip()
+    for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%d/%m/%Y"):
+        try:
+            return datetime.strptime(s, fmt).date()
+        except ValueError:
+            continue
+    return None
+
+
+@router.post("/{report_id}/confirm")
+async def confirm_save(report_id: int, request: Request, db: Session = Depends(get_db)):
+    user = require_role(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
+
+    report = db.query(UploadedReport).filter(UploadedReport.id == report_id).first()
+    if not report:
+        return RedirectResponse(url="/admin/uploads", status_code=302)
+
+    # Only drafts can be confirmed. Confirmed/archived/discarded are not.
+    if report.lifecycle_status != LifecycleStatus.draft:
+        return RedirectResponse(
+            url=f"/admin/uploads/{report.id}/review",
+            status_code=302,
+        )
+
+    form = await request.form()
+
+    # Form fields arrive as parallel arrays — Form lists per row index.
+    barangays = form.getlist("barangay")
+    disaster_types = form.getlist("disaster_type")
+    dates = form.getlist("date_occurred")
+    families = form.getlist("affected_families")
+    individuals = form.getlist("affected_individuals")
+    casualties = form.getlist("casualties")
+    descriptions = form.getlist("description")
+    resources = form.getlist("resources_used")
+    include_flags = form.getlist("include_row")  # only ticked rows are saved
+
+    barangay_lookup = {b.name.lower(): b for b in db.query(Barangay).all()}
+    valid_disaster_values = {dt.value for dt in DisasterType}
+
+    saved_fields: List[dict] = []
+    saved_incident_ids: List[int] = []
+    errors: List[str] = []
+
+    total = max(
+        len(barangays), len(disaster_types), len(dates), len(families),
+        len(individuals), len(casualties), len(descriptions), len(resources),
+    )
+
+    for i in range(total):
+        idx = i + 1
+        included = str(i) in include_flags  # checkbox value carries row index
+        if not included:
+            continue
+
+        b_name = (barangays[i] if i < len(barangays) else "").strip()
+        d_type = (disaster_types[i] if i < len(disaster_types) else "").strip()
+        d_str  = (dates[i] if i < len(dates) else "").strip()
+        fam    = (families[i] if i < len(families) else "0").strip() or "0"
+        ind    = (individuals[i] if i < len(individuals) else "0").strip() or "0"
+        cas    = (casualties[i] if i < len(casualties) else "0").strip() or "0"
+        desc   = (descriptions[i] if i < len(descriptions) else "").strip()
+        rsrc   = (resources[i] if i < len(resources) else "").strip()
+
+        brgy = barangay_lookup.get(b_name.lower())
+        if not brgy:
+            errors.append(f"Row {idx}: unknown barangay '{b_name}'.")
+            continue
+        if d_type not in valid_disaster_values:
+            errors.append(f"Row {idx}: invalid disaster type '{d_type}'.")
+            continue
+        d_obj = _parse_date(d_str)
+        if not d_obj:
+            errors.append(f"Row {idx}: invalid date '{d_str}'. Use YYYY-MM-DD.")
+            continue
+        try:
+            fam_i = int(float(fam)); ind_i = int(float(ind)); cas_i = int(float(cas))
+        except ValueError:
+            errors.append(f"Row {idx}: numeric fields must be integers.")
+            continue
+
+        incident = Incident(
+            barangay_id=brgy.id,
+            reported_by=user["id"],
+            disaster_type=DisasterType(d_type),
+            date_occurred=d_obj,
+            affected_families=fam_i,
+            casualties=cas_i,
+            description=desc,
+            source=f"uploaded_report:{report.id}",
+        )
+        db.add(incident)
+        db.flush()
+        saved_incident_ids.append(incident.id)
+        saved_fields.append({
+            "barangay": brgy.name,
+            "disaster_type": d_type,
+            "date_occurred": d_obj.strftime("%Y-%m-%d"),
+            "affected_families": fam_i,
+            "affected_individuals": ind_i,
+            "casualties": cas_i,
+            "description": desc,
+            "resources_used": rsrc,
+            "incident_id": incident.id,
+        })
+
+    if errors and not saved_incident_ids:
+        # Nothing valid — bounce back to review with error banner. Cache
+        # errors in extracted_data so the review screen can show them.
+        data = dict(report.extracted_data or {})
+        data["validation_errors"] = errors
+        report.extracted_data = data
+        db.commit()
+        return RedirectResponse(
+            url=f"/admin/uploads/{report.id}/review?error=No+valid+rows+saved",
+            status_code=302,
+        )
+
+    data = dict(report.extracted_data or {})
+    _ensure_original_snapshot(data)  # keep the as-extracted rows for traceability
+    data["fields"] = saved_fields if saved_fields else data.get("fields")
+    data["linked_incident_ids"] = saved_incident_ids
+    data["validation_errors"] = errors or None
+    report.extracted_data = data
+    report.status = ReportStatus.confirmed
+    report.lifecycle_status = LifecycleStatus.confirmed
+    if report.barangay_id is None and len(saved_incident_ids) == 1 and saved_fields:
+        # Single-row PDF — attach barangay to the upload for the history filter.
+        only = saved_fields[0]
+        brgy = barangay_lookup.get(only["barangay"].lower())
+        if brgy:
+            report.barangay_id = brgy.id
+
+    db.commit()
+
+    add_upload_history(
+        db, report_id=report.id, user_id=user["id"],
+        event_type=UploadEvent.confirmed,
+        new_value=f"Confirmed — saved {len(saved_incident_ids)} incident(s) to the database.",
+    )
+    db.commit()
+
+    log_action(
+        db,
+        user_id=user["id"],
+        action="confirmed",
+        target_table="uploaded_reports",
+        target_id=report.id,
+        description=(
+            f"Admin confirmed upload '{report.file_name}'; "
+            f"saved {len(saved_incident_ids)} incident(s)."
+        ),
+    )
+
+    return RedirectResponse(
+        url=f"/admin/uploads/{report.id}/review?success=Saved+{len(saved_incident_ids)}+incident(s)",
+        status_code=302,
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Optional: serve the raw Bronze file back (admin-only download)
+# ─────────────────────────────────────────────────────────────────────
+
+@router.get("/{report_id}/file")
+def download_file(report_id: int, request: Request, db: Session = Depends(get_db)):
+    user = require_role(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
+
+    report = db.query(UploadedReport).filter(UploadedReport.id == report_id).first()
+    if not report or not report.file_path or not os.path.exists(report.file_path):
+        return RedirectResponse(url="/admin/uploads", status_code=302)
+
+    return FileResponse(report.file_path, filename=report.file_name)
+
+
+# ─────────────────────────────────────────────────────────────────────
+# LIFECYCLE ACTIONS — archive / restore / discard
+# ─────────────────────────────────────────────────────────────────────
+
+@router.post("/{report_id}/archive")
+def archive_upload(report_id: int, request: Request, db: Session = Depends(get_db)):
+    user = require_role(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
+
+    report = db.query(UploadedReport).filter(UploadedReport.id == report_id).first()
+    if not report:
+        return RedirectResponse(url="/admin/uploads", status_code=302)
+
+    # Only confirmed uploads can be archived.
+    if report.lifecycle_status != LifecycleStatus.confirmed:
+        return RedirectResponse(
+            url=f"/admin/uploads/{report.id}/review?error=Only+confirmed+uploads+can+be+archived",
+            status_code=302,
+        )
+
+    report.lifecycle_status = LifecycleStatus.archived
+    report.archived_at = datetime.utcnow()
+    report.archived_by = user["id"]
+    db.commit()
+
+    add_upload_history(
+        db, report_id=report.id, user_id=user["id"],
+        event_type=UploadEvent.archived,
+        new_value="Upload archived (kept searchable and auditable).",
+    )
+    db.commit()
+    log_action(
+        db, user_id=user["id"], action="archived",
+        target_table="uploaded_reports", target_id=report.id,
+        description=f"Admin archived upload '{report.file_name}'.",
+    )
+    return RedirectResponse(
+        url=f"/admin/uploads/{report.id}/review?success=Upload+archived",
+        status_code=302,
+    )
+
+
+@router.post("/{report_id}/restore")
+def restore_upload(report_id: int, request: Request, db: Session = Depends(get_db)):
+    user = require_role(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
+
+    report = db.query(UploadedReport).filter(UploadedReport.id == report_id).first()
+    if not report:
+        return RedirectResponse(url="/admin/uploads", status_code=302)
+
+    # Only archived uploads can be restored. Discarded uploads are terminal.
+    if report.lifecycle_status != LifecycleStatus.archived:
+        return RedirectResponse(
+            url=f"/admin/uploads/{report.id}/review?error=Only+archived+uploads+can+be+restored",
+            status_code=302,
+        )
+
+    report.lifecycle_status = LifecycleStatus.confirmed
+    report.archived_at = None
+    report.archived_by = None
+    db.commit()
+
+    add_upload_history(
+        db, report_id=report.id, user_id=user["id"],
+        event_type=UploadEvent.unarchived,
+        new_value="Upload restored from archive to confirmed.",
+    )
+    db.commit()
+    log_action(
+        db, user_id=user["id"], action="restored",
+        target_table="uploaded_reports", target_id=report.id,
+        description=f"Admin restored upload '{report.file_name}' from archive.",
+    )
+    return RedirectResponse(
+        url=f"/admin/uploads/{report.id}/review?success=Upload+restored",
+        status_code=302,
+    )
+
+
+@router.post("/{report_id}/discard")
+def discard_upload(report_id: int, request: Request, db: Session = Depends(get_db)):
+    user = require_role(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
+
+    report = db.query(UploadedReport).filter(UploadedReport.id == report_id).first()
+    if not report:
+        return RedirectResponse(url="/admin/uploads", status_code=302)
+
+    # Only unconfirmed drafts can be discarded. Confirmed uploads cannot be
+    # deleted; archived uploads must be restored first.
+    if report.lifecycle_status != LifecycleStatus.draft:
+        return RedirectResponse(
+            url=f"/admin/uploads/{report.id}/review?error=Only+draft+uploads+can+be+discarded",
+            status_code=302,
+        )
+
+    report.lifecycle_status = LifecycleStatus.discarded
+    report.discarded_at = datetime.utcnow()
+    report.discarded_by = user["id"]
+    db.commit()
+
+    add_upload_history(
+        db, report_id=report.id, user_id=user["id"],
+        event_type=UploadEvent.discarded,
+        new_value="Unconfirmed draft discarded.",
+    )
+    db.commit()
+    log_action(
+        db, user_id=user["id"], action="discarded",
+        target_table="uploaded_reports", target_id=report.id,
+        description=f"Admin discarded draft upload '{report.file_name}'.",
+    )
+    return RedirectResponse(
+        url="/admin/uploads?success=Draft+discarded",
+        status_code=302,
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────
+# AUDIT TRAIL — per-upload history page
+# ─────────────────────────────────────────────────────────────────────
+
+@router.get("/{report_id}/history", response_class=HTMLResponse)
+def upload_history(report_id: int, request: Request, db: Session = Depends(get_db)):
+    user = require_role(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
+
+    report = db.query(UploadedReport).filter(UploadedReport.id == report_id).first()
+    if not report:
+        return RedirectResponse(url="/admin/uploads", status_code=302)
+
+    # Append-only trail — newest first (latest at the top, oldest at the bottom).
+    events = (
+        db.query(UploadHistory)
+        .filter(UploadHistory.report_id == report.id)
+        .order_by(UploadHistory.timestamp.desc(), UploadHistory.id.desc())
+        .all()
+    )
+
+    # The preserved as-extracted snapshot, for distinguishing extracted vs
+    # manually corrected values.
+    data = report.extracted_data or {}
+    original_fields = data.get("original_fields")
+
+    return templates.TemplateResponse(
+        request=request,
+        name="admin/upload_history.html",
+        context={
+            "user": user,
+            "active_nav": "uploads",
+            "report": report,
+            "events": events,
+            "original_fields": original_fields,
+            "field_keys": FIELD_KEYS,
+            "lifecycle_status": report.lifecycle_status.value,
+        },
+    )

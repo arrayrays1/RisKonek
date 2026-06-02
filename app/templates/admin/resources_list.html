@@ -1,0 +1,250 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Resources Module — RisKonek{% endblock %}
+
+{% set active_nav = 'resources' %}
+
+{% macro alert_pill(a) -%}
+    {% if a == 'expired' %}
+        <span class="status-pill status-unavailable">Expired</span>
+    {% elif a == 'near_expiry' %}
+        <span class="status-pill status-maintenance">Near Expiry</span>
+    {% elif a == 'low_stock' %}
+        <span class="status-pill status-maintenance">Low Stock</span>
+    {% else %}
+        <span class="status-pill status-operational">OK</span>
+    {% endif %}
+{%- endmacro %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start page-header">
+    <div>
+        <h1>Resource Goods Inventory</h1>
+        <p>Consumable disaster-response resources (food packs, water, medicine, hygiene kits, blankets, tarpaulins, sleeping kits).</p>
+    </div>
+    <a href="/admin/resources/new" class="btn btn-rk">
+        <i class="bi bi-plus-lg"></i> Add Resource
+    </a>
+</div>
+
+{% if request.query_params.get('success') %}
+<div class="alert alert-success alert-dismissible fade show">
+    <i class="bi bi-check-circle-fill me-1"></i>
+    {{ request.query_params.get('success') }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+{% if request.query_params.get('error') %}
+<div class="alert alert-danger alert-dismissible fade show">
+    <i class="bi bi-exclamation-triangle-fill me-1"></i>
+    {{ request.query_params.get('error') }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+<!-- ── Summary cards ──────────────────────────────────────────── -->
+<div class="row g-3 mb-3">
+    <div class="col-md-3">
+        <div class="stat-card d-flex justify-content-between align-items-center">
+            <div>
+                <div class="stat-label">Total Active Items</div>
+                <div class="stat-value">{{ summary.total }}</div>
+            </div>
+            <div class="stat-icon" style="background:#eafaf1;color:var(--rk-green)">
+                <i class="bi bi-box-seam"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card d-flex justify-content-between align-items-center">
+            <div>
+                <div class="stat-label">Low Stock</div>
+                <div class="stat-value">{{ summary.low_stock }}</div>
+            </div>
+            <div class="stat-icon" style="background:#fef9e7;color:#b7950b">
+                <i class="bi bi-exclamation-triangle"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card d-flex justify-content-between align-items-center">
+            <div>
+                <div class="stat-label">Near Expiry (≤ 30d)</div>
+                <div class="stat-value">{{ summary.near_expiry }}</div>
+            </div>
+            <div class="stat-icon" style="background:#fef9e7;color:#b7950b">
+                <i class="bi bi-clock-history"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card d-flex justify-content-between align-items-center">
+            <div>
+                <div class="stat-label">Expired</div>
+                <div class="stat-value">{{ summary.expired }}</div>
+            </div>
+            <div class="stat-icon" style="background:#fde8e8;color:#c0392b">
+                <i class="bi bi-x-octagon"></i>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── Filters ────────────────────────────────────────────────── -->
+<div class="dash-card mb-3">
+    <form method="GET" action="/admin/resources" class="row g-2 align-items-end">
+        <div class="col-md-4">
+            <label class="form-label small fw-semibold mb-1">Search</label>
+            <input type="text" name="q" value="{{ f_q }}" class="form-control form-control-sm"
+                   placeholder="Search name or storage location…" autocomplete="off">
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small fw-semibold mb-1">Category</label>
+            <select name="category" class="form-select form-select-sm">
+                <option value="">All categories</option>
+                {% for c in categories %}
+                <option value="{{ c }}" {% if f_category == c %}selected{% endif %}>{{ c.title() }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small fw-semibold mb-1">Alert</label>
+            <select name="alert" class="form-select form-select-sm">
+                <option value="">Any</option>
+                <option value="low_stock"   {% if f_alert == 'low_stock'   %}selected{% endif %}>Low Stock</option>
+                <option value="near_expiry" {% if f_alert == 'near_expiry' %}selected{% endif %}>Near Expiry</option>
+                <option value="expired"     {% if f_alert == 'expired'     %}selected{% endif %}>Expired</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small fw-semibold mb-1">View</label>
+            <select name="archived" class="form-select form-select-sm">
+                <option value=""  {% if not show_archived %}selected{% endif %}>Active</option>
+                <option value="1" {% if show_archived %}selected{% endif %}>Archived</option>
+            </select>
+        </div>
+        <div class="col-md-1 d-grid">
+            <button type="submit" class="btn btn-rk btn-sm">
+                <i class="bi bi-funnel"></i>
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- ── Table ──────────────────────────────────────────────────── -->
+<div class="dash-card p-0">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead style="background:#f9fafb">
+                <tr style="font-size:12px;color:var(--rk-muted);text-transform:uppercase;letter-spacing:0.04em">
+                    <th class="px-3 py-3">Item</th>
+                    <th class="py-3">Category</th>
+                    <th class="py-3 text-end">Qty</th>
+                    <th class="py-3">Unit</th>
+                    <th class="py-3">Location</th>
+                    <th class="py-3 text-end">Threshold</th>
+                    <th class="py-3">Expiry</th>
+                    <th class="py-3">Alert</th>
+                    <th class="py-3 text-end px-3">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in rows %}
+                <tr style="font-size:13px">
+                    <td class="px-3">
+                        <div class="fw-semibold">{{ r.name }}</div>
+                        <div class="text-muted small">
+                            {% if r.is_perishable %}<i class="bi bi-droplet-half me-1"></i>perishable{% else %}non-perishable{% endif %}
+                        </div>
+                    </td>
+                    <td>{{ r.category_label }}</td>
+                    <td class="text-end fw-semibold">{{ r.quantity }}</td>
+                    <td class="text-muted">{{ r.unit or '—' }}</td>
+                    <td>{{ r.storage_location }}</td>
+                    <td class="text-end text-muted">{{ r.restock_threshold }}</td>
+                    <td>{{ r.expiry_date.strftime('%Y-%m-%d') if r.expiry_date else '—' }}</td>
+                    <td>{{ alert_pill(r.alert) }}</td>
+                    <td class="text-end px-3">
+                        {% if not r.is_archived %}
+                        <button type="button" class="btn btn-outline-success btn-sm"
+                                data-bs-toggle="modal" data-bs-target="#stockModal-{{ r.id }}">
+                            <i class="bi bi-plus-slash-minus"></i> Stock
+                        </button>
+                        <a href="/admin/resources/{{ r.id }}/edit"
+                           class="btn btn-outline-secondary btn-sm">
+                            <i class="bi bi-pencil"></i>
+                        </a>
+                        <form method="POST" action="/admin/resources/{{ r.id }}/archive" class="d-inline"
+                              onsubmit="return confirm('Archive {{ r.name }}?')">
+                            <button type="submit" class="btn btn-outline-warning btn-sm">
+                                <i class="bi bi-archive"></i>
+                            </button>
+                        </form>
+                        {% else %}
+                        <form method="POST" action="/admin/resources/{{ r.id }}/archive" class="d-inline">
+                            <button type="submit" class="btn btn-outline-success btn-sm">
+                                <i class="bi bi-arrow-counterclockwise"></i> Restore
+                            </button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="9" class="text-center text-muted py-4">
+                        No resources match your filters.
+                        {% if f_q or f_category or f_alert or f_archived %}
+                        <a href="/admin/resources" class="ms-2">Clear filters</a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ── Stock modals (one per active row) ──────────────────────── -->
+{% for r in rows %}
+{% if not r.is_archived %}
+<div class="modal fade" id="stockModal-{{ r.id }}" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <form method="POST" action="/admin/resources/{{ r.id }}/stock" class="modal-content">
+      <div class="modal-header">
+        <h6 class="modal-title">Stock change — {{ r.name }}</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-2 small text-muted">
+            Current stock: <strong>{{ r.quantity }}</strong> {{ r.unit or '' }}
+        </div>
+        <div class="row g-2">
+          <div class="col-5">
+            <label class="form-label small">Action</label>
+            <select name="action" class="form-select form-select-sm" required>
+              <option value="add">Add Stock</option>
+              <option value="deduct">Deduct Stock</option>
+            </select>
+          </div>
+          <div class="col-7">
+            <label class="form-label small">Amount</label>
+            <input type="number" name="amount" min="1" class="form-control form-control-sm" required>
+          </div>
+        </div>
+        <div class="mt-2">
+          <label class="form-label small">Reason (optional)</label>
+          <input type="text" name="reason" class="form-control form-control-sm"
+                 placeholder="e.g. delivered by supplier / distributed to barangay">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" class="btn btn-rk btn-sm">Apply</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+{% endfor %}
+
+{% endblock %}

@@ -1,0 +1,236 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Vehicle & Equipment — RisKonek{% endblock %}
+
+{% set active_nav = 'equipment' %}
+
+{% macro status_pill(v, label) -%}
+    {% if v in ('available', 'serviceable') %}
+        <span class="status-pill status-operational">{{ label }}</span>
+    {% elif v == 'deployed' %}
+        <span class="badge bg-info text-dark">{{ label }}</span>
+    {% elif v == 'under_repair' %}
+        <span class="status-pill status-maintenance">{{ label }}</span>
+    {% elif v in ('unserviceable', 'not_serviceable') %}
+        <span class="status-pill status-unavailable">{{ label }}</span>
+    {% else %}
+        <span class="badge bg-light text-dark border">{{ label }}</span>
+    {% endif %}
+{%- endmacro %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start page-header">
+    <div>
+        <h1>Vehicle &amp; Equipment Monitoring</h1>
+        <p>Operational disaster-response equipment (vehicles, generators, chainsaws, rescue boats, radios, flashlights, life vests).</p>
+    </div>
+    <a href="/admin/equipment/new" class="btn btn-rk">
+        <i class="bi bi-plus-lg"></i> Add Equipment
+    </a>
+</div>
+
+{% if request.query_params.get('success') %}
+<div class="alert alert-success alert-dismissible fade show">
+    <i class="bi bi-check-circle-fill me-1"></i>
+    {{ request.query_params.get('success') }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+{% if request.query_params.get('error') %}
+<div class="alert alert-danger alert-dismissible fade show">
+    <i class="bi bi-exclamation-triangle-fill me-1"></i>
+    {{ request.query_params.get('error') }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+<!-- ── Summary cards ──────────────────────────────────────────── -->
+<div class="row g-3 mb-3">
+    <div class="col-md-3">
+        <div class="stat-card d-flex justify-content-between align-items-center">
+            <div>
+                <div class="stat-label">Active Units</div>
+                <div class="stat-value">{{ summary.total }}</div>
+            </div>
+            <div class="stat-icon" style="background:#eafaf1;color:var(--rk-green)">
+                <i class="bi bi-truck"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card d-flex justify-content-between align-items-center">
+            <div>
+                <div class="stat-label">Available</div>
+                <div class="stat-value">{{ summary.available }}</div>
+            </div>
+            <div class="stat-icon" style="background:#eafaf1;color:var(--rk-green)">
+                <i class="bi bi-check2-circle"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card d-flex justify-content-between align-items-center">
+            <div>
+                <div class="stat-label">Deployed</div>
+                <div class="stat-value">{{ summary.deployed }}</div>
+            </div>
+            <div class="stat-icon" style="background:#e6f2fa;color:#226e9b">
+                <i class="bi bi-broadcast-pin"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card d-flex justify-content-between align-items-center">
+            <div>
+                <div class="stat-label">Under Repair / Unserviceable</div>
+                <div class="stat-value">{{ summary.under_repair + summary.unserviceable }}</div>
+            </div>
+            <div class="stat-icon" style="background:#fde8e8;color:#c0392b">
+                <i class="bi bi-tools"></i>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── Filters ────────────────────────────────────────────────── -->
+<div class="dash-card mb-3">
+    <form method="GET" action="/admin/equipment" class="row g-2 align-items-end">
+        <div class="col-md-4">
+            <label class="form-label small fw-semibold mb-1">Search</label>
+            <input type="text" name="q" value="{{ f_q }}" class="form-control form-control-sm"
+                   placeholder="Search name or plate/serial…" autocomplete="off">
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small fw-semibold mb-1">Type</label>
+            <select name="equipment_type" class="form-select form-select-sm">
+                <option value="">All types</option>
+                {% for v, label in types %}
+                <option value="{{ v }}" {% if f_type == v %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small fw-semibold mb-1">Status</label>
+            <select name="status" class="form-select form-select-sm">
+                <option value="">Any</option>
+                {% for v, label in statuses %}
+                <option value="{{ v }}" {% if f_status == v %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small fw-semibold mb-1">View</label>
+            <select name="archived" class="form-select form-select-sm">
+                <option value=""  {% if not show_archived %}selected{% endif %}>Active</option>
+                <option value="1" {% if show_archived %}selected{% endif %}>Archived</option>
+            </select>
+        </div>
+        <div class="col-md-1 d-grid">
+            <button type="submit" class="btn btn-rk btn-sm">
+                <i class="bi bi-funnel"></i>
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- ── Table ──────────────────────────────────────────────────── -->
+<div class="dash-card p-0">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead style="background:#f9fafb">
+                <tr style="font-size:12px;color:var(--rk-muted);text-transform:uppercase;letter-spacing:0.04em">
+                    <th class="px-3 py-3">Equipment</th>
+                    <th class="py-3">Type</th>
+                    <th class="py-3">Status</th>
+                    <th class="py-3">Assigned</th>
+                    <th class="py-3">Plate / Serial</th>
+                    <th class="py-3">Last Inspected</th>
+                    <th class="py-3 text-end px-3">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for e in rows %}
+                <tr style="font-size:13px">
+                    <td class="px-3 fw-semibold">{{ e.name }}</td>
+                    <td>{{ e.type_label }}</td>
+                    <td>{{ status_pill(e.status_value, e.status_label) }}</td>
+                    <td class="text-muted">{{ e.assigned }}</td>
+                    <td class="text-muted">{{ e.plate_or_serial }}</td>
+                    <td class="text-muted">{{ e.last_inspected.strftime('%Y-%m-%d') if e.last_inspected else '—' }}</td>
+                    <td class="text-end px-3">
+                        {% if not e.is_archived %}
+                        <button type="button" class="btn btn-outline-primary btn-sm"
+                                data-bs-toggle="modal" data-bs-target="#statusModal-{{ e.id }}">
+                            <i class="bi bi-arrow-repeat"></i> Status
+                        </button>
+                        <a href="/admin/equipment/{{ e.id }}/edit"
+                           class="btn btn-outline-secondary btn-sm">
+                            <i class="bi bi-pencil"></i>
+                        </a>
+                        <form method="POST" action="/admin/equipment/{{ e.id }}/archive" class="d-inline"
+                              onsubmit="return confirm('Archive {{ e.name }}?')">
+                            <button type="submit" class="btn btn-outline-warning btn-sm">
+                                <i class="bi bi-archive"></i>
+                            </button>
+                        </form>
+                        {% else %}
+                        <form method="POST" action="/admin/equipment/{{ e.id }}/archive" class="d-inline">
+                            <button type="submit" class="btn btn-outline-success btn-sm">
+                                <i class="bi bi-arrow-counterclockwise"></i> Restore
+                            </button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="text-center text-muted py-4">
+                        No equipment matches your filters.
+                        {% if f_q or f_type or f_status or f_archived %}
+                        <a href="/admin/equipment" class="ms-2">Clear filters</a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ── Status change modals ───────────────────────────────────── -->
+{% for e in rows %}
+{% if not e.is_archived %}
+<div class="modal fade" id="statusModal-{{ e.id }}" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <form method="POST" action="/admin/equipment/{{ e.id }}/status" class="modal-content">
+      <div class="modal-header">
+        <h6 class="modal-title">Change status — {{ e.name }}</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-2 small text-muted">
+            Current: {{ status_pill(e.status_value, e.status_label) }}
+        </div>
+        <label class="form-label small">New status</label>
+        <select name="status" class="form-select form-select-sm" required>
+            {% for v, label in status_choices %}
+            <option value="{{ v }}" {% if e.status_value == v %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+        <div class="mt-2">
+          <label class="form-label small">Reason (optional)</label>
+          <input type="text" name="reason" class="form-control form-control-sm"
+                 placeholder="e.g. deployed to flood response / sent for engine repair">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" class="btn btn-rk btn-sm">Apply</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+{% endfor %}
+
+{% endblock %}

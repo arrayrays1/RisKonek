@@ -1,0 +1,112 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Audit Entry #{{ log.id }} — RisKonek{% endblock %}
+
+{% set active_nav = 'audit' %}
+
+{% block head_extra %}
+<style>
+    .kv { font-size: 13px; }
+    .kv .k { color: var(--rk-muted); width: 160px; display: inline-block; }
+    .kv .v { font-weight: 500; }
+    .diff-box { font-size: 12px; border-radius: 6px; padding: 8px 10px; white-space: pre-wrap; word-break: break-word; min-height: 38px; }
+    .diff-old { background: #fdecea; border: 1px solid #f4c2bd; color: #842029; }
+    .diff-new { background: #eafaf1; border: 1px solid #c8e6d4; color: #14563a; }
+    .diff-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--rk-muted); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start page-header">
+    <div>
+        <h1>Audit Entry #{{ log.id }}</h1>
+        <p>Detailed view of a single logged action.</p>
+    </div>
+    <a href="/admin/audit" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Back to Audit Trail
+    </a>
+</div>
+
+<div class="dash-card mb-3">
+    <div class="kv d-flex flex-column gap-2">
+        <div><span class="k">Action performed</span>
+            <span class="v"><span class="badge bg-light text-dark border">{{ log.action }}</span></span></div>
+        <div><span class="k">Category / Module</span><span class="v">{{ category }}</span></div>
+        <div><span class="k">Affected table</span><span class="v">{{ log.target_table or '—' }}</span></div>
+        <div><span class="k">Affected record ID</span><span class="v">{{ log.target_id if log.target_id is not none else '—' }}</span></div>
+        <div><span class="k">Timestamp</span><span class="v">{{ log.timestamp | pht }}</span></div>
+        <div><span class="k">Performed by</span>
+            <span class="v">
+                {% if actor %}{{ actor.username }}
+                    <a href="/admin/audit?user_id={{ actor.id }}" class="small ms-2">(view this user's trail)</a>
+                {% else %}user #{{ log.user_id }}{% endif %}
+            </span></div>
+        <div><span class="k">Description</span><span class="v">{{ log.description or '—' }}</span></div>
+    </div>
+</div>
+
+<!-- ── Related entity links ───────────────────────────────────────── -->
+{% if related_upload %}
+<div class="dash-card mb-3">
+    <div class="card-title-row">
+        <i class="bi bi-link-45deg"></i>
+        <h6>Related Upload</h6>
+    </div>
+    <p class="small mb-2">
+        <strong>{{ related_upload.file_name }}</strong>
+        <span class="badge bg-light text-dark border">{{ related_upload.file_type.value | upper }}</span>
+        — lifecycle: {{ related_upload.lifecycle_status.value }}
+        {% if related_upload.extracted_data and related_upload.extracted_data.get('linked_incident_ids') %}
+        <br>Linked Incident IDs: {{ related_upload.extracted_data.get('linked_incident_ids') | join(', ') }}
+        {% endif %}
+    </p>
+    <div class="d-flex gap-2">
+        <a href="/admin/uploads/{{ related_upload.id }}/review" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-eye"></i> Open Upload
+        </a>
+        <a href="/admin/uploads/{{ related_upload.id }}/history" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-clock-history"></i> Full Upload History
+        </a>
+    </div>
+</div>
+
+{% if upload_changes %}
+<div class="dash-card">
+    <div class="card-title-row">
+        <i class="bi bi-pencil-square"></i>
+        <h6>Before / After — recorded field changes for this upload</h6>
+    </div>
+    <p class="small text-muted">
+        Field-level edits from the upload's append-only history (newest first).
+    </p>
+    {% for c in upload_changes %}
+    <div class="mb-3">
+        <div class="d-flex justify-content-between">
+            <div class="fw-semibold small">{{ c.field_changed }}</div>
+            <div class="text-muted small">{{ c.timestamp | pht }}{% if c.user %} · {{ c.user.username }}{% endif %}</div>
+        </div>
+        <div class="row g-2 mt-1">
+            <div class="col-md-6">
+                <div class="diff-label mb-1">Before</div>
+                <div class="diff-box diff-old">{{ c.old_value if c.old_value else '(empty)' }}</div>
+            </div>
+            <div class="col-md-6">
+                <div class="diff-label mb-1">After</div>
+                <div class="diff-box diff-new">{{ c.new_value if c.new_value else '(empty)' }}</div>
+            </div>
+        </div>
+        {% if c.reason %}<div class="small text-muted mt-1"><i class="bi bi-chat-left-text me-1"></i>Reason: {{ c.reason }}</div>{% endif %}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+{% else %}
+<div class="dash-card">
+    <p class="text-muted small mb-0">
+        <i class="bi bi-info-circle me-1"></i>
+        No before/after detail is recorded for this action type. Field-level
+        comparisons are available for upload edits.
+    </p>
+</div>
+{% endif %}
+{% endblock %}

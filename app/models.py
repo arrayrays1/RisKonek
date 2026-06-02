@@ -21,7 +21,7 @@ class RiskLevel(str, enum.Enum):
 
 class DisasterType(str, enum.Enum):
     flood = "flood"
-    earthquake = "earthwuake"
+    earthquake = "earthquake"
     fire = "fire"
     landslide = "landslide"
     typhoon = "typhoon"
@@ -46,12 +46,22 @@ class EquipmentType(str, enum.Enum):
     rescue_vehicle = "rescue_vehicle"
     generator = "generator"
     chainsaw = "chainsaw"
+    # Week 7 — additive: client-requested equipment categories.
+    rescue_boat = "rescue_boat"
+    radio = "radio"
+    flashlight = "flashlight"
+    life_vest = "life_vest"
     other = "other"
 
 class EquipmentStatus(str, enum.Enum):
+    # Legacy values kept for backward compatibility with existing rows.
     serviceable = "serviceable"
     not_serviceable = "not_serviceable"
     under_repair = "under_repair"
+    # Week 7 — client-aligned statuses for operational monitoring.
+    available = "available"
+    deployed = "deployed"
+    unserviceable = "unserviceable"
 
 class Urgency(str, enum.Enum):
     low = "low"
@@ -70,6 +80,26 @@ class FileType(str, enum.Enum):
     pdf = "pdf"
     excel = "excel"
     csv = "csv"
+
+class LifecycleStatus(str, enum.Enum):
+    """Upload lifecycle, kept separate from the extraction-oriented
+    ReportStatus. An upload starts as a draft on creation, becomes
+    confirmed once saved to Gold, and can then be archived (and restored).
+    Drafts may be discarded; discarded uploads are terminal."""
+    draft = "draft"
+    confirmed = "confirmed"
+    archived = "archived"
+    discarded = "discarded"
+
+class UploadEvent(str, enum.Enum):
+    """Event types recorded in the append-only UploadHistory trail."""
+    created = "created"
+    extracted = "extracted"
+    confirmed = "confirmed"
+    edited = "edited"
+    archived = "archived"
+    unarchived = "unarchived"
+    discarded = "discarded"
 
 class ResourceCategory(str, enum.Enum):
     food = "food"
@@ -130,7 +160,11 @@ class User(Base):
     reported_incidents = relationship("Incident", back_populates="reported_by_user")
     equipment_reports = relationship("EquipmentReport", back_populates="reported_by_user")
     incident_reports = relationship("IncidentReport", back_populates="submitted_by_user")
-    uploaded_reports = relationship("UploadedReport", back_populates="uploaded_by_user")
+    uploaded_reports = relationship(
+        "UploadedReport",
+        back_populates="uploaded_by_user",
+        foreign_keys="UploadedReport.uploaded_by",
+    )
     updated_resources = relationship("Resource", back_populates="updated_by_user")
 
 # ==========================
@@ -252,6 +286,7 @@ class Equipment(Base):
     status = Column(Enum(EquipmentStatus), default=EquipmentStatus.serviceable)
     plate_or_serial = Column(String(50))
     last_inspected = Column(Date)
+    is_archived = Column(Boolean, default=False)
     created_at = Column(DateTime, server_default=func.now())
 
     #relationships
@@ -315,9 +350,61 @@ class UploadedReport(Base):
     status = Column(Enum(ReportStatus), default=ReportStatus.pending)
     uploaded_at = Column(DateTime, server_default=func.now())
 
+    # ── Upload Lifecycle & Auditability Sprint (additive) ─────────────
+    # Lifecycle is tracked separately from `status` (which tracks
+    # extraction). New uploads start as draft; confirm → confirmed;
+    # confirmed ↔ archived; draft → discarded (terminal).
+    lifecycle_status = Column(
+        Enum(LifecycleStatus), default=LifecycleStatus.draft, nullable=False
+    )
+    archived_at = Column(DateTime, nullable=True)
+    archived_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    discarded_at = Column(DateTime, nullable=True)
+    discarded_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+
     #relationships
-    uploaded_by_user = relationship("User", back_populates="uploaded_reports")
+    uploaded_by_user = relationship(
+        "User", back_populates="uploaded_reports", foreign_keys=[uploaded_by]
+    )
     barangay = relationship("Barangay", back_populates="uploaded_reports")
+    history = relationship(
+        "UploadHistory",
+        back_populates="report",
+        order_by="UploadHistory.timestamp",
+        cascade="all, delete-orphan",
+    )
+
+# ==========================
+# TABLE 10b: Upload History (append-only edit/lifecycle trail)
+# ==========================
+
+class UploadHistory(Base):
+    """Append-only, immutable history of an upload's lifecycle and edits.
+
+    One row per event. Edit events record a single field change
+    (field_changed / old_value / new_value); lifecycle events
+    (created, extracted, confirmed, archived, unarchived, discarded)
+    use event_type with an optional human-readable note in new_value.
+
+    Rows are never updated or deleted in normal operation — corrections
+    are made by appending new rows.
+    """
+    __tablename__ = "upload_history"
+
+    id = Column(Integer, primary_key=True, index=True)
+    report_id = Column(Integer, ForeignKey("uploaded_reports.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    event_type = Column(Enum(UploadEvent), nullable=False)
+    field_changed = Column(String(100))   # only for edit events
+    old_value = Column(Text)
+    new_value = Column(Text)
+    reason = Column(Text)                 # optional free-text reason
+    timestamp = Column(DateTime, server_default=func.now())
+
+    # relationships
+    report = relationship("UploadedReport", back_populates="history")
+    user = relationship("User")
+
 
 # ==========================
 # TABLE 11: Audit Log
@@ -354,3 +441,32 @@ def log_action(db, user_id: int, action: str, target_table: str, target_id: int,
     )
     db.add(log)
     db.commit()
+
+
+# *******************************
+# Upload history helper — append-only. Never updates existing rows.
+# Caller is responsible for committing (so several edit rows can be
+# batched into one transaction).
+# *******************************
+
+def add_upload_history(
+    db,
+    report_id: int,
+    user_id,
+    event_type: "UploadEvent",
+    field_changed: str = None,
+    old_value=None,
+    new_value=None,
+    reason: str = None,
+):
+    entry = UploadHistory(
+        report_id=report_id,
+        user_id=user_id,
+        event_type=event_type,
+        field_changed=field_changed,
+        old_value=None if old_value is None else str(old_value),
+        new_value=None if new_value is None else str(new_value),
+        reason=(reason or None),
+    )
+    db.add(entry)
+    return entry

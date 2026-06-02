@@ -1,0 +1,316 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Review Upload — RisKonek{% endblock %}
+
+{% set active_nav = 'uploads' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start page-header">
+    <div>
+        <h1>Review Extracted Data</h1>
+        <p>Preview from <strong>{{ report.file_name }}</strong>.
+        {% if editable %}
+            Edit any field, untick rows you don't want to save, then confirm to write to the database.
+            You can also <strong>Save Draft</strong> to keep your edits without confirming.
+        {% else %}
+            This upload is read-only.
+        {% endif %}
+        </p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="/admin/uploads/{{ report.id }}/history" class="btn btn-outline-secondary">
+            <i class="bi bi-clock-history"></i> History
+        </a>
+        <a href="/admin/uploads" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to History
+        </a>
+    </div>
+</div>
+
+{% if editable %}
+<div class="alert alert-light border py-2 small">
+    <i class="bi bi-info-circle me-1"></i>
+    This is an unconfirmed <strong>draft</strong>. If you leave or click Cancel, your upload is kept as a draft &mdash; nothing is lost.
+    Use <strong>Discard Unconfirmed Upload</strong> below to remove it.
+</div>
+{% endif %}
+
+{% if request.query_params.get('success') %}
+<div class="alert alert-success alert-dismissible fade show">
+    <i class="bi bi-check-circle-fill me-1"></i>
+    {{ request.query_params.get('success') | replace('+', ' ') }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+{% if request.query_params.get('error') %}
+<div class="alert alert-danger alert-dismissible fade show">
+    <i class="bi bi-exclamation-triangle-fill me-1"></i>
+    {{ request.query_params.get('error') | replace('+', ' ') }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+{% if data.validation_errors %}
+<div class="alert alert-warning">
+    <strong>Validation issues from the last save attempt:</strong>
+    <ul class="mb-0">
+        {% for err in data.validation_errors %}<li>{{ err }}</li>{% endfor %}
+    </ul>
+</div>
+{% endif %}
+
+<!-- ── File / status summary ──────────────────────────────────────── -->
+<div class="dash-card mb-3">
+    <div class="row g-3">
+        <div class="col-md-3">
+            <div class="text-muted small">File</div>
+            <div class="fw-semibold">{{ report.file_name }}</div>
+            <div class="small"><span class="badge bg-light text-dark border">{{ report.file_type.value | upper }}</span></div>
+        </div>
+        <div class="col-md-3">
+            <div class="text-muted small">Uploaded</div>
+            <div>{{ report.uploaded_at | pht }}</div>
+            <div class="small text-muted">by {{ report.uploaded_by_user.username if report.uploaded_by_user else '—' }}</div>
+        </div>
+        <div class="col-md-3">
+            <div class="text-muted small">Lifecycle</div>
+            <div>
+                {% if lifecycle_status == 'draft' %}
+                    <span class="status-pill status-maintenance">Draft</span>
+                {% elif lifecycle_status == 'confirmed' %}
+                    <span class="status-pill status-operational">Confirmed</span>
+                {% elif lifecycle_status == 'archived' %}
+                    <span class="badge bg-secondary"><i class="bi bi-archive me-1"></i>Archived</span>
+                {% elif lifecycle_status == 'discarded' %}
+                    <span class="status-pill status-unavailable">Discarded</span>
+                {% endif %}
+            </div>
+            {% if is_archived and report.archived_at %}
+            <div class="small text-muted">on {{ report.archived_at | pht }}</div>
+            {% elif is_discarded and report.discarded_at %}
+            <div class="small text-muted">on {{ report.discarded_at | pht }}</div>
+            {% endif %}
+        </div>
+        <div class="col-md-3 d-flex flex-column gap-2">
+            <a href="/admin/uploads/{{ report.id }}/file" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-download"></i> Download raw file
+            </a>
+            {% if is_confirmed %}
+            <form method="POST" action="/admin/uploads/{{ report.id }}/archive"
+                  onsubmit="return confirm('Archive this upload? It stays searchable and auditable and can be restored later.');">
+                <button type="submit" class="btn btn-outline-secondary btn-sm w-100">
+                    <i class="bi bi-archive"></i> Archive Upload
+                </button>
+            </form>
+            {% elif is_archived %}
+            <form method="POST" action="/admin/uploads/{{ report.id }}/restore"
+                  onsubmit="return confirm('Restore this upload from the archive?');">
+                <button type="submit" class="btn btn-outline-success btn-sm w-100">
+                    <i class="bi bi-arrow-counterclockwise"></i> Restore Upload
+                </button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% if extraction_error %}
+<div class="alert alert-danger">
+    <strong>Extraction failed:</strong> {{ extraction_error }}<br>
+    You can still enter the data manually below and confirm-save.
+</div>
+{% endif %}
+
+<!-- ── AI summary (optional) ──────────────────────────────────────── -->
+<div class="dash-card mb-3">
+    <div class="card-title-row">
+        <i class="bi bi-robot"></i>
+        <h6>AI Summary</h6>
+    </div>
+    {% if report.ai_summary %}
+        <p class="mb-0" style="white-space:pre-line">{{ report.ai_summary }}</p>
+    {% elif not ai_available %}
+        <p class="text-muted mb-0 small">AI summary unavailable (GROQ_API_KEY not configured).</p>
+    {% else %}
+        <p class="text-muted mb-0 small">No AI summary generated for this file.</p>
+    {% endif %}
+</div>
+
+<!-- ── Raw extracted preview (text or table) ──────────────────────── -->
+<div class="dash-card mb-3">
+    <div class="card-title-row">
+        <i class="bi bi-file-text"></i>
+        <h6>Extracted Preview</h6>
+    </div>
+    {% if columns_preview and rows_preview %}
+        <div class="table-responsive" style="max-height: 260px; overflow:auto;">
+            <table class="table table-sm table-bordered mb-0" style="font-size:12px">
+                <thead style="background:#f9fafb;position:sticky;top:0">
+                    <tr>{% for c in columns_preview %}<th>{{ c }}</th>{% endfor %}</tr>
+                </thead>
+                <tbody>
+                    {% for row in rows_preview %}
+                    <tr>
+                        {% for c in columns_preview %}
+                        <td>{{ row.get(c) if row.get(c) is not none else '' }}</td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="form-text">Showing first {{ rows_preview | length }} rows.</div>
+    {% elif raw_text_preview %}
+        <pre style="white-space:pre-wrap;font-size:12px;max-height:260px;overflow:auto;background:#f9fafb;padding:10px;border-radius:6px">{{ raw_text_preview }}</pre>
+    {% else %}
+        <p class="text-muted mb-0 small">No preview available.</p>
+    {% endif %}
+</div>
+
+<!-- ── Editable structured fields → save draft / confirm ──────────── -->
+<form method="POST" action="/admin/uploads/{{ report.id }}/confirm">
+<div class="dash-card mb-3">
+    <div class="card-title-row">
+        <i class="bi bi-pencil-square"></i>
+        <h6>Structured Fields {% if editable %}— Edit Before Saving{% endif %}</h6>
+    </div>
+
+    {% if editable %}
+    <div class="row g-3 mb-3">
+        <div class="col-md-6">
+            <label class="form-label small fw-semibold mb-1">Display file name (metadata)</label>
+            <input type="text" name="file_name" class="form-control form-control-sm"
+                   value="{{ report.file_name }}">
+        </div>
+        <div class="col-md-6">
+            <label class="form-label small fw-semibold mb-1">Reason for changes (optional)</label>
+            <input type="text" name="edit_reason" class="form-control form-control-sm"
+                   placeholder="e.g. corrected barangay name from source">
+            <div class="form-text">Recorded against each edit in the audit trail.</div>
+        </div>
+    </div>
+    {% endif %}
+
+    <p class="small text-muted">
+        {% if editable %}
+            Untick a row to skip it. Only ticked rows with valid barangay, disaster type, and date will be saved as <strong>Incident</strong> records.
+        {% else %}
+            This upload is read-only ({{ lifecycle_status }}).
+        {% endif %}
+    </p>
+
+    <div class="table-responsive">
+    <table class="table table-bordered align-middle" style="font-size:12px">
+        <thead style="background:#f9fafb">
+            <tr>
+                <th style="width:40px"></th>
+                <th style="min-width:140px">Barangay</th>
+                <th style="min-width:120px">Disaster Type</th>
+                <th style="min-width:130px">Date Occurred</th>
+                <th style="width:90px">Families</th>
+                <th style="width:90px">Individuals</th>
+                <th style="width:90px">Casualties</th>
+                <th style="min-width:220px">Description</th>
+                <th style="min-width:160px">Resources Used</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for f in fields %}
+        {% set i = loop.index0 %}
+        <tr>
+            <td class="text-center">
+                <input type="checkbox" name="include_row" value="{{ i }}" checked
+                       {% if not editable %}disabled{% endif %}>
+            </td>
+            <td>
+                <input list="brgy-list" name="barangay" class="form-control form-control-sm"
+                       value="{{ f.barangay or '' }}"
+                       {% if not editable %}readonly{% endif %}>
+            </td>
+            <td>
+                <select name="disaster_type" class="form-select form-select-sm"
+                        {% if not editable %}disabled{% endif %}>
+                    {% for dt in disaster_types %}
+                    <option value="{{ dt }}" {% if f.disaster_type == dt %}selected{% endif %}>
+                        {{ dt | replace('_',' ') | title }}
+                    </option>
+                    {% endfor %}
+                </select>
+                {% if not editable %}<input type="hidden" name="disaster_type" value="{{ f.disaster_type }}">{% endif %}
+            </td>
+            <td>
+                <input type="date" name="date_occurred" class="form-control form-control-sm"
+                       value="{{ f.date_occurred or '' }}"
+                       {% if not editable %}readonly{% endif %}>
+            </td>
+            <td><input type="number" min="0" name="affected_families" class="form-control form-control-sm"
+                       value="{{ f.affected_families or 0 }}" {% if not editable %}readonly{% endif %}></td>
+            <td><input type="number" min="0" name="affected_individuals" class="form-control form-control-sm"
+                       value="{{ f.affected_individuals or 0 }}" {% if not editable %}readonly{% endif %}></td>
+            <td><input type="number" min="0" name="casualties" class="form-control form-control-sm"
+                       value="{{ f.casualties or 0 }}" {% if not editable %}readonly{% endif %}></td>
+            <td>
+                <textarea name="description" rows="2" class="form-control form-control-sm"
+                          {% if not editable %}readonly{% endif %}>{{ f.description or '' }}</textarea>
+            </td>
+            <td>
+                <textarea name="resources_used" rows="2" class="form-control form-control-sm"
+                          {% if not editable %}readonly{% endif %}>{{ f.resources_used or '' }}</textarea>
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+
+    <datalist id="brgy-list">
+        {% for b in barangays %}<option value="{{ b.name }}">{% endfor %}
+    </datalist>
+
+    {% if editable %}
+    <div class="d-flex justify-content-between align-items-center mt-3">
+        <span class="text-muted small">Cancel keeps this upload as a draft.</span>
+        <div class="d-flex gap-2">
+            <a href="/admin/uploads" class="btn btn-outline-secondary">Cancel</a>
+            <button type="submit" formaction="/admin/uploads/{{ report.id }}/save-draft"
+                    class="btn btn-outline-primary">
+                <i class="bi bi-save"></i> Save Draft
+            </button>
+            <button type="submit" class="btn btn-rk">
+                <i class="bi bi-check2-circle"></i> Confirm &amp; Save
+            </button>
+        </div>
+    </div>
+    {% endif %}
+</div>
+</form>
+
+{% if data.linked_incident_ids %}
+<div class="alert alert-success small">
+    <i class="bi bi-link-45deg"></i>
+    Linked Incident IDs: {{ data.linked_incident_ids | join(', ') }}
+</div>
+{% endif %}
+
+<!-- ── Discard (drafts only) ──────────────────────────────────────── -->
+{% if editable %}
+<div class="dash-card border-danger-subtle">
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <h6 class="mb-1 text-danger">Discard Unconfirmed Upload</h6>
+            <p class="small text-muted mb-0">
+                Permanently marks this draft as discarded. It will no longer appear with active uploads.
+                Confirmed uploads can never be discarded.
+            </p>
+        </div>
+        <form method="POST" action="/admin/uploads/{{ report.id }}/discard"
+              onsubmit="return confirm('Discard this unconfirmed upload? This cannot be undone.');">
+            <button type="submit" class="btn btn-outline-danger">
+                <i class="bi bi-trash"></i> Discard Unconfirmed Upload
+            </button>
+        </form>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

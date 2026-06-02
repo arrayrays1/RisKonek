@@ -16,6 +16,7 @@ instance/
 
 # Uploaded files / data lake local storage
 uploads/
+sample_uploads/
 
 # Local seed/import data
 data/*.xlsx
@@ -38,3 +39,4 @@ data/*.csv
 # OS files
 .DS_Store
 Thumbs.db
+

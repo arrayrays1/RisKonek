@@ -1,0 +1,157 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Upload History — RisKonek{% endblock %}
+
+{% set active_nav = 'uploads' %}
+
+{% block head_extra %}
+<style>
+    .timeline { position: relative; margin-left: 8px; padding-left: 28px; }
+    .timeline::before {
+        content: ""; position: absolute; left: 9px; top: 4px; bottom: 4px;
+        width: 2px; background: #e3e7ee;
+    }
+    .tl-item { position: relative; padding-bottom: 22px; }
+    .tl-dot {
+        position: absolute; left: -28px; top: 0;
+        width: 20px; height: 20px; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 10px; color: #fff;
+    }
+    .tl-time { font-size: 12px; color: var(--rk-muted); }
+    .tl-title { font-size: 14px; font-weight: 600; }
+    .diff-box {
+        font-size: 12px; border-radius: 6px; padding: 8px 10px;
+        white-space: pre-wrap; word-break: break-word; min-height: 38px;
+    }
+    .diff-old { background: #fdecea; border: 1px solid #f4c2bd; color: #842029; }
+    .diff-new { background: #eafaf1; border: 1px solid #c8e6d4; color: #14563a; }
+    .diff-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--rk-muted); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start page-header">
+    <div>
+        <h1>Audit Trail</h1>
+        <p>Append-only history for <strong>{{ report.file_name }}</strong> (ID #{{ report.id }}).
+        Every lifecycle change and field edit is recorded and never altered.</p>
+    </div>
+    <a href="/admin/uploads/{{ report.id }}/review" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Back to Review
+    </a>
+</div>
+
+<div class="dash-card mb-3">
+    <div class="row g-3">
+        <div class="col-md-4">
+            <div class="text-muted small">File</div>
+            <div class="fw-semibold">{{ report.file_name }}</div>
+            <span class="badge bg-light text-dark border">{{ report.file_type.value | upper }}</span>
+        </div>
+        <div class="col-md-4">
+            <div class="text-muted small">Lifecycle</div>
+            {% if lifecycle_status == 'draft' %}<span class="status-pill status-maintenance">Draft</span>
+            {% elif lifecycle_status == 'confirmed' %}<span class="status-pill status-operational">Confirmed</span>
+            {% elif lifecycle_status == 'archived' %}<span class="badge bg-secondary"><i class="bi bi-archive me-1"></i>Archived</span>
+            {% elif lifecycle_status == 'discarded' %}<span class="status-pill status-unavailable">Discarded</span>
+            {% endif %}
+        </div>
+        <div class="col-md-4">
+            <div class="text-muted small">Total events</div>
+            <div class="fw-semibold">{{ events | length }}</div>
+        </div>
+    </div>
+</div>
+
+<!-- ── Originally extracted snapshot (for traceability) ───────────── -->
+{% if original_fields %}
+<div class="dash-card mb-3">
+    <div class="card-title-row">
+        <i class="bi bi-file-earmark-text"></i>
+        <h6>Originally Extracted Values</h6>
+    </div>
+    <p class="small text-muted">
+        The as-extracted rows, preserved before the first manual edit. Compare against the
+        current values to distinguish <strong>extracted</strong> data from <strong>manual corrections</strong>.
+    </p>
+    <div class="table-responsive">
+        <table class="table table-sm table-bordered mb-0" style="font-size:12px">
+            <thead style="background:#f9fafb">
+                <tr>{% for k in field_keys %}<th>{{ k | replace('_', ' ') | title }}</th>{% endfor %}</tr>
+            </thead>
+            <tbody>
+                {% for row in original_fields %}
+                <tr>{% for k in field_keys %}<td>{{ row.get(k) if row.get(k) not in (none, '') else '—' }}</td>{% endfor %}</tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<div class="dash-card">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+        <span class="small">
+            <span class="badge" style="background:#b7950b">Edit</span>
+            <span class="badge" style="background:#1a6b47">Confirm / Restore</span>
+            <span class="badge bg-secondary">Archive</span>
+            <span class="badge" style="background:#c0392b">Discard</span>
+        </span>
+    </div>
+    {% if events %}
+    <div class="timeline">
+        {% for e in events %}
+        {% set et = e.event_type.value %}
+        {% if et == 'created' %}{% set icon = 'bi-cloud-upload' %}{% set bg = '#6c757d' %}
+        {% elif et == 'extracted' %}{% set icon = 'bi-file-earmark-text' %}{% set bg = '#0d6efd' %}
+        {% elif et == 'confirmed' %}{% set icon = 'bi-check2-circle' %}{% set bg = '#1a6b47' %}
+        {% elif et == 'edited' %}{% set icon = 'bi-pencil' %}{% set bg = '#b7950b' %}
+        {% elif et == 'archived' %}{% set icon = 'bi-archive' %}{% set bg = '#6c757d' %}
+        {% elif et == 'unarchived' %}{% set icon = 'bi-arrow-counterclockwise' %}{% set bg = '#1a6b47' %}
+        {% elif et == 'discarded' %}{% set icon = 'bi-trash' %}{% set bg = '#c0392b' %}
+        {% else %}{% set icon = 'bi-dot' %}{% set bg = '#6c757d' %}{% endif %}
+        <div class="tl-item">
+            <span class="tl-dot" style="background:{{ bg }}"><i class="bi {{ icon }}"></i></span>
+            <div class="d-flex justify-content-between align-items-start">
+                <div class="tl-title">
+                    {% if et == 'edited' %}
+                        Edited &mdash; {{ e.field_changed }}
+                    {% else %}
+                        {{ et | replace('_', ' ') | title }}
+                    {% endif %}
+                </div>
+                <div class="tl-time">{{ e.timestamp | pht }}</div>
+            </div>
+            <div class="text-muted small mb-1">
+                by {{ e.user.username if e.user else 'system' }}
+            </div>
+
+            {% if et == 'edited' %}
+            <div class="row g-2 mt-1">
+                <div class="col-md-6">
+                    <div class="diff-label mb-1">Before</div>
+                    <div class="diff-box diff-old">{{ e.old_value if e.old_value else '(empty)' }}</div>
+                </div>
+                <div class="col-md-6">
+                    <div class="diff-label mb-1">After</div>
+                    <div class="diff-box diff-new">{{ e.new_value if e.new_value else '(empty)' }}</div>
+                </div>
+            </div>
+            {% if e.reason %}
+            <div class="small text-muted mt-1"><i class="bi bi-chat-left-text me-1"></i>Reason: {{ e.reason }}</div>
+            {% endif %}
+            {% elif e.new_value %}
+            <div class="small">{{ e.new_value }}</div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-muted mb-0 text-center py-4">
+        <i class="bi bi-clock-history fs-3 d-block mb-2"></i>
+        No history recorded for this upload yet.
+    </p>
+    {% endif %}
+</div>
+{% endblock %}

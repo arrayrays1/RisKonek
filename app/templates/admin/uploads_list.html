@@ -1,0 +1,225 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Report Uploads — RisKonek{% endblock %}
+
+{% set active_nav = 'uploads' %}
+
+{% macro lifecycle_badge(r) -%}
+    {% set ls = r.lifecycle_status.value %}
+    {% if ls == 'draft' %}
+        <span class="status-pill status-maintenance">Draft</span>
+    {% elif ls == 'confirmed' %}
+        <span class="status-pill status-operational">Confirmed</span>
+    {% elif ls == 'archived' %}
+        <span class="badge bg-secondary"><i class="bi bi-archive me-1"></i>Archived</span>
+    {% elif ls == 'discarded' %}
+        <span class="status-pill status-unavailable">Discarded</span>
+    {% endif %}
+{%- endmacro %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start page-header">
+    <div>
+        <h1>Report Uploads</h1>
+    </div>
+    <a href="/admin/uploads/new" class="btn btn-rk">
+        <i class="bi bi-cloud-upload"></i> Upload Report
+    </a>
+</div>
+
+{% if not ai_available %}
+<div class="alert alert-secondary py-2 small">
+    <i class="bi bi-info-circle me-1"></i>
+    AI summary is unavailable (GROQ_API_KEY not configured). Upload and review still work normally.
+</div>
+{% endif %}
+
+{% if request.query_params.get('success') %}
+<div class="alert alert-success alert-dismissible fade show">
+    <i class="bi bi-check-circle-fill me-1"></i>
+    {{ request.query_params.get('success') }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+{% if request.query_params.get('error') %}
+<div class="alert alert-danger alert-dismissible fade show">
+    <i class="bi bi-exclamation-triangle-fill me-1"></i>
+    {{ request.query_params.get('error') }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+<!-- ── DRAFTS ─────────────────────────────────────────────────────── -->
+{% if drafts %}
+<div class="dash-card p-0 mb-4">
+    <div class="px-3 pt-3 pb-2 d-flex align-items-center gap-2">
+        <i class="bi bi-pencil-square text-warning"></i>
+        <h6 class="mb-0">Drafts &mdash; awaiting review</h6>
+        <span class="badge bg-warning-subtle text-dark border">{{ drafts | length }}</span>
+        <span class="text-muted small ms-1">Unconfirmed uploads. Nothing is saved to the database until you confirm.</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+            <thead style="background:#f9fafb">
+                <tr style="font-size:12px;color:var(--rk-muted);text-transform:uppercase;letter-spacing:0.04em">
+                    <th class="px-3 py-3">File</th>
+                    <th class="py-3">Type</th>
+                    <th class="py-3">Uploaded By</th>
+                    <th class="py-3">Uploaded At</th>
+                    <th class="py-3">Status</th>
+                    <th class="py-3 text-end px-3">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in drafts %}
+                <tr style="font-size:13px">
+                    <td class="px-3">
+                        <div class="fw-semibold">{{ r.file_name }}</div>
+                        <div class="text-muted small">ID #{{ r.id }}</div>
+                    </td>
+                    <td><span class="badge bg-light text-dark border">{{ r.file_type.value | upper }}</span></td>
+                    <td>{{ r.uploaded_by_user.username if r.uploaded_by_user else '—' }}</td>
+                    <td>{{ r.uploaded_at | pht }}</td>
+                    <td>{{ lifecycle_badge(r) }}</td>
+                    <td class="text-end px-3">
+                        <a href="/admin/uploads/{{ r.id }}/review" class="btn btn-rk btn-sm me-1">
+                            <i class="bi bi-pencil"></i> Resume Draft
+                        </a>
+                        <a href="/admin/uploads/{{ r.id }}/history"
+                           class="btn btn-outline-secondary btn-sm me-1" title="Audit trail">
+                            <i class="bi bi-clock-history"></i>
+                        </a>
+                        <form method="POST" action="/admin/uploads/{{ r.id }}/discard"
+                              class="d-inline"
+                              onsubmit="return confirm('Discard this unconfirmed draft? This cannot be undone.');">
+                            <button type="submit" class="btn btn-outline-danger btn-sm" title="Discard draft">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<!-- ── CONFIRMED (ACTIVE) ─────────────────────────────────────────── -->
+<div class="dash-card p-0">
+    <div class="px-3 pt-3 pb-2 d-flex align-items-center justify-content-between">
+        <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-collection"></i>
+            <h6 class="mb-0">Confirmed Uploads</h6>
+            <span class="badge bg-light text-dark border">{{ active_reports | length }}</span>
+        </div>
+        {% if hidden_count or show_archived %}
+        <div>
+            {% if show_archived %}
+            <a href="/admin/uploads" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-eye-slash"></i> Hide Archived &amp; Discarded
+            </a>
+            {% else %}
+            <a href="/admin/uploads?show_archived=1" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-archive"></i> Show Archived &amp; Discarded ({{ hidden_count }})
+            </a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+            <thead style="background:#f9fafb">
+                <tr style="font-size:12px;color:var(--rk-muted);text-transform:uppercase;letter-spacing:0.04em">
+                    <th class="px-3 py-3">File</th>
+                    <th class="py-3">Type</th>
+                    <th class="py-3">Uploaded By</th>
+                    <th class="py-3">Uploaded At</th>
+                    <th class="py-3">Status</th>
+                    <th class="py-3 text-end px-3">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in active_reports %}
+                <tr style="font-size:13px">
+                    <td class="px-3">
+                        <div class="fw-semibold">{{ r.file_name }}</div>
+                        <div class="text-muted small">ID #{{ r.id }}</div>
+                    </td>
+                    <td><span class="badge bg-light text-dark border">{{ r.file_type.value | upper }}</span></td>
+                    <td>{{ r.uploaded_by_user.username if r.uploaded_by_user else '—' }}</td>
+                    <td>{{ r.uploaded_at | pht }}</td>
+                    <td>{{ lifecycle_badge(r) }}</td>
+                    <td class="text-end px-3">
+                        <a href="/admin/uploads/{{ r.id }}/review"
+                           class="btn btn-outline-secondary btn-sm me-1">
+                            <i class="bi bi-eye"></i> View
+                        </a>
+                        <a href="/admin/uploads/{{ r.id }}/history"
+                           class="btn btn-outline-secondary btn-sm me-1" title="Audit trail">
+                            <i class="bi bi-clock-history"></i>
+                        </a>
+                        <a href="/admin/uploads/{{ r.id }}/file"
+                           class="btn btn-outline-secondary btn-sm me-1" title="Download raw file">
+                            <i class="bi bi-download"></i>
+                        </a>
+                        <form method="POST" action="/admin/uploads/{{ r.id }}/archive"
+                              class="d-inline"
+                              onsubmit="return confirm('Archive this upload? It stays searchable and auditable and can be restored later.');">
+                            <button type="submit" class="btn btn-outline-secondary btn-sm" title="Archive">
+                                <i class="bi bi-archive"></i>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center text-muted py-5">
+                        <i class="bi bi-inbox fs-3 d-block mb-2"></i>
+                        No confirmed uploads yet.
+                    </td>
+                </tr>
+                {% endfor %}
+
+                {% if show_archived and hidden_reports %}
+                <tr><td colspan="6" class="bg-light text-muted small fw-semibold px-3 py-2">
+                    <i class="bi bi-archive me-1"></i> Archived &amp; Discarded
+                </td></tr>
+                {% for r in hidden_reports %}
+                <tr style="font-size:13px;opacity:0.85">
+                    <td class="px-3">
+                        <div class="fw-semibold">{{ r.file_name }}</div>
+                        <div class="text-muted small">ID #{{ r.id }}</div>
+                    </td>
+                    <td><span class="badge bg-light text-dark border">{{ r.file_type.value | upper }}</span></td>
+                    <td>{{ r.uploaded_by_user.username if r.uploaded_by_user else '—' }}</td>
+                    <td>{{ r.uploaded_at | pht }}</td>
+                    <td>{{ lifecycle_badge(r) }}</td>
+                    <td class="text-end px-3">
+                        <a href="/admin/uploads/{{ r.id }}/review"
+                           class="btn btn-outline-secondary btn-sm me-1">
+                            <i class="bi bi-eye"></i> View
+                        </a>
+                        <a href="/admin/uploads/{{ r.id }}/history"
+                           class="btn btn-outline-secondary btn-sm me-1" title="Audit trail">
+                            <i class="bi bi-clock-history"></i>
+                        </a>
+                        {% if r.lifecycle_status.value == 'archived' %}
+                        <form method="POST" action="/admin/uploads/{{ r.id }}/restore"
+                              class="d-inline"
+                              onsubmit="return confirm('Restore this upload from the archive?');">
+                            <button type="submit" class="btn btn-outline-success btn-sm" title="Restore">
+                                <i class="bi bi-arrow-counterclockwise"></i> Restore
+                            </button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

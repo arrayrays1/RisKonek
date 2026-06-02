@@ -263,13 +263,21 @@
 </head>
 <body>
 
+{# ── Role-aware sidebar locals (hoisted so brand subtitle can use them) ── #}
+{% set role = (user.role if user else '') %}
+{% set is_admin = role == 'admin' %}
+{% set is_staff = role == 'cdrrmo_staff' %}
+{% set is_cfau  = role == 'cfau_oic' %}
+{% set portal_label = 'Admin Portal' if is_admin else ('Logistics Portal' if is_staff else ('Operations Portal' if is_cfau else 'Portal')) %}
+{% set role_label = 'CDRRMO Admin' if is_admin else ('CDRRMO Logistics Staff' if is_staff else ('CFAU / Operations' if is_cfau else '')) %}
+
 <!-- ── SIDEBAR ────────────────────────────────────────────────────── -->
 <div class="sidebar" id="sidebar">
     <div class="sidebar-brand">
         <div class="brand-icon">R</div>
         <div class="brand-text">
             <div class="brand-name">RISKONEK</div>
-            <div class="brand-sub">Admin Portal</div>
+            <div class="brand-sub">{{ portal_label }}</div>
         </div>
         <button class="sidebar-toggle" id="sidebarToggle" type="button"
                 aria-label="Toggle sidebar" title="Toggle sidebar">
@@ -282,13 +290,14 @@
         <div class="user-avatar">{{ user.username[0].upper() }}</div>
         <div class="user-info">
             <div class="user-name">{{ user.username }}</div>
-            <div class="user-role">CDRRMO Admin</div>
+            <div class="user-role">{{ role_label }}</div>
         </div>
     </div>
     {% endif %}
 
     {% set active = active_nav | default('') %}
     <nav>
+        {% if is_admin %}
         <a href="/admin/dashboard"
            class="nav-item-link {{ 'active' if active == 'analytics' else '' }}">
             <i class="bi bi-grid-1x2-fill nav-icon"></i><span class="nav-label">Analytics Overview</span>
@@ -297,16 +306,38 @@
            class="nav-item-link {{ 'active' if active == 'barangays' else '' }}">
             <i class="bi bi-geo-alt-fill nav-icon"></i><span class="nav-label">Barangay Field Data</span>
         </a>
+        {% endif %}
+
+        {% if is_staff %}
+        <a href="/staff/dashboard"
+           class="nav-item-link {{ 'active' if active == 'staff_dashboard' else '' }}">
+            <i class="bi bi-grid-1x2-fill nav-icon"></i><span class="nav-label">Dashboard</span>
+        </a>
+        {% endif %}
+        {% if is_cfau %}
+        <a href="/cfau/dashboard"
+           class="nav-item-link {{ 'active' if active == 'cfau_dashboard' else '' }}">
+            <i class="bi bi-grid-1x2-fill nav-icon"></i><span class="nav-label">Dashboard</span>
+        </a>
+        {% endif %}
+
+        {% if is_admin or is_staff %}
         <a href="/admin/resources"
            class="nav-item-link {{ 'active' if active == 'resources' else '' }}"
            title="Stockpile / resource goods owned by CDRRMO Logistics Staff (food packs, water, medicine, hygiene kits, blankets, and other relief goods)">
             <i class="bi bi-box-seam-fill nav-icon"></i><span class="nav-label">Resources Module</span>
         </a>
-        <a href="/admin/equipment-reports"
+        {% endif %}
+
+        {% if is_admin or is_staff or is_cfau %}
+        <a href="/admin/equipment"
            class="nav-item-link {{ 'active' if active == 'equipment' else '' }}"
            title="Shared module — accessible to CDRRMO Logistics Staff and CFAU / Operations Personnel (vehicles, generators, chainsaws, flashlights, rescue tools, boats, ambulances, and other operational equipment)">
             <i class="bi bi-wrench-adjustable nav-icon"></i><span class="nav-label">Vehicle &amp; Equipment</span>
         </a>
+        {% endif %}
+
+        {% if is_admin %}
         <a href="/admin/map"
            class="nav-item-link {{ 'active' if active == 'map' else '' }}">
             <i class="bi bi-map-fill nav-icon"></i><span class="nav-label">Hazard Reference Map</span>
@@ -315,14 +346,21 @@
            class="nav-item-link {{ 'active' if active == 'simulator' else '' }}">
             <i class="bi bi-lightning-fill nav-icon"></i><span class="nav-label">Disaster Simulator</span>
         </a>
+        <a href="/admin/uploads"
+            class="nav-item-link {{ 'active' if active == 'uploads' else '' }}"
+            title="View and manage all uploaded disaster reports">
+                <i class="bi bi-cloud-upload-fill nav-icon"></i><span class="nav-label">Report Uploads</span>
+        </a>
         <a href="/admin/audit"
-           class="nav-item-link {{ 'active' if active == 'audit' else '' }}">
-            <i class="bi bi-file-earmark-text-fill nav-icon"></i><span class="nav-label">Decision Logs</span>
+           class="nav-item-link {{ 'active' if active == 'audit' else '' }}"
+           title="System-wide audit trail of all logged actions">
+            <i class="bi bi-file-earmark-text-fill nav-icon"></i><span class="nav-label">Audit Trail</span>
         </a>
         <a href="/admin/users"
            class="nav-item-link {{ 'active' if active == 'users' else '' }}">
             <i class="bi bi-people-fill nav-icon"></i><span class="nav-label">User Management</span>
         </a>
+        {% endif %}
     </nav>
 
     <div class="sidebar-footer">
