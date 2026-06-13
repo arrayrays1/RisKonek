@@ -26,12 +26,12 @@ from app.auth import require_role
 from app.models import (
     UploadedReport, UploadHistory, ReportStatus, FileType,
     LifecycleStatus, UploadEvent,
-    Incident, DisasterType, Barangay, log_action, add_upload_history,
+    Incident, IncidentReport, DisasterType, Barangay, log_action, add_upload_history,
 )
 from app.etl.extract_pdf import extract_pdf
 from app.etl.extract_excel import extract_excel, extract_csv
 from app.etl.structure import (
-    structure_rows, structure_row, empty_field_row,
+    structure_rows, structure_row, empty_field_row, structure_text,
 )
 from app.etl.ai_pipeline import summarize as ai_summarize, is_available as ai_available
 
@@ -145,6 +145,14 @@ def upload_list(request: Request, db: Session = Depends(get_db)):
         .all()
     )
 
+    # CFAU post-incident uploads (Week 8.1) reuse the same UploadedReport
+    # table but are tagged in extracted_data JSON and managed under /cfau.
+    # Keep this admin incident-upload list showing only incident-kind uploads.
+    reports = [
+        r for r in reports
+        if (r.extracted_data or {}).get("report_kind") != "post_incident"
+    ]
+
     # Split by lifecycle. Drafts always get their own section; archived and
     # discarded uploads stay hidden until the admin opts to show them.
     drafts, active, hidden = [], [], []
@@ -257,7 +265,11 @@ async def upload_submit(
         if file_type_enum == FileType.pdf:
             out = extract_pdf(stored_path)
             extracted["raw_text"] = out.get("text", "")
-            extracted["fields"] = [empty_field_row()]
+            # Best-effort: pre-fill only confidently detected fields from the
+            # raw text; everything else keeps its blank-row default and stays
+            # editable. Known barangay names make that detection reliable.
+            known_barangays = [b.name for b in db.query(Barangay).all()]
+            extracted["fields"] = [structure_text(extracted["raw_text"], known_barangays)]
         elif file_type_enum == FileType.excel:
             out = extract_excel(stored_path)
             extracted["columns"] = out["columns"]
@@ -764,6 +776,20 @@ def upload_history(report_id: int, request: Request, db: Session = Depends(get_d
     data = report.extracted_data or {}
     original_fields = data.get("original_fields")
 
+    # Round-trip traceability: if this is a CFAU post-incident upload that
+    # was converted, surface a link back to the produced Post-Incident
+    # Report (managed in the Post-Incident Reports module). Reuses the
+    # existing Week 8.1 JSON linkage — no new column.
+    produced_incident_report = None
+    if data.get("report_kind") == "post_incident":
+        produced_id = data.get("produced_incident_report_id")
+        if produced_id:
+            produced_incident_report = (
+                db.query(IncidentReport)
+                .filter(IncidentReport.id == produced_id)
+                .first()
+            )
+
     return templates.TemplateResponse(
         request=request,
         name="admin/upload_history.html",
@@ -775,5 +801,6 @@ def upload_history(report_id: int, request: Request, db: Session = Depends(get_d
             "original_fields": original_fields,
             "field_keys": FIELD_KEYS,
             "lifecycle_status": report.lifecycle_status.value,
+            "produced_incident_report": produced_incident_report,
         },
     )

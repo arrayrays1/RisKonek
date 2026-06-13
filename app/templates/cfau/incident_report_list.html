@@ -1,0 +1,123 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Post-Incident Reports — RisKonek{% endblock %}
+
+{% set active_nav = 'incident_reports' %}
+
+{% macro workflow_pill(v, label) -%}
+    {% if v == 'submitted' %}
+        <span class="status-pill status-operational">{{ label }}</span>
+    {% else %}
+        <span class="badge bg-light text-dark border">{{ label }}</span>
+    {% endif %}
+{%- endmacro %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start page-header">
+    <div>
+        <h1>Post-Incident Reports</h1>
+        <p>
+            {% if is_admin_view %}All operational reports filed by CFAU after disaster responses.{% else %}
+            Your operational reports filed after disaster response activities.{% endif %}
+        </p>
+    </div>
+    <div class="dropdown">
+        <button class="btn btn-rk dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="bi bi-plus-lg"></i> New Report
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end">
+            <li>
+                <a class="dropdown-item" href="/cfau/incident-reports/new">
+                    <i class="bi bi-pencil-square me-1"></i> Fill Manually
+                </a>
+            </li>
+            <li>
+                <a class="dropdown-item" href="/cfau/incident-reports/upload">
+                    <i class="bi bi-cloud-upload me-1"></i> Upload Existing Report
+                </a>
+            </li>
+        </ul>
+    </div>
+</div>
+
+{% if request.query_params.get('success') %}
+<div class="alert alert-success alert-dismissible fade show">
+    <i class="bi bi-check-circle-fill me-1"></i>{{ request.query_params.get('success') }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+{% if request.query_params.get('error') %}
+<div class="alert alert-danger alert-dismissible fade show">
+    <i class="bi bi-exclamation-triangle-fill me-1"></i>{{ request.query_params.get('error') }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+<!-- ── Filter ─────────────────────────────────────────────────── -->
+<div class="dash-card mb-3">
+    <form method="GET" action="/cfau/incident-reports" class="row g-2 align-items-end js-live-filter">
+        <div class="col-md-3">
+            <label class="form-label small fw-semibold mb-1">Status</label>
+            <select name="status" class="form-select form-select-sm">
+                <option value="">All statuses</option>
+                {% for v, label in statuses %}
+                <option value="{{ v }}" {% if f_status == v %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2 d-grid">
+            <a href="/cfau/incident-reports" class="btn btn-outline-secondary btn-sm"><i class="bi bi-x-circle"></i> Reset</a>
+        </div>
+    </form>
+</div>
+
+<!-- ── Table ──────────────────────────────────────────────────── -->
+<div class="dash-card p-0">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead style="background:#f9fafb">
+                <tr style="font-size:12px;color:var(--rk-muted);text-transform:uppercase;letter-spacing:0.04em">
+                    <th class="px-3 py-3">Disaster Type</th>
+                    <th class="py-3">Barangay</th>
+                    <th class="py-3">Date Occurred</th>
+                    <th class="py-3">Personnel</th>
+                    <th class="py-3">Status</th>
+                    {% if is_admin_view %}<th class="py-3">Reporter</th>{% endif %}
+                    <th class="py-3 text-end px-3">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in rows %}
+                <tr style="font-size:13px">
+                    <td class="px-3 fw-semibold">{{ r.disaster_type }}</td>
+                    <td>{{ r.barangay }}</td>
+                    <td class="text-muted">{{ r.date_occurred.strftime('%Y-%m-%d') if r.date_occurred else '—' }}</td>
+                    <td class="text-muted">{{ r.personnel_count }}</td>
+                    <td>{{ workflow_pill(r.report_status, r.report_status_label) }}</td>
+                    {% if is_admin_view %}<td class="text-muted">{{ r.reporter }}</td>{% endif %}
+                    <td class="text-end px-3">
+                        <a href="/cfau/incident-reports/{{ r.id }}" class="btn btn-outline-secondary btn-sm">
+                            <i class="bi bi-eye"></i> View
+                        </a>
+                        {% if r.report_status == 'draft' %}
+                        <a href="/cfau/incident-reports/{{ r.id }}/edit" class="btn btn-outline-secondary btn-sm">
+                            <i class="bi bi-pencil"></i>
+                        </a>
+                        <form method="POST" action="/cfau/incident-reports/{{ r.id }}/submit" class="d-inline"
+                              onsubmit="return confirm('Submit this report? You will no longer be able to edit it.')">
+                            <button type="submit" class="btn btn-rk btn-sm"><i class="bi bi-send"></i> Submit</button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="{{ 7 if is_admin_view else 6 }}" class="text-center text-muted py-4">
+                    No post-incident reports found.
+                    {% if f_status %}<a href="/cfau/incident-reports" class="ms-2">Clear filter</a>{% endif %}
+                </td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -12,7 +12,7 @@
 
 <!-- ── Search + filter card ───────────────────────────────────── -->
 <div class="dash-card mb-4">
-    <form method="GET" action="/admin/barangays" class="row g-2 align-items-center">
+    <form method="GET" action="/admin/barangays" class="row g-2 align-items-center js-live-filter">
         <div class="col-md-8">
             <div class="input-group">
                 <span class="input-group-text bg-white">
@@ -34,9 +34,9 @@
             </select>
         </div>
         <div class="col-md-1 d-grid">
-            <button type="submit" class="btn btn-rk">
-                <i class="bi bi-funnel"></i>
-            </button>
+            <a href="/admin/barangays" class="btn btn-outline-secondary" title="Reset filters">
+                <i class="bi bi-x-circle"></i>
+            </a>
         </div>
     </form>
 </div>

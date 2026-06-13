@@ -64,6 +64,27 @@
     </div>
 </div>
 
+{% if produced_incident_report %}
+<!-- ── Round-trip traceability (Week 8.1 post-incident linkage) ───── -->
+<div class="dash-card mb-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div>
+        <div class="card-title-row mb-1">
+            <i class="bi bi-journal-text" style="color:var(--rk-green)"></i>
+            <h6 class="mb-0">Produced Post-Incident Report</h6>
+        </div>
+        <p class="small text-muted mb-0">
+            This upload was converted into Post-Incident Report
+            <strong>#{{ produced_incident_report.id }}</strong>, managed in the
+            Post-Incident Reports module. This screen remains the ETL / data
+            lakehouse record for the uploaded file.
+        </p>
+    </div>
+    <a href="/admin/incident-reports/{{ produced_incident_report.id }}" class="btn btn-rk btn-sm">
+        <i class="bi bi-box-arrow-up-right"></i> Open Report #{{ produced_incident_report.id }}
+    </a>
+</div>
+{% endif %}
+
 <!-- ── Originally extracted snapshot (for traceability) ───────────── -->
 {% if original_fields %}
 <div class="dash-card mb-3">

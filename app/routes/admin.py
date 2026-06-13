@@ -10,6 +10,7 @@ from app.models import (
     DisasterType, RiskLevel, Facility, FacilityType,
     UploadedReport, UploadHistory, UploadEvent,
     ResourceCategory, EquipmentType, log_action,
+    EquipmentReport, IncidentReport, ServiceabilityStatus, Urgency,
 )
 from app.auth import require_role, hash_password
 from app.analytics.simulator import compute_risk_score
@@ -696,20 +697,14 @@ def barangay_list(
     )
 
 
-@router.get("/barangays/{barangay_id}", response_class=HTMLResponse)
-def barangay_profile(
-    barangay_id: int,
-    request: Request,
-    db: Session = Depends(get_db),
-):
-    user = require_role(request, ["admin"])
-    if isinstance(user, RedirectResponse):
-        return user
+def barangay_profile_context(db, brgy: Barangay) -> dict:
+    """Build the full barangay-profile context for `brgy`.
 
-    brgy = db.query(Barangay).filter(Barangay.id == barangay_id).first()
-    if not brgy:
-        return RedirectResponse(url="/admin/barangays", status_code=302)
-
+    Shared by the admin barangay profile (TR-ADM-23) and the
+    barangay-scoped BDRRMO profile (Week 9) so both render identical
+    population / incident / facility / planning-priority data without
+    duplicating the logic. Does NOT include `user` — the caller adds it.
+    """
     population = db.query(Population).filter(
         Population.barangay_id == brgy.id
     ).order_by(Population.recorded_at.desc()).first()
@@ -719,7 +714,8 @@ def barangay_profile(
     ).order_by(Incident.date_occurred.desc()).all()
 
     facilities = db.query(Facility).filter(
-        Facility.barangay_id == brgy.id
+        Facility.barangay_id == brgy.id,
+        Facility.is_archived == False,
     ).order_by(Facility.facility_type, Facility.name).all()
 
     # ── Risk score (reuse existing formula) ──────────────────────────
@@ -742,10 +738,6 @@ def barangay_profile(
     def pct(n):
         return round((n / total_pop) * 100, 1) if total_pop else 0.0
 
-    # ── Risk trends (rule-based) ─────────────────────────────────────
-    flood_trend = _risk_trend(incidents, DisasterType.flood)
-    fire_trend = _risk_trend(incidents, DisasterType.fire)
-
     # ── Critical facilities (formatted) ──────────────────────────────
     facility_rows = []
     for f in facilities:
@@ -761,31 +753,49 @@ def barangay_profile(
             "status_class": status_class,
         })
 
+    return {
+        "barangay": brgy,
+        "risk_level": brgy.risk_level.value if brgy.risk_level else "low",
+        "risk_score": risk_result["score"],
+        "risk_breakdown": risk_result["breakdown"],
+        "total_population": total_pop,
+        "households": households,
+        "vulnerable_pct": _vulnerable_percent(population),
+        "elderly": elderly,
+        "pwd": pwd,
+        "children": children,
+        "elderly_pct": pct(elderly),
+        "pwd_pct": pct(pwd),
+        "children_pct": pct(children),
+        "flood_trend": _risk_trend(incidents, DisasterType.flood),
+        "fire_trend": _risk_trend(incidents, DisasterType.fire),
+        "facility_rows": facility_rows,
+        "incident_counts": incident_counts_by_type,
+        "recent_incidents": recent_incidents[:10],
+        "hazard_types": [h.strip() for h in (brgy.hazard_types or "").split(",") if h.strip()],
+    }
+
+
+@router.get("/barangays/{barangay_id}", response_class=HTMLResponse)
+def barangay_profile(
+    barangay_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    user = require_role(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
+
+    brgy = db.query(Barangay).filter(Barangay.id == barangay_id).first()
+    if not brgy:
+        return RedirectResponse(url="/admin/barangays", status_code=302)
+
+    context = barangay_profile_context(db, brgy)
+    context["user"] = user
     return templates.TemplateResponse(
         request=request,
         name="admin/barangay_profile.html",
-        context={
-            "user": user,
-            "barangay": brgy,
-            "risk_level": brgy.risk_level.value if brgy.risk_level else "low",
-            "risk_score": risk_result["score"],
-            "risk_breakdown": risk_result["breakdown"],
-            "total_population": total_pop,
-            "households": households,
-            "vulnerable_pct": _vulnerable_percent(population),
-            "elderly": elderly,
-            "pwd": pwd,
-            "children": children,
-            "elderly_pct": pct(elderly),
-            "pwd_pct": pct(pwd),
-            "children_pct": pct(children),
-            "flood_trend": flood_trend,
-            "fire_trend": fire_trend,
-            "facility_rows": facility_rows,
-            "incident_counts": incident_counts_by_type,
-            "recent_incidents": recent_incidents[:10],
-            "hazard_types": [h.strip() for h in (brgy.hazard_types or "").split(",") if h.strip()],
-        },
+        context=context,
     )
 
 
@@ -831,6 +841,7 @@ def facilities_map_data(request: Request, db: Session = Depends(get_db)):
     facilities = (
         db.query(Facility)
         .join(Barangay, Facility.barangay_id == Barangay.id)
+        .filter(Facility.is_archived == False)
         .order_by(Barangay.name, Facility.name)
         .all()
     )
@@ -1605,3 +1616,475 @@ def equipment_archive_toggle(
     url = "/admin/equipment?archived=1&success=" + verb.title() if e.is_archived \
         else "/admin/equipment?success=" + verb.title()
     return RedirectResponse(url=url, status_code=302)
+
+
+# ─────────────────────────────────────────────────────────────────────
+# WEEK 8 — EQUIPMENT SERVICEABILITY REVIEW (admin side of Module B)
+# Roles: admin only. CFAU files reports under /cfau/serviceability;
+# the admin reviews them here, updates the workflow status, and adds
+# remarks. Reuses the existing EquipmentReport model + AuditLog.
+# ─────────────────────────────────────────────────────────────────────
+
+SERVICEABILITY_WORKFLOW_LABELS = {
+    "draft": "Draft",
+    "submitted": "Submitted",
+    "reviewed": "Reviewed",
+    "resolved": "Resolved",
+}
+SERVICEABILITY_FINDING_LABELS = {
+    "serviceable": "Serviceable",
+    "under_repair": "Under Repair",
+    "unserviceable": "Unserviceable",
+    # Legacy finding values still render sensibly.
+    "not_serviceable": "Unserviceable (legacy)",
+    "available": "Serviceable",
+    "deployed": "Deployed",
+}
+SERVICEABILITY_TYPE_LABELS = {
+    "inspection": "Inspection",
+    "maintenance": "Maintenance Finding",
+    "serviceability": "Serviceability Assessment",
+}
+
+# Maps a report *finding* (EquipmentStatus subset) onto the live fleet
+# status terms used by the Week 7 monitoring module. A "serviceable"
+# finding becomes "available" so the live module stays on client-aligned
+# vocabulary rather than the legacy value.
+FINDING_TO_LIVE_STATUS = {
+    "serviceable": "available",
+    "under_repair": "under_repair",
+    "unserviceable": "unserviceable",
+}
+
+# Urgency drives the admin review queue: higher rank surfaces first so a
+# critical report (e.g. an unserviceable ambulance) is seen immediately.
+URGENCY_RANK = {"critical": 3, "high": 2, "moderate": 1, "low": 0}
+
+
+@router.get("/serviceability", response_class=HTMLResponse)
+def serviceability_review_list(
+    request: Request,
+    db: Session = Depends(get_db),
+    status: Optional[str] = None,
+    urgency: Optional[str] = None,
+):
+    user = require_role(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
+
+    query = db.query(EquipmentReport)
+    if status and status in {s.value for s in ServiceabilityStatus}:
+        query = query.filter(EquipmentReport.report_status == ServiceabilityStatus(status))
+    if urgency and urgency in {u.value for u in Urgency}:
+        query = query.filter(EquipmentReport.urgency == Urgency(urgency))
+
+    reports = query.all()
+
+    rows = []
+    for r in reports:
+        urgency_value = r.urgency.value if r.urgency else "moderate"
+        status_value = r.report_status.value if r.report_status else "draft"
+        # A report needs attention when it is submitted (awaiting review);
+        # high/critical urgency in that state is flagged as priority.
+        needs_review = status_value == "submitted"
+        is_priority = needs_review and urgency_value in ("high", "critical")
+        rows.append({
+            "id": r.id,
+            "title": r.title or "(untitled)",
+            "equipment": r.equipment.name if r.equipment else "—",
+            "report_type": SERVICEABILITY_TYPE_LABELS.get(r.report_type, r.report_type or "—"),
+            "finding": SERVICEABILITY_FINDING_LABELS.get(
+                r.status.value if r.status else "", "—"
+            ),
+            "urgency": urgency_value,
+            "urgency_label": urgency_value.title(),
+            "urgency_rank": URGENCY_RANK.get(urgency_value, 1),
+            "report_status": status_value,
+            "report_status_label": SERVICEABILITY_WORKFLOW_LABELS.get(status_value, "Draft"),
+            "reporter": r.reported_by_user.username if r.reported_by_user else "—",
+            "reported_at": r.reported_at,
+            "submitted_at": r.submitted_at,
+            "needs_review": needs_review,
+            "is_priority": is_priority,
+        })
+
+    # Priority queue ordering: urgency is the primary key (critical → low),
+    # so the most urgent reports always surface at the top by default.
+    # Within the same urgency, items still awaiting review come first, then
+    # the most recent. reported_at is the final tiebreaker (datetime.min
+    # guards against NULLs).
+    rows.sort(
+        key=lambda x: (
+            x["urgency_rank"],
+            x["needs_review"],
+            x["submitted_at"] or x["reported_at"] or datetime.min,
+        ),
+        reverse=True,
+    )
+
+    all_reports = db.query(EquipmentReport).all()
+    summary = {
+        "submitted": sum(1 for x in all_reports if x.report_status == ServiceabilityStatus.submitted),
+        "reviewed": sum(1 for x in all_reports if x.report_status == ServiceabilityStatus.reviewed),
+        "resolved": sum(1 for x in all_reports if x.report_status == ServiceabilityStatus.resolved),
+        "total": len(all_reports),
+        # Submitted reports at high/critical urgency — the ones that should
+        # be acted on immediately.
+        "priority": sum(
+            1 for x in all_reports
+            if x.report_status == ServiceabilityStatus.submitted
+            and x.urgency and x.urgency.value in ("high", "critical")
+        ),
+    }
+
+    return templates.TemplateResponse(
+        request=request,
+        name="admin/serviceability_review.html",
+        context={
+            "user": user,
+            "active_nav": "serviceability_review",
+            "rows": rows,
+            "summary": summary,
+            "statuses": [(s.value, SERVICEABILITY_WORKFLOW_LABELS[s.value]) for s in ServiceabilityStatus],
+            "urgencies": [(u.value, u.value.title()) for u in Urgency],
+            "f_status": status or "",
+            "f_urgency": urgency or "",
+            "detail": None,
+        },
+    )
+
+
+@router.get("/serviceability/{report_id}", response_class=HTMLResponse)
+def serviceability_review_detail(report_id: int, request: Request, db: Session = Depends(get_db)):
+    user = require_role(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
+
+    r = db.query(EquipmentReport).filter(EquipmentReport.id == report_id).first()
+    if not r:
+        return RedirectResponse(url="/admin/serviceability", status_code=302)
+
+    # ── Admin-assisted live-status sync state ─────────────────────────
+    # The finding and the live Equipment.status are kept separate; the
+    # admin can optionally push the finding onto the live record.
+    equipment = r.equipment
+    finding_value = r.status.value if r.status else None
+    mapped_live = FINDING_TO_LIVE_STATUS.get(finding_value, finding_value)
+    live_status_value = equipment.status.value if (equipment and equipment.status) else None
+
+    # Only submitted/reviewed/resolved reports may be applied (not drafts),
+    # and only when the live status actually differs from the finding.
+    statuses_differ = (
+        equipment is not None
+        and mapped_live is not None
+        and live_status_value != mapped_live
+    )
+    can_apply = statuses_differ and r.report_status != ServiceabilityStatus.draft
+
+    return templates.TemplateResponse(
+        request=request,
+        name="admin/serviceability_review_detail.html",
+        context={
+            "user": user,
+            "active_nav": "serviceability_review",
+            "r": r,
+            "finding_label": SERVICEABILITY_FINDING_LABELS.get(finding_value or "", "—"),
+            "report_type_label": SERVICEABILITY_TYPE_LABELS.get(r.report_type, r.report_type or "—"),
+            "workflow_label": SERVICEABILITY_WORKFLOW_LABELS.get(
+                r.report_status.value if r.report_status else "draft", "Draft"
+            ),
+            # Only reports that have been submitted by CFAU can be acted on.
+            "can_review": r.report_status in (
+                ServiceabilityStatus.submitted, ServiceabilityStatus.reviewed
+            ),
+            # Live-status sync context.
+            "live_status_label": EQUIPMENT_STATUS_LABELS.get(live_status_value or "", "—"),
+            "mapped_live_label": EQUIPMENT_STATUS_LABELS.get(mapped_live or "", "—"),
+            "can_apply_finding": can_apply,
+            "finding_applied": r.finding_applied_at is not None,
+        },
+    )
+
+
+@router.post("/serviceability/{report_id}/apply-finding")
+def serviceability_apply_finding(report_id: int, request: Request, db: Session = Depends(get_db)):
+    """Admin-assisted sync: push this report's finding onto the live
+    Equipment.status. Never triggered by review/resolve — it is an
+    explicit, separate action so a human always confirms a fleet change.
+    """
+    user = require_role(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
+
+    r = db.query(EquipmentReport).filter(EquipmentReport.id == report_id).first()
+    if not r:
+        return RedirectResponse(url="/admin/serviceability", status_code=302)
+
+    if r.report_status == ServiceabilityStatus.draft:
+        return RedirectResponse(
+            url=f"/admin/serviceability/{report_id}?error=Report+is+still+a+draft",
+            status_code=302,
+        )
+
+    equipment = r.equipment
+    finding_value = r.status.value if r.status else None
+    mapped_live = FINDING_TO_LIVE_STATUS.get(finding_value, finding_value)
+    if not equipment or not mapped_live or mapped_live not in {s.value for s in EquipmentStatus}:
+        return RedirectResponse(
+            url=f"/admin/serviceability/{report_id}?error=Cannot+apply+finding",
+            status_code=302,
+        )
+
+    old_status = equipment.status.value if equipment.status else "—"
+    if old_status == mapped_live:
+        # Already in sync — just record that the finding has been applied.
+        r.finding_applied_at = datetime.utcnow()
+        db.commit()
+        return RedirectResponse(
+            url=f"/admin/serviceability/{report_id}?success=Live+status+already+matches",
+            status_code=302,
+        )
+
+    equipment.status = EquipmentStatus(mapped_live)
+    r.finding_applied_at = datetime.utcnow()
+    db.commit()
+
+    log_action(
+        db, user["id"], "status_changed", "equipment", equipment.id,
+        f"Equipment #{equipment.id} '{equipment.name}' live status "
+        f"{old_status} → {mapped_live}, applied from serviceability report "
+        f"#{r.id} (finding: {SERVICEABILITY_FINDING_LABELS.get(finding_value, finding_value)})",
+    )
+
+    return RedirectResponse(
+        url=f"/admin/serviceability/{report_id}?success=Live+equipment+status+updated",
+        status_code=302,
+    )
+
+
+@router.post("/serviceability/{report_id}/review")
+def serviceability_review_action(
+    report_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    new_status: str = Form(...),     # "reviewed" or "resolved"
+    admin_remarks: str = Form(""),
+):
+    user = require_role(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
+
+    r = db.query(EquipmentReport).filter(EquipmentReport.id == report_id).first()
+    if not r:
+        return RedirectResponse(url="/admin/serviceability", status_code=302)
+
+    if new_status not in ("reviewed", "resolved"):
+        return RedirectResponse(
+            url=f"/admin/serviceability/{report_id}?error=Invalid+status",
+            status_code=302,
+        )
+    # Drafts have not been submitted yet — nothing for the admin to review.
+    if r.report_status == ServiceabilityStatus.draft:
+        return RedirectResponse(
+            url=f"/admin/serviceability/{report_id}?error=Report+is+still+a+draft",
+            status_code=302,
+        )
+
+    old = r.report_status.value if r.report_status else "—"
+    r.report_status = ServiceabilityStatus(new_status)
+    if admin_remarks.strip():
+        r.admin_remarks = admin_remarks.strip()
+    # Record who reviewed it (set on first review, kept thereafter).
+    if r.reviewed_by is None:
+        r.reviewed_by = user["id"]
+        r.reviewed_at = datetime.utcnow()
+    db.commit()
+
+    note = f" — remarks: {admin_remarks.strip()}" if admin_remarks.strip() else ""
+    log_action(
+        db, user["id"], new_status, "equipment_reports", r.id,
+        f"Serviceability report '{r.title}' {old} → {new_status}{note}",
+    )
+
+    return RedirectResponse(
+        url=f"/admin/serviceability?success=Report+marked+{new_status}",
+        status_code=302,
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────
+# WEEK 9 (Part A) — ADMIN POST-INCIDENT REPORTS (thin management layer)
+# Read-only oversight over the SAME IncidentReport records CFAU files.
+# IncidentReport stays the single source of truth — no new model, and
+# the admin cannot edit/submit submitted reports here (view + filter
+# + open detail only). Mirrors the Serviceability Review layer.
+# ─────────────────────────────────────────────────────────────────────
+
+# Only draft / submitted are meaningful for post-incident reports.
+INCIDENT_REPORT_WORKFLOW_LABELS = {
+    "draft": "Draft",
+    "submitted": "Submitted",
+    "reviewed": "Reviewed",
+    "resolved": "Resolved",
+}
+
+# Week 8.1 tags CFAU post-incident uploads in extracted_data JSON with this
+# kind, and links the produced report via `produced_incident_report_id`.
+_UPLOAD_KIND_POST_INCIDENT = "post_incident"
+
+
+def _source_uploads_by_report_id(db) -> dict:
+    """Map produced IncidentReport id → its source UploadedReport.
+
+    Built in ONE query so the admin list can show provenance ("Uploaded"
+    vs "Manual") and link to the source upload without an N+1 reverse
+    scan. Reuses the existing Week 8.1 JSON linkage — there is no FK
+    column between the two tables.
+    """
+    uploads = (
+        db.query(UploadedReport)
+        .filter(UploadedReport.extracted_data.isnot(None))
+        .all()
+    )
+    mapping = {}
+    for up in uploads:
+        data = up.extracted_data or {}
+        if data.get("report_kind") == _UPLOAD_KIND_POST_INCIDENT:
+            produced = data.get("produced_incident_report_id")
+            if produced:
+                mapping[produced] = up
+    return mapping
+
+
+@router.get("/incident-reports", response_class=HTMLResponse)
+def incident_reports_list(
+    request: Request,
+    db: Session = Depends(get_db),
+    reporter: Optional[str] = None,
+    barangay: Optional[str] = None,
+    disaster_type: Optional[str] = None,
+    status: Optional[str] = None,
+    origin: Optional[str] = None,
+):
+    user = require_role(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
+
+    # Empty form values arrive as "" (selects left blank). Treat them as None
+    # and coerce the numeric filters safely — never parse "" as int.
+    reporter_id = int(reporter) if (reporter or "").strip().isdigit() else None
+    barangay_id = int(barangay) if (barangay or "").strip().isdigit() else None
+
+    # Join Incident so barangay / disaster-type filters can be applied.
+    query = db.query(IncidentReport).join(
+        Incident, IncidentReport.incident_id == Incident.id
+    )
+    if reporter_id:
+        query = query.filter(IncidentReport.submitted_by == reporter_id)
+    if barangay_id:
+        query = query.filter(Incident.barangay_id == barangay_id)
+    if disaster_type and disaster_type in {d.value for d in DisasterType}:
+        query = query.filter(Incident.disaster_type == DisasterType(disaster_type))
+    if status and status in {s.value for s in ServiceabilityStatus}:
+        query = query.filter(IncidentReport.report_status == ServiceabilityStatus(status))
+
+    reports = query.order_by(IncidentReport.created_at.desc()).all()
+
+    # One batch lookup for provenance — avoids an N+1 reverse scan.
+    source_map = _source_uploads_by_report_id(db)
+    origin_filter = origin if origin in ("uploaded", "manual") else ""
+
+    rows = []
+    for r in reports:
+        inc = r.incident
+        status_value = r.report_status.value if r.report_status else "draft"
+        src = source_map.get(r.id)
+        origin_value = "uploaded" if src else "manual"
+        # Origin is derived (not a column), so it's filtered in-memory.
+        if origin_filter and origin_value != origin_filter:
+            continue
+        rows.append({
+            "id": r.id,
+            "disaster_type": (inc.disaster_type.value.replace("_", " ").title()
+                              if inc and inc.disaster_type else "—"),
+            "barangay": inc.barangay.name if (inc and inc.barangay) else "—",
+            "date_occurred": inc.date_occurred if inc else None,
+            "personnel_count": r.personnel_count or 0,
+            "report_status": status_value,
+            "report_status_label": INCIDENT_REPORT_WORKFLOW_LABELS.get(status_value, "Draft"),
+            "reporter": r.submitted_by_user.username if r.submitted_by_user else "—",
+            "created_at": r.created_at,
+            "origin": origin_value,
+            "source_upload_id": src.id if src else None,
+        })
+
+    # Summary over ALL reports (independent of the active filters).
+    all_reports = db.query(IncidentReport).all()
+    summary = {
+        "total": len(all_reports),
+        "draft": sum(1 for x in all_reports if x.report_status == ServiceabilityStatus.draft),
+        "submitted": sum(1 for x in all_reports if x.report_status == ServiceabilityStatus.submitted),
+    }
+
+    # Filter dropdown options.
+    reporter_users = (
+        db.query(User)
+        .join(IncidentReport, IncidentReport.submitted_by == User.id)
+        .distinct()
+        .order_by(User.username)
+        .all()
+    )
+    barangays = db.query(Barangay).order_by(Barangay.name).all()
+
+    return templates.TemplateResponse(
+        request=request,
+        name="admin/incident_reports_list.html",
+        context={
+            "user": user,
+            "active_nav": "incident_reports_review",
+            "rows": rows,
+            "summary": summary,
+            "reporters": [(u.id, u.username) for u in reporter_users],
+            "barangays": [(b.id, b.name) for b in barangays],
+            "disaster_types": [(d.value, d.value.replace("_", " ").title()) for d in DisasterType],
+            "statuses": [("draft", "Draft"), ("submitted", "Submitted")],
+            "origins": [("uploaded", "Uploaded"), ("manual", "Manual")],
+            "f_reporter": reporter or "",
+            "f_barangay": barangay or "",
+            "f_disaster_type": disaster_type or "",
+            "f_status": status or "",
+            "f_origin": origin_filter,
+        },
+    )
+
+
+@router.get("/incident-reports/{report_id}", response_class=HTMLResponse)
+def incident_report_detail(report_id: int, request: Request, db: Session = Depends(get_db)):
+    user = require_role(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
+
+    r = db.query(IncidentReport).filter(IncidentReport.id == report_id).first()
+    if not r:
+        return RedirectResponse(url="/admin/incident-reports", status_code=302)
+
+    inc = r.incident
+    # Provenance: the source upload (if this report came from a CFAU upload).
+    source_upload = _source_uploads_by_report_id(db).get(r.id)
+    return templates.TemplateResponse(
+        request=request,
+        name="admin/incident_report_detail.html",
+        context={
+            "user": user,
+            "active_nav": "incident_reports_review",
+            "r": r,
+            "incident": inc,
+            "disaster_type": (inc.disaster_type.value.replace("_", " ").title()
+                              if inc and inc.disaster_type else "—"),
+            "barangay": inc.barangay.name if (inc and inc.barangay) else "—",
+            "workflow_label": INCIDENT_REPORT_WORKFLOW_LABELS.get(
+                r.report_status.value if r.report_status else "draft", "Draft"
+            ),
+            "source_upload": source_upload,
+        },
+    )

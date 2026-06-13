@@ -176,6 +176,13 @@
         <h6>Structured Fields {% if editable %}— Edit Before Saving{% endif %}</h6>
     </div>
 
+    {% if editable and report.file_type.value == 'pdf' %}
+    <div class="alert alert-warning py-2 small">
+        <i class="bi bi-magic me-1"></i>
+        PDF fields are best-effort suggestions and must be verified before saving.
+    </div>
+    {% endif %}
+
     {% if editable %}
     <div class="row g-3 mb-3">
         <div class="col-md-6">

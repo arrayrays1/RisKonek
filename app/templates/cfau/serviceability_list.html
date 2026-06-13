@@ -1,0 +1,134 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Serviceability Reports — RisKonek{% endblock %}
+
+{% set active_nav = 'serviceability' %}
+
+{% macro workflow_pill(v, label) -%}
+    {% if v == 'draft' %}
+        <span class="badge bg-light text-dark border">{{ label }}</span>
+    {% elif v == 'submitted' %}
+        <span class="status-pill status-maintenance">{{ label }}</span>
+    {% elif v == 'reviewed' %}
+        <span class="badge bg-info text-dark">{{ label }}</span>
+    {% elif v == 'resolved' %}
+        <span class="status-pill status-operational">{{ label }}</span>
+    {% else %}
+        <span class="badge bg-light text-dark border">{{ label }}</span>
+    {% endif %}
+{%- endmacro %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start page-header">
+    <div>
+        <h1>Equipment Serviceability Reports</h1>
+        <p>
+            {% if is_admin_view %}All serviceability reports filed by CFAU.{% else %}
+            Your inspection, maintenance, and serviceability reports.{% endif %}
+        </p>
+    </div>
+    <a href="/cfau/serviceability/new" class="btn btn-rk">
+        <i class="bi bi-plus-lg"></i> New Report
+    </a>
+</div>
+
+{% if request.query_params.get('success') %}
+<div class="alert alert-success alert-dismissible fade show">
+    <i class="bi bi-check-circle-fill me-1"></i>{{ request.query_params.get('success') }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+{% if request.query_params.get('error') %}
+<div class="alert alert-danger alert-dismissible fade show">
+    <i class="bi bi-exclamation-triangle-fill me-1"></i>{{ request.query_params.get('error') }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+<!-- ── Summary cards ──────────────────────────────────────────── -->
+<div class="row g-3 mb-3">
+    <div class="col-md-3"><div class="stat-card">
+        <div class="stat-label">Total</div><div class="stat-value">{{ summary.total }}</div>
+    </div></div>
+    <div class="col-md-3"><div class="stat-card">
+        <div class="stat-label">Drafts</div><div class="stat-value">{{ summary.draft }}</div>
+    </div></div>
+    <div class="col-md-3"><div class="stat-card">
+        <div class="stat-label">Submitted</div><div class="stat-value">{{ summary.submitted }}</div>
+    </div></div>
+    <div class="col-md-3"><div class="stat-card">
+        <div class="stat-label">Reviewed / Resolved</div>
+        <div class="stat-value">{{ summary.reviewed + summary.resolved }}</div>
+    </div></div>
+</div>
+
+<!-- ── Filter ─────────────────────────────────────────────────── -->
+<div class="dash-card mb-3">
+    <form method="GET" action="/cfau/serviceability" class="row g-2 align-items-end js-live-filter">
+        <div class="col-md-3">
+            <label class="form-label small fw-semibold mb-1">Status</label>
+            <select name="status" class="form-select form-select-sm">
+                <option value="">All statuses</option>
+                {% for v, label in statuses %}
+                <option value="{{ v }}" {% if f_status == v %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2 d-grid">
+            <a href="/cfau/serviceability" class="btn btn-outline-secondary btn-sm"><i class="bi bi-x-circle"></i> Reset</a>
+        </div>
+    </form>
+</div>
+
+<!-- ── Table ──────────────────────────────────────────────────── -->
+<div class="dash-card p-0">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead style="background:#f9fafb">
+                <tr style="font-size:12px;color:var(--rk-muted);text-transform:uppercase;letter-spacing:0.04em">
+                    <th class="px-3 py-3">Title</th>
+                    <th class="py-3">Equipment</th>
+                    <th class="py-3">Type</th>
+                    <th class="py-3">Finding</th>
+                    <th class="py-3">Status</th>
+                    {% if is_admin_view %}<th class="py-3">Reporter</th>{% endif %}
+                    <th class="py-3">Created</th>
+                    <th class="py-3 text-end px-3">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in rows %}
+                <tr style="font-size:13px">
+                    <td class="px-3 fw-semibold">{{ r.title }}</td>
+                    <td>{{ r.equipment }}</td>
+                    <td class="text-muted">{{ r.report_type }}</td>
+                    <td>{{ r.finding }}</td>
+                    <td>{{ workflow_pill(r.report_status, r.report_status_label) }}</td>
+                    {% if is_admin_view %}<td class="text-muted">{{ r.reporter }}</td>{% endif %}
+                    <td class="text-muted">{{ r.reported_at | pht }}</td>
+                    <td class="text-end px-3">
+                        <a href="/cfau/serviceability/{{ r.id }}" class="btn btn-outline-secondary btn-sm">
+                            <i class="bi bi-eye"></i> View
+                        </a>
+                        {% if r.report_status == 'draft' %}
+                        <a href="/cfau/serviceability/{{ r.id }}/edit" class="btn btn-outline-secondary btn-sm">
+                            <i class="bi bi-pencil"></i>
+                        </a>
+                        <form method="POST" action="/cfau/serviceability/{{ r.id }}/submit" class="d-inline"
+                              onsubmit="return confirm('Submit this report for review? You will no longer be able to edit it.')">
+                            <button type="submit" class="btn btn-rk btn-sm"><i class="bi bi-send"></i> Submit</button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="{{ 8 if is_admin_view else 7 }}" class="text-center text-muted py-4">
+                    No serviceability reports found.
+                    {% if f_status %}<a href="/cfau/serviceability" class="ms-2">Clear filter</a>{% endif %}
+                </td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

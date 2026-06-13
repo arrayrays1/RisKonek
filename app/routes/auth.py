@@ -90,7 +90,7 @@ async def login_submit(request: Request, db: Session = Depends(get_db)):
     if role == "admin":
         return RedirectResponse(url="/admin/dashboard", status_code=302)
     elif role == "bdrrmo":
-        return RedirectResponse(url="/bdrrmo/dashboard", status_code=302)
+        return RedirectResponse(url="/bdrrmo/profile", status_code=302)
     elif role == "cfau_oic":
         return RedirectResponse(url="/cfau/dashboard", status_code=302)
     elif role == "cdrrmo_staff":

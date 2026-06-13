@@ -1,0 +1,87 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Serviceability Report — RisKonek{% endblock %}
+
+{% set active_nav = 'serviceability' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start page-header">
+    <div>
+        <h1>{{ r.title or '(untitled)' }}</h1>
+        <p>Serviceability report #{{ r.id }} · {{ report_type_label }}</p>
+    </div>
+    <a href="/cfau/serviceability" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Back
+    </a>
+</div>
+
+{% if request.query_params.get('error') %}
+<div class="alert alert-danger alert-dismissible fade show">
+    <i class="bi bi-exclamation-triangle-fill me-1"></i>{{ request.query_params.get('error') }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+<div class="row g-3">
+    <div class="col-md-8">
+        <div class="dash-card">
+            <div class="row g-3 mb-2">
+                <div class="col-sm-6">
+                    <div class="stat-label">Equipment</div>
+                    <div class="fw-semibold">{{ r.equipment.name if r.equipment else '—' }}</div>
+                </div>
+                <div class="col-sm-3">
+                    <div class="stat-label">Finding</div>
+                    <div class="fw-semibold">{{ finding_label }}</div>
+                </div>
+                <div class="col-sm-3">
+                    <div class="stat-label">Urgency</div>
+                    <div class="fw-semibold">{{ (r.urgency.value if r.urgency else 'moderate') | title }}</div>
+                </div>
+            </div>
+            <hr>
+            <div class="stat-label">Findings / Issue Description</div>
+            <p class="mb-0" style="white-space:pre-wrap">{{ r.issue_description or '—' }}</p>
+        </div>
+
+        {% if r.admin_remarks %}
+        <div class="dash-card mt-3">
+            <div class="card-title-row">
+                <i class="bi bi-chat-left-text" style="color:var(--rk-green);font-size:16px"></i>
+                <h6>Admin Remarks</h6>
+            </div>
+            <p class="mb-0" style="white-space:pre-wrap">{{ r.admin_remarks }}</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="col-md-4">
+        <div class="dash-card">
+            <div class="card-title-row">
+                <i class="bi bi-clock-history" style="color:var(--rk-green);font-size:16px"></i>
+                <h6>Status</h6>
+            </div>
+            <p><span class="badge bg-secondary">{{ workflow_label }}</span></p>
+            <ul class="list-unstyled small text-muted mb-3">
+                <li><strong>Reporter:</strong> {{ r.reported_by_user.username if r.reported_by_user else '—' }}</li>
+                <li><strong>Created:</strong> {{ r.reported_at | pht }}</li>
+                <li><strong>Submitted:</strong> {{ (r.submitted_at | pht) or 'Not yet submitted' }}</li>
+                <li><strong>Reviewed:</strong> {{ (r.reviewed_at | pht) or 'Not yet reviewed' }}</li>
+            </ul>
+            {% if can_edit %}
+            <div class="d-grid gap-2">
+                <a href="/cfau/serviceability/{{ r.id }}/edit" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-pencil"></i> Edit Draft
+                </a>
+                <form method="POST" action="/cfau/serviceability/{{ r.id }}/submit"
+                      onsubmit="return confirm('Submit this report for review? You will no longer be able to edit it.')">
+                    <button type="submit" class="btn btn-rk btn-sm w-100"><i class="bi bi-send"></i> Submit for Review</button>
+                </form>
+            </div>
+            {% else %}
+            <p class="small text-muted mb-0">This report has been submitted and can no longer be edited.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

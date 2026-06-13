@@ -1,0 +1,161 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Review Report — RisKonek{% endblock %}
+
+{% set active_nav = 'serviceability_review' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start page-header">
+    <div>
+        <h1>{{ r.title or '(untitled)' }}</h1>
+        <p>Serviceability report #{{ r.id }} · {{ report_type_label }}</p>
+    </div>
+    <a href="/admin/serviceability" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Back
+    </a>
+</div>
+
+{% if request.query_params.get('error') %}
+<div class="alert alert-danger alert-dismissible fade show">
+    <i class="bi bi-exclamation-triangle-fill me-1"></i>{{ request.query_params.get('error') }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+<div class="row g-3">
+    <div class="col-md-7">
+        <div class="dash-card">
+            <div class="row g-3 mb-2">
+                <div class="col-sm-6">
+                    <div class="stat-label">Equipment</div>
+                    <div class="fw-semibold">{{ r.equipment.name if r.equipment else '—' }}</div>
+                </div>
+                <div class="col-sm-3">
+                    <div class="stat-label">Finding</div>
+                    <div class="fw-semibold">{{ finding_label }}</div>
+                </div>
+                <div class="col-sm-3">
+                    <div class="stat-label">Urgency</div>
+                    {% set u = r.urgency.value if r.urgency else 'moderate' %}
+                    <div>
+                    {% if u == 'critical' %}
+                        <span class="status-pill" style="background:#fde8e8;color:#c0392b;border:1px solid #f4c2bd">
+                            <i class="bi bi-exclamation-triangle-fill"></i> Critical</span>
+                    {% elif u == 'high' %}
+                        <span class="status-pill" style="background:#fdebd0;color:#b9770e;border:1px solid #f5cba7">
+                            <i class="bi bi-exclamation-circle-fill"></i> High</span>
+                    {% elif u == 'moderate' %}
+                        <span class="status-pill status-maintenance">Moderate</span>
+                    {% else %}
+                        <span class="status-pill" style="background:#eef0f2;color:#6c757d;border:1px solid #dee2e6">Low</span>
+                    {% endif %}
+                    </div>
+                </div>
+            </div>
+            <hr>
+            <div class="stat-label">Findings / Issue Description</div>
+            <p class="mb-0" style="white-space:pre-wrap">{{ r.issue_description or '—' }}</p>
+        </div>
+
+        <div class="dash-card mt-3">
+            <ul class="list-unstyled small text-muted mb-0">
+                <li><strong>Reporter:</strong> {{ r.reported_by_user.username if r.reported_by_user else '—' }}</li>
+                <li><strong>Current status:</strong> {{ workflow_label }}</li>
+                <li><strong>Created:</strong> {{ r.reported_at | pht }}</li>
+                <li><strong>Submitted:</strong> {{ (r.submitted_at | pht) or 'Not yet submitted' }}</li>
+                <li><strong>Reviewed:</strong>
+                    {{ (r.reviewed_at | pht) or 'Not yet reviewed' }}
+                    {% if r.reviewed_by_user %} by {{ r.reviewed_by_user.username }}{% endif %}
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="col-md-5">
+        <div class="dash-card">
+            <div class="card-title-row">
+                <i class="bi bi-clipboard2-check" style="color:var(--rk-green);font-size:16px"></i>
+                <h6>Review Action</h6>
+            </div>
+            {% if can_review %}
+            <form method="POST" action="/admin/serviceability/{{ r.id }}/review">
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Update Status</label>
+                    <select name="new_status" class="form-select" required>
+                        <option value="reviewed" {% if r.report_status.value == 'reviewed' %}selected{% endif %}>Reviewed</option>
+                        <option value="resolved" {% if r.report_status.value == 'resolved' %}selected{% endif %}>Resolved</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Admin Remarks</label>
+                    <textarea name="admin_remarks" rows="4" class="form-control"
+                              placeholder="Notes for the reporter — repair scheduled, parts ordered, closed out…">{{ r.admin_remarks or '' }}</textarea>
+                </div>
+                <div class="d-grid">
+                    <button type="submit" class="btn btn-rk"><i class="bi bi-check2"></i> Save Review</button>
+                </div>
+            </form>
+            {% else %}
+            <p class="small text-muted mb-2">
+                This report is still a draft with CFAU and cannot be reviewed until it is submitted.
+            </p>
+            {% if r.admin_remarks %}
+            <div class="stat-label">Existing Remarks</div>
+            <p class="mb-0" style="white-space:pre-wrap">{{ r.admin_remarks }}</p>
+            {% endif %}
+            {% endif %}
+
+            <!-- ── Live equipment status sync ─────────────────────── -->
+            <hr class="my-3">
+            <div class="card-title-row">
+                <i class="bi bi-arrow-left-right" style="color:var(--rk-green);font-size:16px"></i>
+                <h6>Live Equipment Status</h6>
+                {% if finding_applied %}
+                <span class="status-pill status-operational ms-2">
+                    <i class="bi bi-check2"></i> Applied to Live Status
+                </span>
+                {% else %}
+                <span class="badge bg-light text-dark border ms-2">Not Yet Applied</span>
+                {% endif %}
+            </div>
+            <div class="row g-3 mb-2">
+                <div class="col-sm-6">
+                    <div class="stat-label">Live fleet status</div>
+                    <div class="fw-semibold">{{ live_status_label }}</div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="stat-label">This report's finding</div>
+                    <div class="fw-semibold">{{ finding_label }}</div>
+                </div>
+            </div>
+            {% if finding_applied and r.finding_applied_at %}
+            <p class="small text-muted mb-2">
+                <i class="bi bi-clock"></i> Applied on {{ r.finding_applied_at | pht }}.
+            </p>
+            {% endif %}
+            {% if can_apply_finding %}
+            <p class="small text-muted mb-2">
+                The live status differs from this finding. Applying will set the live unit to
+                <strong>{{ mapped_live_label }}</strong> and record it in the audit trail.
+            </p>
+            <form method="POST" action="/admin/serviceability/{{ r.id }}/apply-finding"
+                  onsubmit="return confirm('Set the live equipment status to {{ mapped_live_label }}?')">
+                <button type="submit" class="btn btn-outline-primary btn-sm">
+                    <i class="bi bi-arrow-right-circle"></i> Apply Finding to Live Equipment
+                </button>
+            </form>
+            {% else %}
+            <p class="small text-muted mb-0">
+                {% if r.report_status.value == 'draft' %}
+                    The finding can be applied once the report is submitted.
+                {% else %}
+                    Live status already matches this finding. To change it after a repair,
+                    use the <a href="/admin/equipment">Vehicle &amp; Equipment</a> module — the
+                    authoritative place for manual status changes.
+                {% endif %}
+            </p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

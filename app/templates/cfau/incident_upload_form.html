@@ -1,0 +1,53 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Upload Post-Incident Report — RisKonek{% endblock %}
+
+{% set active_nav = 'incident_reports' %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Upload Post-Incident Report</h1>
+    <p>Upload an externally prepared document (PDF, XLSX, XLS, CSV). The raw file is stored
+       unchanged and its contents are extracted as a reference — you'll then complete and
+       verify the report fields before saving.</p>
+</div>
+
+{% if error %}
+<div class="alert alert-danger">
+    <i class="bi bi-exclamation-triangle-fill me-1"></i> {{ error }}
+</div>
+{% endif %}
+
+<div class="dash-card" style="max-width: 720px;">
+    <form method="POST" action="/cfau/incident-reports/upload" enctype="multipart/form-data">
+        <div class="mb-3">
+            <label class="form-label fw-semibold">Report file</label>
+            <input type="file" name="file" class="form-control"
+                   accept=".pdf,.xlsx,.xls,.csv" required>
+            <div class="form-text">Supported: PDF, XLSX, XLS, CSV.</div>
+        </div>
+
+        <div class="alert alert-secondary py-2 small mb-3">
+            <strong>What happens next:</strong>
+            <ol class="mb-0 ps-3">
+                <li>The raw file is saved and its text/tables are extracted.</li>
+                <li>You review the extracted content alongside the report form.</li>
+                <li>You select the linked incident, complete the fields, and save as draft or submit.</li>
+            </ol>
+        </div>
+
+        {% if not ai_available %}
+        <div class="alert alert-light border py-2 small mb-3">
+            <i class="bi bi-robot me-1"></i> AI summary unavailable — upload continues normally without it.
+        </div>
+        {% endif %}
+
+        <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-rk">
+                <i class="bi bi-cloud-upload"></i> Upload &amp; Extract
+            </button>
+            <a href="/cfau/incident-reports" class="btn btn-outline-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

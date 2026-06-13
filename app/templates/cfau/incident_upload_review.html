@@ -1,0 +1,186 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Review Uploaded Report — RisKonek{% endblock %}
+
+{% set active_nav = 'incident_reports' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start page-header">
+    <div>
+        <h1>Review Uploaded Report</h1>
+        <p>Preview from <strong>{{ report.file_name }}</strong>. Use the extracted content below
+           as reference, then complete and verify the post-incident report form and save as a
+           draft or submit.</p>
+    </div>
+    <a href="/cfau/incident-reports" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Back
+    </a>
+</div>
+
+{% if error %}
+<div class="alert alert-danger alert-dismissible fade show">
+    <i class="bi bi-exclamation-triangle-fill me-1"></i>{{ error | replace('+', ' ') }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+{% if extraction_error %}
+<div class="alert alert-warning">
+    <strong>Extraction failed:</strong> {{ extraction_error }}<br>
+    The file was stored, but no content could be extracted. You can still complete the report manually below.
+</div>
+{% endif %}
+
+<!-- ── Upload Metadata (reused from admin upload review) ───────────── -->
+<div class="dash-card mb-3">
+    <div class="row g-3">
+        <div class="col-md-3">
+            <div class="text-muted small">File</div>
+            <div class="fw-semibold">{{ report.file_name }}</div>
+            <div class="small"><span class="badge bg-light text-dark border">{{ report.file_type.value | upper }}</span></div>
+        </div>
+        <div class="col-md-3">
+            <div class="text-muted small">Uploaded</div>
+            <div>{{ report.uploaded_at | pht }}</div>
+            <div class="small text-muted">by {{ report.uploaded_by_user.username if report.uploaded_by_user else '—' }}</div>
+        </div>
+        <div class="col-md-3">
+            <div class="text-muted small">Lifecycle</div>
+            <div>
+                {% set ls = report.lifecycle_status.value %}
+                {% if ls == 'draft' %}
+                    <span class="status-pill status-maintenance">Draft</span>
+                {% elif ls == 'confirmed' %}
+                    <span class="status-pill status-operational">Confirmed</span>
+                {% elif ls == 'archived' %}
+                    <span class="badge bg-secondary"><i class="bi bi-archive me-1"></i>Archived</span>
+                {% elif ls == 'discarded' %}
+                    <span class="status-pill status-unavailable">Discarded</span>
+                {% endif %}
+            </div>
+        </div>
+        <div class="col-md-3 d-flex flex-column gap-2">
+            <a href="/cfau/incident-reports/upload/{{ report.id }}/file" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-download"></i> View Original File
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- ── AI summary (reused from admin upload review) ────────────────── -->
+<div class="dash-card mb-3">
+    <div class="card-title-row">
+        <i class="bi bi-robot"></i>
+        <h6>AI Summary</h6>
+    </div>
+    {% if ai_summary %}
+        <p class="mb-0" style="white-space:pre-line">{{ ai_summary }}</p>
+    {% elif not ai_available %}
+        <p class="text-muted mb-0 small">AI summary unavailable (GROQ_API_KEY not configured).</p>
+    {% else %}
+        <p class="text-muted mb-0 small">No AI summary generated for this file.</p>
+    {% endif %}
+</div>
+
+<!-- ── Extracted preview (reused from admin upload review) ─────────── -->
+<div class="dash-card mb-3">
+    <div class="card-title-row">
+        <i class="bi bi-file-text"></i>
+        <h6>Extracted Preview</h6>
+    </div>
+    {% if columns_preview and rows_preview %}
+        <div class="table-responsive" style="max-height: 380px; overflow:auto;">
+            <table class="table table-sm table-bordered mb-0" style="font-size:12px">
+                <thead style="background:#f9fafb;position:sticky;top:0">
+                    <tr>{% for c in columns_preview %}<th>{{ c }}</th>{% endfor %}</tr>
+                </thead>
+                <tbody>
+                    {% for row in rows_preview %}
+                    <tr>
+                        {% for c in columns_preview %}
+                        <td>{{ row.get(c) if row.get(c) is not none else '' }}</td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="form-text">Showing first {{ rows_preview | length }} rows — reference only; the report form is not auto-filled.</div>
+    {% elif raw_text_preview %}
+        <pre style="white-space:pre-wrap;font-size:12px;max-height:380px;overflow:auto;background:#f9fafb;padding:10px;border-radius:6px">{{ raw_text_preview }}</pre>
+        <div class="form-text">Reference only — the report form is not auto-filled.</div>
+    {% else %}
+        <p class="text-muted mb-0 small">No preview available.</p>
+    {% endif %}
+</div>
+
+<!-- ── Post-Incident Report form (Week 8 — unchanged fields) ───────── -->
+<div class="dash-card mb-3">
+    <div class="card-title-row">
+        <i class="bi bi-pencil-square"></i>
+        <h6>Post-Incident Report — Complete &amp; Verify</h6>
+    </div>
+    <form method="POST" action="/cfau/incident-reports/upload/{{ report.id }}/submit" class="row g-3">
+
+        <div class="col-12">
+            <label class="form-label small fw-semibold">Incident *</label>
+            <select name="incident_id" required class="form-select">
+                <option value="">— Select the disaster incident this report covers —</option>
+                {% for iid, label in incidents %}
+                <option value="{{ iid }}">{{ label }}</option>
+                {% endfor %}
+            </select>
+            <div class="form-text small">
+                No matching incident? It must be recorded in the Incident module first —
+                this avoids creating duplicate disaster records.
+            </div>
+        </div>
+
+        <div class="col-12">
+            <label class="form-label small fw-semibold">Operations Summary</label>
+            <textarea name="operations_summary" rows="3" class="form-control"
+                      placeholder="Overview of the response operation…"></textarea>
+        </div>
+        <div class="col-12">
+            <label class="form-label small fw-semibold">Actions Taken</label>
+            <textarea name="actions_taken" rows="3" class="form-control"
+                      placeholder="Concrete actions carried out during the response…"></textarea>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label small fw-semibold">Equipment Used</label>
+            <textarea name="equipment_used" rows="2" class="form-control"
+                      placeholder="e.g. Rescue Truck 02, 2 rescue boats…"></textarea>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small fw-semibold">Personnel Deployed</label>
+            <input type="number" name="personnel_count" min="0" class="form-control" value="0">
+        </div>
+        <div class="col-md-4">
+            <label class="form-label small fw-semibold">Personnel Notes</label>
+            <input type="text" name="personnel_notes" class="form-control"
+                   placeholder="e.g. 2 medics, 1 driver">
+        </div>
+        <div class="col-12">
+            <label class="form-label small fw-semibold">Challenges Encountered</label>
+            <textarea name="challenges_encountered" rows="3" class="form-control"
+                      placeholder="Obstacles, field risks, resource gaps…"></textarea>
+        </div>
+        <div class="col-12">
+            <label class="form-label small fw-semibold">Recommendations</label>
+            <textarea name="recommendations" rows="3" class="form-control"
+                      placeholder="Suggested improvements for future responses…"></textarea>
+        </div>
+
+        <div class="col-12 d-flex justify-content-end gap-2 pt-2">
+            <a href="/cfau/incident-reports" class="btn btn-outline-secondary">Cancel</a>
+            <button type="submit" name="action" value="draft" class="btn btn-outline-primary">
+                <i class="bi bi-save"></i> Save Draft
+            </button>
+            <button type="submit" name="action" value="submit" class="btn btn-rk"
+                    onclick="return confirm('Submit this report? You will no longer be able to edit it.')">
+                <i class="bi bi-send"></i> Submit
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

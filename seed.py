@@ -8,7 +8,8 @@ from app.models import (
     Base,
     Barangay, Population, Incident, Resource, Equipment, User,
     RiskLevel, DisasterType, Severity, ResourceCategory,
-    EquipmentType, EquipmentStatus, UserRole, Facility, FacilityType
+    EquipmentType, EquipmentStatus, UserRole, Facility, FacilityType,
+    FacilityStatus
 )
 from app.auth import hash_password
 from datetime import date, timedelta
@@ -391,6 +392,7 @@ if not os.path.exists(DEFAULT_EXCEL_PATH):
                 cap_lo, cap_hi = FACILITY_CAPACITY[ftype]
                 capacity = random.randint(cap_lo, cap_hi) if cap_hi > 0 else None
 
+                is_available = random.random() > 0.05  # ~5% under maintenance
                 facility = Facility(
                     barangay_id=brgy.id,
                     name=name,
@@ -399,7 +401,11 @@ if not os.path.exists(DEFAULT_EXCEL_PATH):
                     longitude=round(lng, 6),
                     capacity=capacity,
                     address=f"{brgy.name}, San Pedro, Laguna",
-                    is_active=random.random() > 0.05,  # ~5% under maintenance
+                    is_active=is_available,
+                    operational_status=(
+                        FacilityStatus.available if is_available
+                        else FacilityStatus.under_maintenance
+                    ),
                 )
                 db.add(facility)
                 facility_count += 1
@@ -460,7 +466,7 @@ print("\n✓ Database seeded successfully!")
 print("\nTest accounts (password: password123)")
 print("  admin      → /admin/dashboard")
 print("  cfau_oic   → /cfau/dashboard")
-print("  bdrrmo1    → /bdrrmo/dashboard  (Cuyab)")
+print("  bdrrmo1    → /bdrrmo/profile  (Cuyab)")
 print("  staff1     → /staff/dashboard")
 print("\nNOTE: All data is for demonstration purposes.")
 print("Replace with actual CDRRMO records before deployment.")

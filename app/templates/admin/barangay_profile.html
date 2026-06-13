@@ -251,6 +251,32 @@
                 {% endif %}
             </div>
 
+            <div class="info-section mb-3">
+                <h6><i class="bi bi-person-vcard"></i> Officials &amp; Emergency Contacts</h6>
+                <div class="row g-2" style="font-size:13px">
+                    <div class="col-md-6">
+                        <div class="text-muted" style="font-size:12px">Barangay Captain</div>
+                        <div>{{ barangay.captain_name or '—' }}
+                            {% if barangay.captain_contact %}<span class="text-muted">· {{ barangay.captain_contact }}</span>{% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="text-muted" style="font-size:12px">BDRRMO Chairperson</div>
+                        <div>{{ barangay.chairperson_name or '—' }}
+                            {% if barangay.chairperson_contact %}<span class="text-muted">· {{ barangay.chairperson_contact }}</span>{% endif %}
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <div class="text-muted" style="font-size:12px">Emergency Responders</div>
+                        {% if barangay.emergency_contacts %}
+                        <div style="white-space:pre-line">{{ barangay.emergency_contacts }}</div>
+                        {% else %}
+                        <div class="text-muted">—</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
             <div class="info-section">
                 <h6><i class="bi bi-journal-text"></i> Recent Incidents</h6>
                 {% if recent_incidents %}

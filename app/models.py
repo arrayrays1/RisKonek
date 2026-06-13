@@ -40,6 +40,15 @@ class FacilityType(str, enum.Enum):
     hospital = "hospital"
     staging_area = "staging_area"
 
+class FacilityStatus(str, enum.Enum):
+    """Week 9 — operational status tag for a critical facility, as
+    maintained by the BDRRMO Chairperson. Distinct from the structural
+    `Facility.status` field (Permanent / Temporary / Under Construction)
+    imported in Week 5."""
+    available = "available"
+    under_maintenance = "under_maintenance"
+    unavailable = "unavailable"
+
 class EquipmentType(str, enum.Enum):
     fire_truck = "fire_truck"
     ambulance = "ambulance"
@@ -68,6 +77,18 @@ class Urgency(str, enum.Enum):
     moderate = "moderate"
     high = "high"
     critical = "critical"
+
+class ServiceabilityStatus(str, enum.Enum):
+    """Week 8 — workflow status for CFAU operational reports.
+
+    Tracks where a report sits in its review lifecycle, kept separate
+    from the EquipmentStatus serviceability *finding*. Used by both
+    EquipmentReport (full draft → submitted → reviewed → resolved flow)
+    and IncidentReport (only draft → submitted are used)."""
+    draft = "draft"
+    submitted = "submitted"
+    reviewed = "reviewed"
+    resolved = "resolved"
 
 class ReportStatus(str, enum.Enum):
     pending = "pending"
@@ -126,6 +147,10 @@ class Barangay(Base):
     chairperson_contact = Column(String(20))
     area_sqkm = Column(Float)
     hazard_types = Column(String(200))  # comma-separated: "flood,earthquake"
+    # Week 9 (TR-BDR-07) — free-text list of emergency responders the
+    # BDRRMO Chairperson maintains (names / roles / contact numbers).
+    # Officials are captured by captain_*/chairperson_* above.
+    emergency_contacts = Column(Text)
     created_at = Column(DateTime, server_default=func.now())
 
     # Relationships — one barangay has many of these
@@ -158,7 +183,11 @@ class User(Base):
     barangay = relationship("Barangay", back_populates="users")
     audit_logs = relationship("AuditLog", back_populates="user")
     reported_incidents = relationship("Incident", back_populates="reported_by_user")
-    equipment_reports = relationship("EquipmentReport", back_populates="reported_by_user")
+    equipment_reports = relationship(
+        "EquipmentReport",
+        back_populates="reported_by_user",
+        foreign_keys="EquipmentReport.reported_by",
+    )
     incident_reports = relationship("IncidentReport", back_populates="submitted_by_user")
     uploaded_reports = relationship(
         "UploadedReport",
@@ -202,6 +231,15 @@ class Facility(Base):
     capacity = Column(Integer)  # legacy: kept for backward compatibility
     address = Column(String(255))
     is_active = Column(Boolean, default=True)
+    # Week 9 — three-state operational tag managed by the BDRRMO
+    # Chairperson. `is_active` is kept in sync (available -> True) so the
+    # admin map/profile continue to work unchanged.
+    operational_status = Column(
+        Enum(FacilityStatus), default=FacilityStatus.available, nullable=False
+    )
+    # Week 9 — soft delete / archive, matching the Resource/Equipment
+    # convention. Archived facilities are hidden from the default list.
+    is_archived = Column(Boolean, default=False)
     created_at = Column(DateTime, server_default=func.now())
 
     # Week 5 — fields sourced from san_pedro_critical_facilities.xlsx.
@@ -305,13 +343,33 @@ class EquipmentReport(Base):
     reported_by = Column(Integer, ForeignKey("users.id"), nullable=False)
     issue_description = Column(Text)
     urgency = Column(Enum(Urgency), default=Urgency.moderate)
+    # `status` is the serviceability FINDING (serviceable / under_repair /
+    # unserviceable), not the workflow state — those are tracked separately.
     status = Column(Enum(EquipmentStatus), default=EquipmentStatus.not_serviceable)
     admin_remarks = Column(Text)
-    reported_at = Column(DateTime, server_default=func.now())
+    reported_at = Column(DateTime, server_default=func.now())  # created timestamp
+
+    # ── Week 8 — CFAU Serviceability Reporting (additive) ─────────────
+    title = Column(String(200))
+    report_type = Column(String(30))   # inspection / maintenance / serviceability
+    report_status = Column(
+        Enum(ServiceabilityStatus),
+        default=ServiceabilityStatus.draft,
+        nullable=False,
+    )
+    submitted_at = Column(DateTime, nullable=True)   # set when submitted
+    reviewed_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    reviewed_at = Column(DateTime, nullable=True)
+    # Set when an admin applies this report's finding to the live
+    # Equipment.status (admin-assisted sync). NULL = not yet applied.
+    finding_applied_at = Column(DateTime, nullable=True)
 
     # relationships
     equipment = relationship("Equipment", back_populates="equipment_reports")
-    reported_by_user = relationship("User", back_populates="equipment_reports")
+    reported_by_user = relationship(
+        "User", back_populates="equipment_reports", foreign_keys=[reported_by]
+    )
+    reviewed_by_user = relationship("User", foreign_keys=[reviewed_by])
 
 # ==========================
 # TABLE 9: Incident Reprot
@@ -326,7 +384,20 @@ class IncidentReport(Base):
     equipment_used = Column(Text)
     field_risks = Column(Text)
     recommendations = Column(Text)
-    submitted_at = Column(DateTime, server_default=func.now())
+    submitted_at = Column(DateTime, nullable=True)   # set when submitted (NULL = draft)
+
+    # ── Week 8 — CFAU Post-Incident Reporting (additive) ──────────────
+    operations_summary = Column(Text)
+    actions_taken = Column(Text)
+    challenges_encountered = Column(Text)
+    personnel_count = Column(Integer, default=0)
+    personnel_notes = Column(Text)
+    report_status = Column(
+        Enum(ServiceabilityStatus),
+        default=ServiceabilityStatus.draft,
+        nullable=False,
+    )
+    created_at = Column(DateTime, server_default=func.now())
 
     #relationships
     incident = relationship("Incident", back_populates="incident_reports")

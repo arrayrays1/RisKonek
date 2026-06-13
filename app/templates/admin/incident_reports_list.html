@@ -1,0 +1,144 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Post-Incident Reports — RisKonek{% endblock %}
+
+{% set active_nav = 'incident_reports_review' %}
+
+{% macro workflow_pill(v, label) -%}
+    {% if v == 'submitted' %}
+        <span class="status-pill status-maintenance">{{ label }}</span>
+    {% elif v == 'reviewed' %}
+        <span class="badge bg-info text-dark">{{ label }}</span>
+    {% elif v == 'resolved' %}
+        <span class="status-pill status-operational">{{ label }}</span>
+    {% else %}
+        <span class="badge bg-light text-dark border">{{ label }}</span>
+    {% endif %}
+{%- endmacro %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Post-Incident Reports</h1>
+    <p>Oversight of operational reports filed by CFAU after disaster response. Read-only — CFAU remains the author of these records.</p>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-md-4"><div class="stat-card">
+        <div class="stat-label">Total Reports</div><div class="stat-value">{{ summary.total }}</div>
+    </div></div>
+    <div class="col-md-4"><div class="stat-card">
+        <div class="stat-label">Submitted</div><div class="stat-value">{{ summary.submitted }}</div>
+    </div></div>
+    <div class="col-md-4"><div class="stat-card">
+        <div class="stat-label">Drafts</div><div class="stat-value">{{ summary.draft }}</div>
+    </div></div>
+</div>
+
+<div class="dash-card mb-3">
+    <form method="GET" action="/admin/incident-reports" class="row g-2 align-items-end js-live-filter">
+        <div class="col-md-3">
+            <label class="form-label small fw-semibold mb-1">Reporter</label>
+            <select name="reporter" class="form-select form-select-sm">
+                <option value="">All reporters</option>
+                {% for uid, uname in reporters %}
+                <option value="{{ uid }}" {% if f_reporter|string == uid|string %}selected{% endif %}>{{ uname }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small fw-semibold mb-1">Barangay</label>
+            <select name="barangay" class="form-select form-select-sm">
+                <option value="">All barangays</option>
+                {% for bid, bname in barangays %}
+                <option value="{{ bid }}" {% if f_barangay|string == bid|string %}selected{% endif %}>{{ bname }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small fw-semibold mb-1">Disaster Type</label>
+            <select name="disaster_type" class="form-select form-select-sm">
+                <option value="">All types</option>
+                {% for v, label in disaster_types %}
+                <option value="{{ v }}" {% if f_disaster_type == v %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small fw-semibold mb-1">Status</label>
+            <select name="status" class="form-select form-select-sm">
+                <option value="">All statuses</option>
+                {% for v, label in statuses %}
+                <option value="{{ v }}" {% if f_status == v %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small fw-semibold mb-1">Origin</label>
+            <select name="origin" class="form-select form-select-sm">
+                <option value="">All origins</option>
+                {% for v, label in origins %}
+                <option value="{{ v }}" {% if f_origin == v %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-1 d-grid">
+            <a href="/admin/incident-reports" class="btn btn-outline-secondary btn-sm" title="Reset filters">
+                <i class="bi bi-x-circle"></i>
+            </a>
+        </div>
+    </form>
+</div>
+
+<div class="dash-card p-0">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead style="background:#f9fafb">
+                <tr style="font-size:12px;color:var(--rk-muted);text-transform:uppercase;letter-spacing:0.04em">
+                    <th class="px-3 py-3">Report</th>
+                    <th class="py-3">Disaster Type</th>
+                    <th class="py-3">Barangay</th>
+                    <th class="py-3">Date Occurred</th>
+                    <th class="py-3 text-end">Personnel</th>
+                    <th class="py-3">Reporter</th>
+                    <th class="py-3">Origin</th>
+                    <th class="py-3">Status</th>
+                    <th class="py-3 text-end px-3">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in rows %}
+                <tr style="font-size:13px">
+                    <td class="px-3 fw-semibold">#{{ r.id }}</td>
+                    <td>{{ r.disaster_type }}</td>
+                    <td>{{ r.barangay }}</td>
+                    <td class="text-muted">
+                        {{ r.date_occurred.strftime('%b %d, %Y') if r.date_occurred else '—' }}
+                    </td>
+                    <td class="text-end">{{ r.personnel_count }}</td>
+                    <td class="text-muted">{{ r.reporter }}</td>
+                    <td>
+                        {% if r.origin == 'uploaded' %}
+                        <span class="badge bg-info text-dark"><i class="bi bi-cloud-arrow-up me-1"></i>Uploaded</span>
+                        {% else %}
+                        <span class="badge bg-light text-dark border"><i class="bi bi-pencil me-1"></i>Manual</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ workflow_pill(r.report_status, r.report_status_label) }}</td>
+                    <td class="text-end px-3">
+                        <a href="/admin/incident-reports/{{ r.id }}" class="btn btn-outline-primary btn-sm">
+                            <i class="bi bi-eye"></i> View
+                        </a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="9" class="text-center text-muted py-4">
+                    No post-incident reports found.
+                    {% if f_reporter or f_barangay or f_disaster_type or f_status or f_origin %}
+                    <a href="/admin/incident-reports" class="ms-2">Clear filters</a>{% endif %}
+                </td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

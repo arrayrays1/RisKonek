@@ -1,0 +1,92 @@
+{% extends "admin/base.html" %}
+
+{% block title %}{{ 'Edit' if edit_mode else 'New' }} Serviceability Report — RisKonek{% endblock %}
+
+{% set active_nav = 'serviceability' %}
+
+{% block content %}
+<div class="page-header">
+    <h1>{{ 'Edit Serviceability Report' if edit_mode else 'New Serviceability Report' }}</h1>
+    <p>Record an equipment inspection, maintenance finding, or serviceability assessment.
+       Save as a draft to keep editing, or submit it for admin review.</p>
+</div>
+
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+
+<div class="dash-card">
+    <form method="POST"
+          action="{{ '/cfau/serviceability/' ~ target.id ~ '/edit' if edit_mode else '/cfau/serviceability/new' }}"
+          class="row g-3">
+
+        <div class="col-md-8">
+            <label class="form-label small fw-semibold">Report Title *</label>
+            <input type="text" name="title" required class="form-control"
+                   value="{{ target.title if target else '' }}"
+                   placeholder="e.g. Routine inspection — Rescue Truck 02">
+        </div>
+
+        <div class="col-md-4">
+            <label class="form-label small fw-semibold">Report Type *</label>
+            <select name="report_type" class="form-select">
+                {% for v, label in report_types %}
+                <option value="{{ v }}" {% if target and target.report_type == v %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="col-md-6">
+            <label class="form-label small fw-semibold">Equipment *</label>
+            <select name="equipment_id" required class="form-select">
+                <option value="">— Select equipment —</option>
+                {% for e in equipment %}
+                <option value="{{ e.id }}"
+                    {% if target and target.equipment_id == e.id %}selected{% endif %}>
+                    {{ e.name }}{% if e.plate_or_serial %} ({{ e.plate_or_serial }}){% endif %}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="col-md-3">
+            <label class="form-label small fw-semibold">Serviceability Finding *</label>
+            <select name="finding" class="form-select">
+                {% for v, label in findings %}
+                <option value="{{ v }}"
+                    {% if target and target.status and target.status.value == v %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="col-md-3">
+            <label class="form-label small fw-semibold">Urgency</label>
+            <select name="urgency" class="form-select">
+                {% for v in urgencies %}
+                <option value="{{ v }}"
+                    {% if (target and target.urgency and target.urgency.value == v) or (not target and v == 'moderate') %}selected{% endif %}>
+                    {{ v.title() }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="col-12">
+            <label class="form-label small fw-semibold">Findings / Issue Description</label>
+            <textarea name="issue_description" rows="4" class="form-control"
+                      placeholder="Describe the condition found, parts affected, or work recommended…">{{ target.issue_description if target else '' }}</textarea>
+        </div>
+
+        <div class="col-12 d-flex justify-content-end gap-2 pt-2">
+            <a href="/cfau/serviceability" class="btn btn-outline-secondary">Cancel</a>
+            <button type="submit" name="action" value="draft" class="btn btn-outline-primary">
+                <i class="bi bi-save"></i> {{ 'Save Draft' if not edit_mode else 'Save Changes' }}
+            </button>
+            <button type="submit" name="action" value="submit" class="btn btn-rk"
+                    onclick="return confirm('Submit this report for review? You will no longer be able to edit it.')">
+                <i class="bi bi-send"></i> Submit for Review
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

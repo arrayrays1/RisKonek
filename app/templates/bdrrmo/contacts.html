@@ -1,0 +1,74 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Contact Details — RisKonek{% endblock %}
+
+{% set active_nav = 'bdrrmo_contacts' %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Barangay Contact Details</h1>
+    <p>Maintain officials and emergency responder contacts for
+       {% if barangay %}Barangay {{ barangay.name }}{% else %}your barangay{% endif %}.
+       These details are made available to authorized CDRRMO users.</p>
+</div>
+
+{% if success %}
+<div class="alert alert-success alert-dismissible fade show">
+    <i class="bi bi-check-circle-fill me-1"></i>{{ success }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+{% if error %}
+<div class="alert alert-danger alert-dismissible fade show">
+    <i class="bi bi-exclamation-triangle-fill me-1"></i>{{ error }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+{% if not barangay %}
+<div class="alert alert-warning">
+    <i class="bi bi-exclamation-triangle-fill me-1"></i>
+    No barangay is currently assigned to your account. Please contact the CDRRMO Admin.
+</div>
+{% else %}
+<div class="dash-card">
+    <div class="card-title-row">
+        <i class="bi bi-person-vcard" style="color:var(--rk-green)"></i>
+        <h6>Officials &amp; Emergency Responders</h6>
+    </div>
+    <form method="POST" action="/bdrrmo/contacts" class="row g-3">
+        <div class="col-md-6">
+            <label class="form-label small fw-semibold mb-1">Barangay Captain</label>
+            <input type="text" name="captain_name" maxlength="100" class="form-control form-control-sm"
+                   value="{{ barangay.captain_name or '' }}">
+        </div>
+        <div class="col-md-6">
+            <label class="form-label small fw-semibold mb-1">Captain Contact</label>
+            <input type="text" name="captain_contact" maxlength="20" class="form-control form-control-sm"
+                   value="{{ barangay.captain_contact or '' }}">
+        </div>
+        <div class="col-md-6">
+            <label class="form-label small fw-semibold mb-1">BDRRMO Chairperson</label>
+            <input type="text" name="chairperson_name" maxlength="100" class="form-control form-control-sm"
+                   value="{{ barangay.chairperson_name or '' }}">
+        </div>
+        <div class="col-md-6">
+            <label class="form-label small fw-semibold mb-1">Chairperson Contact</label>
+            <input type="text" name="chairperson_contact" maxlength="20" class="form-control form-control-sm"
+                   value="{{ barangay.chairperson_contact or '' }}">
+        </div>
+        <div class="col-12">
+            <label class="form-label small fw-semibold mb-1">Emergency Responders</label>
+            <textarea name="emergency_contacts" rows="4" class="form-control form-control-sm"
+                      placeholder="One per line — name, role, and contact number (e.g. Juan Dela Cruz — Rescue Team Lead — 0917…)">{{ barangay.emergency_contacts or '' }}</textarea>
+            <div class="form-text">Free-text list of responders and their contact numbers.</div>
+        </div>
+        <div class="col-12">
+            <button type="submit" class="btn btn-rk btn-sm">
+                <i class="bi bi-save"></i> Save Contact Details
+            </button>
+        </div>
+    </form>
+</div>
+{% endif %}
+{% endblock %}

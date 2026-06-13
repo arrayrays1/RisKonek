@@ -106,6 +106,21 @@
         .sidebar-user .user-role { color: rgba(255,255,255,0.6); font-size: 11px; }
 
         .sidebar nav { flex: 1; padding: 8px 0; }
+
+        /* Non-clickable grouping label (e.g. "Incident Management").
+           Hidden in the collapsed rail along with the nav labels. */
+        .nav-section {
+            padding: 14px 20px 4px;
+            color: rgba(255,255,255,0.45);
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            white-space: nowrap;
+            user-select: none;
+        }
+        html.rk-sidebar-collapsed .sidebar:not(:hover) .nav-section { display: none; }
+
         .nav-item-link {
             display: flex; align-items: center; gap: 12px;
             padding: 10px 20px;
@@ -268,8 +283,9 @@
 {% set is_admin = role == 'admin' %}
 {% set is_staff = role == 'cdrrmo_staff' %}
 {% set is_cfau  = role == 'cfau_oic' %}
-{% set portal_label = 'Admin Portal' if is_admin else ('Logistics Portal' if is_staff else ('Operations Portal' if is_cfau else 'Portal')) %}
-{% set role_label = 'CDRRMO Admin' if is_admin else ('CDRRMO Logistics Staff' if is_staff else ('CFAU / Operations' if is_cfau else '')) %}
+{% set is_bdrrmo = role == 'bdrrmo' %}
+{% set portal_label = 'Admin Portal' if is_admin else ('Logistics Portal' if is_staff else ('Operations Portal' if is_cfau else ('Barangay Portal' if is_bdrrmo else 'Portal'))) %}
+{% set role_label = 'CDRRMO Admin' if is_admin else ('CDRRMO Logistics Staff' if is_staff else ('CFAU / Operations' if is_cfau else ('BDRRMO / Barangay Focal' if is_bdrrmo else ''))) %}
 
 <!-- ── SIDEBAR ────────────────────────────────────────────────────── -->
 <div class="sidebar" id="sidebar">
@@ -321,6 +337,34 @@
         </a>
         {% endif %}
 
+        {% if is_bdrrmo %}
+        <a href="/bdrrmo/profile"
+           class="nav-item-link {{ 'active' if active == 'bdrrmo_profile' else '' }}"
+           title="Disaster profile and planning priority for your barangay">
+            <i class="bi bi-geo-alt-fill nav-icon"></i><span class="nav-label">Barangay Profile</span>
+        </a>
+        <a href="/bdrrmo/incidents"
+           class="nav-item-link {{ 'active' if active == 'bdrrmo_incidents' else '' }}"
+           title="Historical disaster incidents in your barangay">
+            <i class="bi bi-clock-history nav-icon"></i><span class="nav-label">Incident History</span>
+        </a>
+        <a href="/bdrrmo/facilities"
+           class="nav-item-link {{ 'active' if active == 'bdrrmo_facilities' else '' }}"
+           title="Critical facilities in your barangay">
+            <i class="bi bi-building nav-icon"></i><span class="nav-label">Critical Facilities</span>
+        </a>
+        <a href="/bdrrmo/population"
+           class="nav-item-link {{ 'active' if active == 'bdrrmo_population' else '' }}"
+           title="Record and view population data for your barangay">
+            <i class="bi bi-people-fill nav-icon"></i><span class="nav-label">Population Records</span>
+        </a>
+        <a href="/bdrrmo/contacts"
+           class="nav-item-link {{ 'active' if active == 'bdrrmo_contacts' else '' }}"
+           title="Manage officials and emergency responder contacts">
+            <i class="bi bi-person-vcard nav-icon"></i><span class="nav-label">Contact Details</span>
+        </a>
+        {% endif %}
+
         {% if is_admin or is_staff %}
         <a href="/admin/resources"
            class="nav-item-link {{ 'active' if active == 'resources' else '' }}"
@@ -337,6 +381,27 @@
         </a>
         {% endif %}
 
+        {% if is_cfau %}
+        <a href="/cfau/serviceability"
+           class="nav-item-link {{ 'active' if active == 'serviceability' else '' }}"
+           title="Equipment inspection, maintenance, and serviceability reports">
+            <i class="bi bi-clipboard2-check nav-icon"></i><span class="nav-label">Serviceability Reports</span>
+        </a>
+        <a href="/cfau/incident-reports"
+           class="nav-item-link {{ 'active' if active == 'incident_reports' else '' }}"
+           title="Document response actions and operational outcomes for incidents.">
+            <i class="bi bi-journal-text nav-icon"></i><span class="nav-label">Post-Incident Reports</span>
+        </a>
+        {% endif %}
+
+        {% if is_admin %}
+        <a href="/admin/serviceability"
+           class="nav-item-link {{ 'active' if active == 'serviceability_review' else '' }}"
+           title="Review and resolve CFAU equipment serviceability reports">
+            <i class="bi bi-clipboard2-check nav-icon"></i><span class="nav-label">Serviceability Review</span>
+        </a>
+        {% endif %}
+
         {% if is_admin %}
         <a href="/admin/map"
            class="nav-item-link {{ 'active' if active == 'map' else '' }}">
@@ -346,10 +411,16 @@
            class="nav-item-link {{ 'active' if active == 'simulator' else '' }}">
             <i class="bi bi-lightning-fill nav-icon"></i><span class="nav-label">Disaster Simulator</span>
         </a>
+        <div class="nav-section">Incident Management</div>
         <a href="/admin/uploads"
             class="nav-item-link {{ 'active' if active == 'uploads' else '' }}"
-            title="View and manage all uploaded disaster reports">
-                <i class="bi bi-cloud-upload-fill nav-icon"></i><span class="nav-label">Report Uploads</span>
+            title="Upload and convert disaster reports into incident records.">
+                <i class="bi bi-cloud-upload-fill nav-icon"></i><span class="nav-label">Incident Data Uploads</span>
+        </a>
+        <a href="/admin/incident-reports"
+           class="nav-item-link {{ 'active' if active == 'incident_reports_review' else '' }}"
+           title="Document response actions and operational outcomes for incidents.">
+            <i class="bi bi-journal-text nav-icon"></i><span class="nav-label">Post-Incident Reports</span>
         </a>
         <a href="/admin/audit"
            class="nav-item-link {{ 'active' if active == 'audit' else '' }}"
@@ -404,6 +475,33 @@
     requestAnimationFrame(function () {
         requestAnimationFrame(function () {
             html.classList.remove('rk-no-anim');
+        });
+    });
+})();
+</script>
+<script>
+// ── Live filtering ────────────────────────────────────────────────
+// Any <form class="js-live-filter"> auto-applies its filters: selects and
+// date inputs submit immediately on change; text inputs submit after a short
+// debounce so the page doesn't reload on every keystroke. No Apply button
+// needed — mirrors the audit-trail filter behaviour across the system.
+(function () {
+    document.querySelectorAll('form.js-live-filter').forEach(function (form) {
+        form.querySelectorAll('select, input[type="date"]').forEach(function (el) {
+            el.addEventListener('change', function () { form.submit(); });
+        });
+
+        form.querySelectorAll('input[type="text"], input[type="search"]').forEach(function (el) {
+            let timer;
+            el.addEventListener('input', function () {
+                clearTimeout(timer);
+                timer = setTimeout(function () { form.submit(); }, 400);
+            });
+            // After an auto-submit reload, keep the cursor in the search box.
+            if (el.value) {
+                el.focus();
+                el.setSelectionRange(el.value.length, el.value.length);
+            }
         });
     });
 })();

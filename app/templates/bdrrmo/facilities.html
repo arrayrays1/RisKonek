@@ -1,0 +1,198 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Critical Facilities — RisKonek{% endblock %}
+
+{% set active_nav = 'bdrrmo_facilities' %}
+
+{% block content %}
+{% set status_labels = {'available': 'Available', 'under_maintenance': 'Under Maintenance', 'unavailable': 'Unavailable'} %}
+{% set status_classes = {'available': 'status-operational', 'under_maintenance': 'status-maintenance', 'unavailable': 'status-unavailable'} %}
+
+<div class="page-header">
+    <h1>Critical Facilities</h1>
+    <p>Manage evacuation centers and critical facility points in
+       {% if barangay %}Barangay {{ barangay.name }}{% else %}your barangay{% endif %}.</p>
+</div>
+
+{% if success %}
+<div class="alert alert-success alert-dismissible fade show">
+    <i class="bi bi-check-circle-fill me-1"></i>{{ success }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+{% if error %}
+<div class="alert alert-danger alert-dismissible fade show">
+    <i class="bi bi-exclamation-triangle-fill me-1"></i>{{ error }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+{% if not barangay %}
+<div class="alert alert-warning">
+    <i class="bi bi-exclamation-triangle-fill me-1"></i>
+    No barangay is currently assigned to your account. Please contact the CDRRMO Admin.
+</div>
+{% else %}
+
+{# Resolve the facility being edited (if any) so the form can pre-fill. #}
+{% set editing = none %}
+{% if edit_id %}
+    {% for f in facilities %}
+        {% if f.id|string == edit_id %}{% set editing = f %}{% endif %}
+    {% endfor %}
+{% endif %}
+
+{% if not show_archived %}
+<!-- ── Add / Edit facility (TR-BDR-03/04) ─────────────────────── -->
+<div class="dash-card mb-4">
+    <div class="card-title-row">
+        <i class="bi bi-{{ 'pencil-square' if editing else 'plus-circle' }}" style="color:var(--rk-green)"></i>
+        <h6>{{ 'Edit Facility' if editing else 'Add Critical Facility' }}</h6>
+    </div>
+    <form method="POST"
+          action="/bdrrmo/facilities{{ '/' ~ editing.id ~ '/edit' if editing else '' }}"
+          class="row g-3">
+        <div class="col-md-6">
+            <label class="form-label small fw-semibold mb-1">Facility Name</label>
+            <input type="text" name="name" maxlength="150" class="form-control form-control-sm"
+                   value="{{ editing.name if editing else '' }}" required>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small fw-semibold mb-1">Type</label>
+            <select name="facility_type" class="form-select form-select-sm" required>
+                {% for t in facility_types %}
+                <option value="{{ t }}"
+                    {{ 'selected' if editing and editing.facility_type.value == t else '' }}>
+                    {{ t.replace('_', ' ').title() }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small fw-semibold mb-1">Status</label>
+            <select name="operational_status" class="form-select form-select-sm">
+                {% for s in facility_statuses %}
+                <option value="{{ s }}"
+                    {{ 'selected' if (editing and editing.operational_status.value == s) or (not editing and s == 'available') else '' }}>
+                    {{ status_labels[s] }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label small fw-semibold mb-1">Latitude</label>
+            <input type="number" step="any" name="latitude" class="form-control form-control-sm"
+                   value="{{ editing.latitude if editing else '' }}" placeholder="14.3500" required>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label small fw-semibold mb-1">Longitude</label>
+            <input type="number" step="any" name="longitude" class="form-control form-control-sm"
+                   value="{{ editing.longitude if editing else '' }}" placeholder="121.0500" required>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label small fw-semibold mb-1">Address <span class="text-muted">(optional)</span></label>
+            <input type="text" name="address" maxlength="255" class="form-control form-control-sm"
+                   value="{{ editing.address or '' if editing else '' }}">
+        </div>
+        <div class="col-12">
+            <button type="submit" class="btn btn-rk btn-sm">
+                <i class="bi bi-save"></i> {{ 'Save Changes' if editing else 'Add Facility' }}
+            </button>
+            {% if editing %}
+            <a href="/bdrrmo/facilities" class="btn btn-outline-secondary btn-sm">Cancel</a>
+            {% endif %}
+            <span class="text-muted small ms-2">
+                Duplicate names or near-identical coordinates in your barangay are blocked.
+            </span>
+        </div>
+    </form>
+</div>
+{% endif %}
+
+<!-- ── View toggle (active / archived) ────────────────────────── -->
+<div class="d-flex justify-content-between align-items-center mb-2">
+    <div class="btn-group btn-group-sm" role="group">
+        <a href="/bdrrmo/facilities"
+           class="btn btn-outline-secondary {{ 'active' if not show_archived else '' }}">
+            Active
+        </a>
+        <a href="/bdrrmo/facilities?archived=1"
+           class="btn btn-outline-secondary {{ 'active' if show_archived else '' }}">
+            Archived{% if archived_count %} ({{ archived_count }}){% endif %}
+        </a>
+    </div>
+</div>
+
+<!-- ── Facility list ──────────────────────────────────────────── -->
+<div class="dash-card p-0">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead style="background:#f9fafb">
+                <tr style="font-size:12px;color:var(--rk-muted);text-transform:uppercase;letter-spacing:0.04em">
+                    <th class="px-3 py-3">Facility Name</th>
+                    <th class="py-3">Type</th>
+                    <th class="py-3">Coordinates</th>
+                    <th class="py-3">Status</th>
+                    <th class="py-3 px-3 text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for f in facilities %}
+                {% set sval = f.operational_status.value %}
+                <tr style="font-size:13px">
+                    <td class="px-3 fw-semibold">
+                        {{ f.name }}
+                        {% if f.address %}<div class="text-muted" style="font-size:11px">{{ f.address }}</div>{% endif %}
+                    </td>
+                    <td>{{ f.facility_type.value.replace('_', ' ').title() }}</td>
+                    <td class="text-muted">{{ "%.5f"|format(f.latitude) }}, {{ "%.5f"|format(f.longitude) }}</td>
+                    <td>
+                        <span class="status-pill {{ status_classes[sval] }}">{{ status_labels[sval] }}</span>
+                    </td>
+                    <td class="px-3 text-end">
+                        {% if show_archived %}
+                        <form method="POST" action="/bdrrmo/facilities/{{ f.id }}/archive" class="d-inline">
+                            <button type="submit" class="btn btn-outline-secondary btn-sm">
+                                <i class="bi bi-arrow-counterclockwise"></i> Restore
+                            </button>
+                        </form>
+                        {% else %}
+                        <form method="POST" action="/bdrrmo/facilities/{{ f.id }}/status"
+                              class="d-inline">
+                            <div class="input-group input-group-sm d-inline-flex" style="width:auto;vertical-align:middle">
+                                <select name="operational_status" class="form-select form-select-sm"
+                                        onchange="this.form.submit()" style="width:auto">
+                                    {% for s in facility_statuses %}
+                                    <option value="{{ s }}" {{ 'selected' if s == sval else '' }}>{{ status_labels[s] }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </form>
+                        <a href="/bdrrmo/facilities?edit={{ f.id }}" class="btn btn-outline-secondary btn-sm" title="Edit">
+                            <i class="bi bi-pencil"></i>
+                        </a>
+                        <form method="POST" action="/bdrrmo/facilities/{{ f.id }}/archive"
+                              class="d-inline"
+                              onsubmit="return confirm('Archive {{ f.name }}? It will be hidden from the active list but kept on record.')">
+                            <button type="submit" class="btn btn-outline-secondary btn-sm" title="Archive">
+                                <i class="bi bi-archive"></i>
+                            </button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="5" class="text-center text-muted py-4">
+                    {% if show_archived %}
+                    No archived facilities.
+                    {% else %}
+                    No critical facilities recorded for this barangay yet. Use the form above to add one.
+                    {% endif %}
+                </td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

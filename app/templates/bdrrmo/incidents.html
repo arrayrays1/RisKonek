@@ -1,0 +1,119 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Incident History — RisKonek{% endblock %}
+
+{% set active_nav = 'bdrrmo_incidents' %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Incident History</h1>
+    <p>Historical disaster incidents recorded for
+       {% if barangay %}Barangay {{ barangay.name }}{% else %}your barangay{% endif %}.</p>
+</div>
+
+{% if success %}
+<div class="alert alert-success alert-dismissible fade show">
+    <i class="bi bi-check-circle-fill me-1"></i>{{ success }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+{% if error %}
+<div class="alert alert-danger alert-dismissible fade show">
+    <i class="bi bi-exclamation-triangle-fill me-1"></i>{{ error }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+{% if not barangay %}
+<div class="alert alert-warning">
+    <i class="bi bi-exclamation-triangle-fill me-1"></i>
+    No barangay is currently assigned to your account. Please contact the CDRRMO Admin.
+</div>
+{% else %}
+
+<!-- ── Submit a disaster / risk report (TR-BDR-01/02) ──────────── -->
+<div class="dash-card mb-4">
+    <div class="card-title-row">
+        <i class="bi bi-plus-circle" style="color:var(--rk-green)"></i>
+        <h6>Submit Disaster / Risk Report</h6>
+    </div>
+    <form method="POST" action="/bdrrmo/incidents" class="row g-3"
+          onsubmit="return confirm('Submit this incident report for your barangay?')">
+        <div class="col-md-4">
+            <label class="form-label small fw-semibold mb-1">Disaster Type</label>
+            <select name="disaster_type" class="form-select form-select-sm" required>
+                {% for d in disaster_types %}
+                <option value="{{ d }}">{{ d.replace('_', ' ').title() }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label small fw-semibold mb-1">Date Occurred</label>
+            <input type="date" name="date_occurred" class="form-control form-control-sm" required>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label small fw-semibold mb-1">Severity</label>
+            <select name="severity" class="form-select form-select-sm">
+                {% for s in severities %}
+                <option value="{{ s }}" {{ 'selected' if s == 'moderate' else '' }}>{{ s.title() }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label small fw-semibold mb-1">Affected Families</label>
+            <input type="number" name="affected_families" min="0" value="0" class="form-control form-control-sm">
+        </div>
+        <div class="col-md-4">
+            <label class="form-label small fw-semibold mb-1">Casualties</label>
+            <input type="number" name="casualties" min="0" value="0" class="form-control form-control-sm">
+        </div>
+        <div class="col-12">
+            <label class="form-label small fw-semibold mb-1">Description</label>
+            <textarea name="description" rows="2" class="form-control form-control-sm"
+                      placeholder="What happened, areas affected, response taken…"></textarea>
+        </div>
+        <div class="col-12">
+            <button type="submit" class="btn btn-rk btn-sm">
+                <i class="bi bi-send"></i> Submit Report
+            </button>
+            <span class="text-muted small ms-2">
+                Saved against your barangay and your account; appears in the history below.
+            </span>
+        </div>
+    </form>
+</div>
+
+<div class="dash-card p-0">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead style="background:#f9fafb">
+                <tr style="font-size:12px;color:var(--rk-muted);text-transform:uppercase;letter-spacing:0.04em">
+                    <th class="px-3 py-3">Date</th>
+                    <th class="py-3">Type</th>
+                    <th class="py-3">Severity</th>
+                    <th class="py-3 text-end">Affected Families</th>
+                    <th class="py-3 text-end">Casualties</th>
+                    <th class="py-3 px-3">Source</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for inc in incidents %}
+                <tr style="font-size:13px">
+                    <td class="px-3">{{ inc.date_occurred.strftime('%b %d, %Y') if inc.date_occurred else '—' }}</td>
+                    <td>{{ inc.disaster_type.value.replace('_', ' ').title() }}</td>
+                    <td>{{ inc.severity.value.title() if inc.severity else '—' }}</td>
+                    <td class="text-end">{{ "{:,}".format(inc.affected_families or 0) }}</td>
+                    <td class="text-end">{{ inc.casualties or 0 }}</td>
+                    <td class="px-3 text-muted">{{ inc.source or '—' }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6" class="text-center text-muted py-4">
+                    No incidents recorded for this barangay yet.
+                </td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

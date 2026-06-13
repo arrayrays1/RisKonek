@@ -152,3 +152,118 @@ def empty_field_row() -> Dict[str, Any]:
         "description": "",
         "resources_used": "",
     }
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Best-effort PDF text → single field row (Week 8.1)
+#
+# Free-text PDFs aren't tabular, so structure_rows() can't help. This is a
+# deliberately conservative, rule-based pass over the raw text: it only
+# fills a field when a value is *confidently* detected, and otherwise
+# leaves the empty-row default untouched. It assists manual review — it
+# does not replace it. Scope is limited to: barangay, disaster_type,
+# date_occurred, affected_families, casualties.
+# ─────────────────────────────────────────────────────────────────────
+
+# Label aliases used to anchor label-based detection in free text.
+_TEXT_LABELS = {
+    "date_occurred":     ["date occurred", "date of incident", "date of occurrence",
+                          "incident date", "date"],
+    "affected_families": ["affected families", "families affected", "no. of families",
+                          "number of families", "families"],
+    "casualties":        ["casualties", "no. of casualties", "number of casualties",
+                          "deaths", "fatalities"],
+    "barangay":          ["barangay", "brgy.", "brgy", "location"],
+}
+
+# A date token in common PH report formats (numeric or month-name).
+_DATE_TOKEN = (
+    r"(\d{4}-\d{1,2}-\d{1,2}"
+    r"|\d{1,2}[/-]\d{1,2}[/-]\d{2,4}"
+    r"|(?:January|February|March|April|May|June|July|August|September|October|"
+    r"November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)\.?\s+\d{1,2},?\s+\d{4})"
+)
+
+
+def _label_value(text: str, labels: List[str], value_pattern: str) -> Optional[str]:
+    """Return the first 'label : value' match for any alias, else None.
+
+    Anchors on the label so we never grab stray values from prose. The
+    separator may be ':' or '-' (or whitespace), value taken from the
+    same line.
+    """
+    for label in labels:
+        pat = re.compile(
+            rf"{re.escape(label)}\s*[:\-]?\s*({value_pattern})",
+            re.IGNORECASE,
+        )
+        m = pat.search(text)
+        if m:
+            return m.group(1).strip()
+    return None
+
+
+def _detect_barangay(text: str, known_barangays: List[str]) -> str:
+    """Prefer matching a known barangay name (finite, reliable); fall back
+    to a 'Barangay: <name>' label. Returns '' if not confident."""
+    low = text.lower()
+    # Longest names first so 'San Antonio' wins over a substring 'San'.
+    for name in sorted(known_barangays or [], key=len, reverse=True):
+        if name and re.search(rf"\b{re.escape(name.lower())}\b", low):
+            return name
+    labelled = _label_value(text, _TEXT_LABELS["barangay"], r"[A-Za-z .'\-]{3,40}")
+    if labelled:
+        # Trim trailing noise; keep it as a suggestion for the reviewer.
+        return labelled.strip(" .-")
+    return ""
+
+
+def _detect_disaster_type(text: str) -> str:
+    """Confident only when exactly ONE distinct disaster type is found
+    (word-boundary keyword match). Ambiguous/none → 'other' default."""
+    low = text.lower()
+    found = set()
+    for keyword, value in _DISASTER_KEYWORDS.items():
+        if re.search(rf"\b{re.escape(keyword)}\b", low):
+            found.add(value)
+    if len(found) == 1:
+        return next(iter(found))
+    return DisasterType.other.value
+
+
+def structure_text(text: str, known_barangays: Optional[List[str]] = None) -> Dict[str, Any]:
+    """Best-effort single field row from free PDF text. Starts from the
+    blank row and overrides only confidently detected fields."""
+    row = empty_field_row()
+    if not text or not text.strip():
+        return row
+
+    # Barangay — known-list match or label.
+    brgy = _detect_barangay(text, known_barangays or [])
+    if brgy:
+        row["barangay"] = brgy
+
+    # Disaster type — only if exactly one is detected.
+    row["disaster_type"] = _detect_disaster_type(text)
+
+    # Date — label-anchored first, else the first clear date token.
+    date_raw = _label_value(text, _TEXT_LABELS["date_occurred"], _DATE_TOKEN)
+    if not date_raw:
+        m = re.search(_DATE_TOKEN, text)
+        date_raw = m.group(1) if m else None
+    if date_raw:
+        parsed = _to_date_string(date_raw)
+        # Only accept a normalized YYYY-MM-DD; leave blank if unparseable.
+        if re.match(r"^\d{4}-\d{2}-\d{2}$", parsed):
+            row["date_occurred"] = parsed
+
+    # Numeric fields — label-anchored only (never bare numbers from prose).
+    # Strip thousands separators so "1,250" parses as 1250, not 1.
+    fam = _label_value(text, _TEXT_LABELS["affected_families"], r"\d[\d,]*")
+    if fam is not None:
+        row["affected_families"] = _to_int(fam.replace(",", ""))
+    cas = _label_value(text, _TEXT_LABELS["casualties"], r"\d[\d,]*")
+    if cas is not None:
+        row["casualties"] = _to_int(cas.replace(",", ""))
+
+    return row

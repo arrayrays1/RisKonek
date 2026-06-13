@@ -1,0 +1,101 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Post-Incident Report — RisKonek{% endblock %}
+
+{% set active_nav = 'incident_reports' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start page-header">
+    <div>
+        <h1>Post-Incident Report #{{ r.id }}</h1>
+        <p>{{ disaster_type }} · {{ barangay }}
+           {% if incident and incident.date_occurred %} · {{ incident.date_occurred.strftime('%B %d, %Y') }}{% endif %}</p>
+    </div>
+    <a href="/cfau/incident-reports" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Back
+    </a>
+</div>
+
+{% if request.query_params.get('error') %}
+<div class="alert alert-danger alert-dismissible fade show">
+    <i class="bi bi-exclamation-triangle-fill me-1"></i>{{ request.query_params.get('error') }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+<div class="row g-3">
+    <div class="col-md-8">
+        <div class="dash-card">
+            {% macro section(title, value) %}
+            <div class="mb-3">
+                <div class="stat-label">{{ title }}</div>
+                <p class="mb-0" style="white-space:pre-wrap">{{ value or '—' }}</p>
+            </div>
+            {% endmacro %}
+            {{ section('Operations Summary', r.operations_summary) }}
+            {{ section('Actions Taken', r.actions_taken) }}
+            {{ section('Equipment Used', r.equipment_used) }}
+            {{ section('Challenges Encountered', r.challenges_encountered) }}
+            {{ section('Recommendations', r.recommendations) }}
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="dash-card">
+            <div class="card-title-row">
+                <i class="bi bi-clock-history" style="color:var(--rk-green);font-size:16px"></i>
+                <h6>Status</h6>
+            </div>
+            <p><span class="badge bg-secondary">{{ workflow_label }}</span></p>
+            <ul class="list-unstyled small text-muted mb-3">
+                <li><strong>Reporter:</strong> {{ r.submitted_by_user.username if r.submitted_by_user else '—' }}</li>
+                <li><strong>Personnel deployed:</strong> {{ r.personnel_count or 0 }}</li>
+                {% if r.personnel_notes %}<li><strong>Personnel notes:</strong> {{ r.personnel_notes }}</li>{% endif %}
+                <li><strong>Created:</strong> {{ r.created_at | pht }}</li>
+                <li><strong>Submitted:</strong> {{ (r.submitted_at | pht) or 'Not yet submitted' }}</li>
+            </ul>
+            {% if can_edit %}
+            <div class="d-grid gap-2">
+                <a href="/cfau/incident-reports/{{ r.id }}/edit" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-pencil"></i> Edit Draft
+                </a>
+                <form method="POST" action="/cfau/incident-reports/{{ r.id }}/submit"
+                      onsubmit="return confirm('Submit this report? You will no longer be able to edit it.')">
+                    <button type="submit" class="btn btn-rk btn-sm w-100"><i class="bi bi-send"></i> Submit</button>
+                </form>
+            </div>
+            {% else %}
+            <p class="small text-muted mb-0">This report has been submitted and can no longer be edited.</p>
+            {% endif %}
+        </div>
+
+        {% if source_upload %}
+        <!-- ── Source Upload (traceability — Week 8.1) ─────────────── -->
+        <div class="dash-card mt-3">
+            <div class="card-title-row">
+                <i class="bi bi-file-earmark-arrow-up" style="color:var(--rk-green);font-size:16px"></i>
+                <h6>Source Upload</h6>
+            </div>
+            <p class="small mb-2">
+                This report was created from an uploaded document.<br>
+                <strong>{{ source_upload.file_name }}</strong>
+                <span class="badge bg-light text-dark border ms-1">{{ source_upload.file_type.value.upper() }}</span>
+            </p>
+            <p class="small text-muted mb-3">Uploaded {{ source_upload.uploaded_at | pht }}</p>
+            <div class="d-grid gap-2">
+                <a href="/cfau/incident-reports/upload/{{ source_upload.id }}/file"
+                   class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-download"></i> View Original File
+                </a>
+                {% if user.role == 'admin' %}
+                <a href="/admin/uploads/{{ source_upload.id }}/history"
+                   class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-clock-history"></i> Open Upload Record
+                </a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,164 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Barangay Profile — RisKonek{% endblock %}
+
+{% set active_nav = 'bdrrmo_profile' %}
+
+{% block head_extra %}
+<style>
+    .profile-header { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+    .profile-header h1 { margin: 0; }
+    .trend-up { color: #c0392b; }
+    .trend-stable { color: #6c757d; }
+    .group-card { background: #fafbfc; border-radius: 10px; padding: 18px; }
+    .group-card .group-label { font-size: 12px; color: var(--rk-muted); }
+    .group-card .group-value { font-size: 28px; font-weight: 700; color: var(--rk-text); margin: 4px 0; }
+    .group-card .group-pct { font-size: 11px; color: var(--rk-green); font-weight: 600; }
+</style>
+{% endblock %}
+
+{% block content %}
+{% if not barangay %}
+<div class="page-header"><h1>Barangay Profile</h1></div>
+<div class="alert alert-warning">
+    <i class="bi bi-exclamation-triangle-fill me-1"></i>
+    No barangay is currently assigned to your account. Please contact the CDRRMO Admin.
+</div>
+{% else %}
+<div class="page-header">
+    <div class="profile-header">
+        <h1>{{ barangay.name }}</h1>
+        <span class="risk-badge risk-{{ risk_level }}">{{ risk_level.title() }} Planning Priority</span>
+    </div>
+    <p>Disaster profile and preparedness data for your barangay.</p>
+</div>
+
+<!-- ── Headline cards ─────────────────────────────────────────── -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-start">
+                <div class="stat-label">Total Population</div>
+                <div class="stat-icon" style="background:#e8f4fd;color:#2980b9"><i class="bi bi-people-fill"></i></div>
+            </div>
+            <div class="stat-value">{{ "{:,}".format(total_population) }}</div>
+            <div class="stat-change text-muted">{{ "{:,}".format(households) }} households</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-start">
+                <div class="stat-label">Vulnerable %</div>
+                <div class="stat-icon" style="background:#fef3e2;color:#d35400"><i class="bi bi-exclamation-triangle-fill"></i></div>
+            </div>
+            <div class="stat-value">{{ vulnerable_pct }}%</div>
+            <div class="stat-change text-muted">Elderly, PWDs, Children</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-start">
+                <div class="stat-label">Flood Risk Trend</div>
+                <div class="stat-icon" style="background:#fde8e8;color:#c0392b"><i class="bi bi-graph-up-arrow"></i></div>
+            </div>
+            <div class="stat-value {{ 'trend-up' if flood_trend == 'Increasing' else 'trend-stable' }}">{{ flood_trend }}</div>
+            <div class="stat-change text-muted">Last 12 months vs prior</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-start">
+                <div class="stat-label">Fire Risk Trend</div>
+                <div class="stat-icon" style="background:#fef9e7;color:#b7950b"><i class="bi bi-fire"></i></div>
+            </div>
+            <div class="stat-value {{ 'trend-up' if fire_trend == 'Increasing' else 'trend-stable' }}">{{ fire_trend }}</div>
+            <div class="stat-change text-muted">Last 12 months vs prior</div>
+        </div>
+    </div>
+</div>
+
+<!-- ── Vulnerable groups ──────────────────────────────────────── -->
+<div class="dash-card mb-4">
+    <div class="card-title-row">
+        <i class="bi bi-people" style="color:#d35400"></i>
+        <h6>Vulnerable Population Groups</h6>
+    </div>
+    <div class="row g-3">
+        <div class="col-md-4">
+            <div class="group-card">
+                <div class="group-label">Elderly (65+)</div>
+                <div class="group-value">{{ "{:,}".format(elderly) }}</div>
+                <div class="group-pct">{{ elderly_pct }}% of population</div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="group-card">
+                <div class="group-label">Persons with Disabilities</div>
+                <div class="group-value">{{ "{:,}".format(pwd) }}</div>
+                <div class="group-pct">{{ pwd_pct }}% of population</div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="group-card">
+                <div class="group-label">Children (0–12)</div>
+                <div class="group-value">{{ "{:,}".format(children) }}</div>
+                <div class="group-pct">{{ children_pct }}% of population</div>
+            </div>
+        </div>
+    </div>
+    <div class="text-muted mt-3" style="font-size:11px">
+        <i class="bi bi-info-circle"></i>
+        Counts come from the latest population record. Use
+        <a href="/bdrrmo/population">Population Records</a> to log an updated census.
+    </div>
+</div>
+
+<!-- ── Known hazards ──────────────────────────────────────────── -->
+<div class="dash-card mb-4">
+    <div class="card-title-row">
+        <i class="bi bi-shield-exclamation" style="color:var(--rk-green)"></i>
+        <h6>Known Hazard Types</h6>
+    </div>
+    {% if hazard_types %}
+        {% for h in hazard_types %}
+        <span class="badge bg-light text-dark border me-1" style="font-size:12px">{{ h.title() }}</span>
+        {% endfor %}
+    {% else %}
+        <span class="text-muted" style="font-size:13px">No hazards recorded.</span>
+    {% endif %}
+</div>
+
+<!-- ── Planning priority breakdown ────────────────────────────── -->
+<div class="dash-card">
+    <div class="card-title-row">
+        <i class="bi bi-speedometer2" style="color:var(--rk-green)"></i>
+        <h6>Planning Priority Breakdown</h6>
+    </div>
+    <div class="row g-3" style="font-size:13px">
+        <div class="col-md-3">
+            <div class="text-muted">Overall Score</div>
+            <div class="fw-bold" style="font-size:22px">{{ risk_score }}<span class="text-muted" style="font-size:13px"> / 100</span></div>
+        </div>
+        <div class="col-md-3">
+            <div class="text-muted">Hazard Exposure (40%)</div>
+            <div class="fw-semibold">{{ risk_breakdown['hazard_score'] }}</div>
+        </div>
+        <div class="col-md-3">
+            <div class="text-muted">Incident History (40%)</div>
+            <div class="fw-semibold">{{ risk_breakdown['incident_score'] }}</div>
+        </div>
+        <div class="col-md-3">
+            <div class="text-muted">Population Size (20%)</div>
+            <div class="fw-semibold">{{ risk_breakdown['population_score'] }}</div>
+        </div>
+    </div>
+    <div class="text-muted mt-3" style="font-size:11px">
+        <i class="bi bi-info-circle"></i>
+        This score is system-generated for planning support only and is not an
+        official hazard or risk classification. Official hazard and risk levels
+        are based on valid external sources (e.g. HazardHunter, CLUP / CDRA /
+        CIDRA maps, technical-agency data).
+    </div>
+</div>
+{% endif %}
+{% endblock %}

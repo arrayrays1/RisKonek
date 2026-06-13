@@ -1,0 +1,152 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Serviceability Review — RisKonek{% endblock %}
+
+{% set active_nav = 'serviceability_review' %}
+
+{% macro workflow_pill(v, label) -%}
+    {% if v == 'draft' %}
+        <span class="badge bg-light text-dark border">{{ label }}</span>
+    {% elif v == 'submitted' %}
+        <span class="status-pill status-maintenance">{{ label }}</span>
+    {% elif v == 'reviewed' %}
+        <span class="badge bg-info text-dark">{{ label }}</span>
+    {% elif v == 'resolved' %}
+        <span class="status-pill status-operational">{{ label }}</span>
+    {% else %}
+        <span class="badge bg-light text-dark border">{{ label }}</span>
+    {% endif %}
+{%- endmacro %}
+
+{% macro urgency_badge(v, label) -%}
+    {% if v == 'critical' %}
+        <span class="status-pill" style="background:#fde8e8;color:#c0392b;border:1px solid #f4c2bd">
+            <i class="bi bi-exclamation-triangle-fill"></i> {{ label }}</span>
+    {% elif v == 'high' %}
+        <span class="status-pill" style="background:#fdebd0;color:#b9770e;border:1px solid #f5cba7">
+            <i class="bi bi-exclamation-circle-fill"></i> {{ label }}</span>
+    {% elif v == 'moderate' %}
+        <span class="status-pill status-maintenance">{{ label }}</span>
+    {% else %}
+        <span class="status-pill" style="background:#eef0f2;color:#6c757d;border:1px solid #dee2e6">{{ label }}</span>
+    {% endif %}
+{%- endmacro %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Equipment Serviceability Review</h1>
+    <p>Review serviceability reports submitted by CFAU, update their status, and add remarks.</p>
+</div>
+
+{% if request.query_params.get('success') %}
+<div class="alert alert-success alert-dismissible fade show">
+    <i class="bi bi-check-circle-fill me-1"></i>{{ request.query_params.get('success') }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+{% if request.query_params.get('error') %}
+<div class="alert alert-danger alert-dismissible fade show">
+    <i class="bi bi-exclamation-triangle-fill me-1"></i>{{ request.query_params.get('error') }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+{% if summary.priority %}
+<div class="alert alert-danger d-flex align-items-center">
+    <i class="bi bi-exclamation-triangle-fill me-2 fs-5"></i>
+    <div>
+        <strong>{{ summary.priority }}</strong> high/critical-urgency
+        report{{ 's' if summary.priority != 1 else '' }} awaiting review.
+        <a href="/admin/serviceability?status=submitted&urgency=critical" class="alert-link ms-1">View critical</a>
+    </div>
+</div>
+{% endif %}
+
+<div class="row g-3 mb-3">
+    <div class="col-md-3"><div class="stat-card d-flex justify-content-between align-items-center">
+        <div>
+            <div class="stat-label">Needs Urgent Attention</div>
+            <div class="stat-value {{ 'text-danger' if summary.priority else '' }}">{{ summary.priority }}</div>
+        </div>
+        <div class="stat-icon" style="background:#fde8e8;color:#c0392b"><i class="bi bi-exclamation-triangle"></i></div>
+    </div></div>
+    <div class="col-md-3"><div class="stat-card">
+        <div class="stat-label">Awaiting Review</div><div class="stat-value">{{ summary.submitted }}</div>
+    </div></div>
+    <div class="col-md-3"><div class="stat-card">
+        <div class="stat-label">Reviewed</div><div class="stat-value">{{ summary.reviewed }}</div>
+    </div></div>
+    <div class="col-md-3"><div class="stat-card">
+        <div class="stat-label">Resolved</div><div class="stat-value">{{ summary.resolved }}</div>
+    </div></div>
+</div>
+
+<div class="dash-card mb-3">
+    <form method="GET" action="/admin/serviceability" class="row g-2 align-items-end js-live-filter">
+        <div class="col-md-3">
+            <label class="form-label small fw-semibold mb-1">Status</label>
+            <select name="status" class="form-select form-select-sm">
+                <option value="">All statuses</option>
+                {% for v, label in statuses %}
+                <option value="{{ v }}" {% if f_status == v %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small fw-semibold mb-1">Urgency</label>
+            <select name="urgency" class="form-select form-select-sm">
+                <option value="">Any urgency</option>
+                {% for v, label in urgencies %}
+                <option value="{{ v }}" {% if f_urgency == v %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2 d-grid">
+            <a href="/admin/serviceability" class="btn btn-outline-secondary btn-sm"><i class="bi bi-x-circle"></i> Reset</a>
+        </div>
+    </form>
+</div>
+
+<div class="dash-card p-0">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead style="background:#f9fafb">
+                <tr style="font-size:12px;color:var(--rk-muted);text-transform:uppercase;letter-spacing:0.04em">
+                    <th class="px-3 py-3">Urgency</th>
+                    <th class="py-3">Title</th>
+                    <th class="py-3">Equipment</th>
+                    <th class="py-3">Type</th>
+                    <th class="py-3">Finding</th>
+                    <th class="py-3">Reporter</th>
+                    <th class="py-3">Status</th>
+                    <th class="py-3 text-end px-3">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in rows %}
+                <tr style="font-size:13px;{% if r.is_priority %}background:#fff5f5{% endif %}"
+                    {% if r.is_priority %}class="border-start border-danger border-3"{% endif %}>
+                    <td class="px-3">{{ urgency_badge(r.urgency, r.urgency_label) }}</td>
+                    <td class="fw-semibold">{{ r.title }}</td>
+                    <td>{{ r.equipment }}</td>
+                    <td class="text-muted">{{ r.report_type }}</td>
+                    <td>{{ r.finding }}</td>
+                    <td class="text-muted">{{ r.reporter }}</td>
+                    <td>{{ workflow_pill(r.report_status, r.report_status_label) }}</td>
+                    <td class="text-end px-3">
+                        <a href="/admin/serviceability/{{ r.id }}" class="btn btn-outline-primary btn-sm">
+                            <i class="bi bi-eye"></i> Review
+                        </a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="8" class="text-center text-muted py-4">
+                    No serviceability reports found.
+                    {% if f_status or f_urgency %}<a href="/admin/serviceability" class="ms-2">Clear filters</a>{% endif %}
+                </td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

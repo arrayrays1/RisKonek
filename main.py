@@ -48,7 +48,7 @@ def home(request: Request):
         if role == "admin":
             return RedirectResponse(url="/admin/dashboard")
         elif role == "bdrrmo":
-            return RedirectResponse(url="/bdrrmo/dashboard")
+            return RedirectResponse(url="/bdrrmo/profile")
         elif role == "cfau_oic":
             return RedirectResponse(url="/cfau/dashboard")
         elif role == "cdrrmo_staff":
