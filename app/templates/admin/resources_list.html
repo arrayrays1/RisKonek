@@ -50,7 +50,7 @@
                 <div class="stat-label">Total Active Items</div>
                 <div class="stat-value">{{ summary.total }}</div>
             </div>
-            <div class="stat-icon" style="background:#eafaf1;color:var(--rk-green)">
+            <div class="stat-icon" style="background:#d1fae5;color:var(--rk-green)">
                 <i class="bi bi-box-seam"></i>
             </div>
         </div>
@@ -89,6 +89,18 @@
         </div>
     </div>
 </div>
+
+{% set alert_total = summary.low_stock + summary.near_expiry + summary.expired %}
+{% if alert_total > 0 %}
+<div class="alert-banner">
+    <i class="bi bi-exclamation-triangle-fill" style="font-size:16px"></i>
+    <span>
+        <strong>{{ alert_total }} item{{ 's' if alert_total != 1 else '' }} need{{ '' if alert_total != 1 else 's' }} attention:</strong>
+        {{ summary.low_stock }} low stock, {{ summary.near_expiry }} near expiry, {{ summary.expired }} expired.
+        Filter by "Alert" below to review them.
+    </span>
+</div>
+{% endif %}
 
 <!-- ── Filters ────────────────────────────────────────────────── -->
 <div class="dash-card mb-3">
@@ -166,23 +178,23 @@
                     <td>{{ alert_pill(r.alert) }}</td>
                     <td class="text-end px-3">
                         {% if not r.is_archived %}
-                        <button type="button" class="btn btn-outline-success btn-sm"
+                        <button type="button" class="btn-soft" style="color:#047857"
                                 data-bs-toggle="modal" data-bs-target="#stockModal-{{ r.id }}">
                             <i class="bi bi-plus-slash-minus"></i> Stock
                         </button>
                         <a href="/admin/resources/{{ r.id }}/edit"
-                           class="btn btn-outline-secondary btn-sm">
+                           class="btn-soft" title="Edit">
                             <i class="bi bi-pencil"></i>
                         </a>
                         <form method="POST" action="/admin/resources/{{ r.id }}/archive" class="d-inline"
                               onsubmit="return confirm('Archive {{ r.name }}?')">
-                            <button type="submit" class="btn btn-outline-warning btn-sm">
+                            <button type="submit" class="btn-soft" style="color:#b45309" title="Archive">
                                 <i class="bi bi-archive"></i>
                             </button>
                         </form>
                         {% else %}
                         <form method="POST" action="/admin/resources/{{ r.id }}/archive" class="d-inline">
-                            <button type="submit" class="btn btn-outline-success btn-sm">
+                            <button type="submit" class="btn-soft" style="color:#047857">
                                 <i class="bi bi-arrow-counterclockwise"></i> Restore
                             </button>
                         </form>

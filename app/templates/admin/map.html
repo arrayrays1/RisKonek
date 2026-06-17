@@ -14,8 +14,8 @@
     }
     .filter-panel {
         background: white;
-        border-radius: 12px;
-        box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+        border-radius: var(--rk-radius);
+        box-shadow: 0 1px 3px rgba(16,24,40,0.06), 0 1px 8px rgba(16,24,40,0.04);
         padding: 18px;
         overflow-y: auto;
     }
@@ -37,9 +37,9 @@
 
     .map-area {
         position: relative;
-        border-radius: 12px;
+        border-radius: var(--rk-radius);
         overflow: hidden;
-        box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+        box-shadow: 0 1px 3px rgba(16,24,40,0.06), 0 1px 8px rgba(16,24,40,0.04);
         background: white;
     }
     #facilityMap { height: 100%; width: 100%; }
@@ -95,8 +95,8 @@
     }
     .stat-pill {
         background: white;
-        border-radius: 8px;
-        box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+        border-radius: 10px;
+        box-shadow: 0 1px 3px rgba(16,24,40,0.06), 0 1px 8px rgba(16,24,40,0.04);
         padding: 8px 14px;
         font-size: 13px;
         display: flex; align-items: center; gap: 8px;
@@ -118,7 +118,7 @@
     .popup-badge {
         font-size: 10px; font-weight: 600;
         padding: 2px 8px; border-radius: 12px;
-        background: #eafaf1; color: #1a6b47;
+        background: #d1fae5; color: #047857;
     }
     .popup-badge.approx { background: #fef3cd; color: #856404; }
     .popup-badge.city   { background: #e8f0fe; color: #1a4fb0; }
@@ -224,7 +224,7 @@
             <small class="text-muted">Unchecked = no incident restriction.</small>
         </div>
 
-        <button type="button" id="resetFilters" class="btn btn-sm btn-outline-secondary w-100 mt-2">
+        <button type="button" id="resetFilters" class="btn-soft w-100 mt-2 justify-content-center">
             <i class="bi bi-arrow-counterclockwise me-1"></i>Reset filters
         </button>
     </aside>
@@ -235,7 +235,7 @@
         <div class="map-overlay">
             <div class="legend-title">Legend</div>
             <div class="legend-row">
-                <span class="legend-dot" style="background:#1a6b47"></span>
+                <span class="legend-dot" style="background:#047857"></span>
                 <span>Evacuation Center</span>
             </div>
             <div class="legend-row">
@@ -278,7 +278,7 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 // Kept as a plain comment for now — no fake polygons.
 
 const TYPE_COLORS = {
-    evacuation_center: '#1a6b47',
+    evacuation_center: '#047857',
     school:            '#2980b9',
     hospital:          '#c0392b',
     health_clinic:     '#8e44ad',
