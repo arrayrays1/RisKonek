@@ -53,7 +53,7 @@
     <div class="col-md-3">
         <div class="stat-card">
             <div class="stat-label">Elderly / PWD</div>
-            <div class="stat-value" style="font-size:20px">
+            <div class="stat-value stat-value-lg">
                 {% if latest %}{{ "{:,}".format(latest.elderly_count) }} / {{ "{:,}".format(latest.pwd_count) }}{% else %}—{% endif %}
             </div>
             <div class="stat-change text-muted">Latest record</div>
@@ -62,7 +62,7 @@
     <div class="col-md-3">
         <div class="stat-card">
             <div class="stat-label">Last Recorded</div>
-            <div class="stat-value" style="font-size:16px">
+            <div class="stat-value stat-value-lg">
                 {{ latest.recorded_at | pht if latest else "—" }}
             </div>
         </div>
