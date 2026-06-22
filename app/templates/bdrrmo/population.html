@@ -53,7 +53,7 @@
     <div class="col-md-3">
         <div class="stat-card">
             <div class="stat-label">Elderly / PWD</div>
-            <div class="stat-value stat-value-lg">
+            <div class="stat-value" style="font-size:20px">
                 {% if latest %}{{ "{:,}".format(latest.elderly_count) }} / {{ "{:,}".format(latest.pwd_count) }}{% else %}—{% endif %}
             </div>
             <div class="stat-change text-muted">Latest record</div>
@@ -62,7 +62,7 @@
     <div class="col-md-3">
         <div class="stat-card">
             <div class="stat-label">Last Recorded</div>
-            <div class="stat-value stat-value-lg">
+            <div class="stat-value" style="font-size:16px">
                 {{ latest.recorded_at | pht if latest else "—" }}
             </div>
         </div>
@@ -79,30 +79,29 @@
           onsubmit="return confirm('Save this population record? It will be added as a new dated entry.')">
         <div class="col-md-4">
             <label class="form-label small fw-semibold mb-1">Total Population</label>
-            <input type="number" name="total_population" min="0" value="{{ latest.total_population if latest else 0 }}" class="form-control form-control-sm" required>
+            <input type="number" name="total_population" min="0" value="0" class="form-control form-control-sm" required>
         </div>
         <div class="col-md-4">
             <label class="form-label small fw-semibold mb-1">Total Households</label>
-            <input type="number" name="total_households" min="0" value="{{ latest.total_households if latest else 0 }}" class="form-control form-control-sm" required>
+            <input type="number" name="total_households" min="0" value="0" class="form-control form-control-sm" required>
         </div>
         <div class="col-md-4">
             <label class="form-label small fw-semibold mb-1">PWD Count</label>
-            <input type="number" name="pwd_count" min="0" value="{{ latest.pwd_count if latest else 0 }}" class="form-control form-control-sm" required>
+            <input type="number" name="pwd_count" min="0" value="0" class="form-control form-control-sm" required>
         </div>
         <div class="col-md-4">
             <label class="form-label small fw-semibold mb-1">Elderly Count (65+)</label>
-            <input type="number" name="elderly_count" min="0" value="{{ latest.elderly_count if latest else 0 }}" class="form-control form-control-sm" required>
+            <input type="number" name="elderly_count" min="0" value="0" class="form-control form-control-sm" required>
         </div>
         <div class="col-md-4">
             <label class="form-label small fw-semibold mb-1">Children Count (0–12)</label>
-            <input type="number" name="children_count" min="0" value="{{ latest.children_count if latest else 0 }}" class="form-control form-control-sm" required>
+            <input type="number" name="children_count" min="0" value="0" class="form-control form-control-sm" required>
         </div>
         <div class="col-12">
             <button type="submit" class="btn btn-rk btn-sm">
                 <i class="bi bi-save"></i> Save Population Record
             </button>
             <span class="text-muted small ms-2">
-                Pre-filled from your latest snapshot — adjust only what changed.
                 Saved against your barangay and your account. Existing records are kept as history.
             </span>
         </div>

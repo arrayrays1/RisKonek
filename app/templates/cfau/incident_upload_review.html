@@ -105,10 +105,10 @@
                 </tbody>
             </table>
         </div>
-        <div class="form-text">Showing first {{ rows_preview | length }} rows — the report form below has been pre-filled from this content; review and correct before saving.</div>
+        <div class="form-text">Showing first {{ rows_preview | length }} rows — reference only; the report form is not auto-filled.</div>
     {% elif raw_text_preview %}
         <pre style="white-space:pre-wrap;font-size:12px;max-height:380px;overflow:auto;background:#f9fafb;padding:10px;border-radius:6px">{{ raw_text_preview }}</pre>
-        <div class="form-text">The report form below has been pre-filled from this content; review and correct before saving.</div>
+        <div class="form-text">Reference only — the report form is not auto-filled.</div>
     {% else %}
         <p class="text-muted mb-0 small">No preview available.</p>
     {% endif %}
@@ -123,125 +123,52 @@
     <form method="POST" action="/cfau/incident-reports/upload/{{ report.id }}/submit" class="row g-3">
 
         <div class="col-12">
-            <label class="form-label small fw-semibold">Linked Incident</label>
-            {% if selected_incident_id %}
-            <div class="alert alert-success py-2 px-3 mb-2 small">
-                <i class="bi bi-check-circle-fill me-1"></i>
-                Matching incident found and selected automatically. You may keep it,
-                pick another, or clear the selection to use the extracted details below.
-            </div>
-            {% else %}
-            <div class="alert alert-info py-2 px-3 mb-2 small">
-                <i class="bi bi-info-circle-fill me-1"></i>
-                No matching incident found. A new incident will be created automatically
-                from the Core Incident Details below when you save — review them carefully.
-            </div>
-            {% endif %}
-            <select name="incident_id" class="form-select">
-                <option value="">— Auto-match or create from the details below —</option>
+            <label class="form-label small fw-semibold">Incident *</label>
+            <select name="incident_id" required class="form-select">
+                <option value="">— Select the disaster incident this report covers —</option>
                 {% for iid, label in incidents %}
-                <option value="{{ iid }}"
-                    {% if selected_incident_id == iid %}selected{% endif %}>{{ label }}</option>
+                <option value="{{ iid }}">{{ label }}</option>
                 {% endfor %}
             </select>
             <div class="form-text small">
-                Leave this empty to let the system link an exact match (barangay,
-                disaster type and date) or create the incident from the details below.
-            </div>
-        </div>
-
-        <!-- ── Core Incident Details (resolve-or-create source) ────────── -->
-        <div class="col-12">
-            <div class="border rounded p-3" style="background:#f9fafb">
-                <div class="text-muted small fw-semibold mb-2">
-                    <i class="bi bi-clipboard-data me-1"></i>Core Incident Details
-                    <span class="fw-normal">— used to match an existing incident or create a new one</span>
-                </div>
-                <div class="row g-3">
-                    <div class="col-md-5">
-                        <label class="form-label small fw-semibold">Barangay</label>
-                        <select name="barangay" class="form-select">
-                            <option value="">— Select barangay —</option>
-                            {% for b in barangays %}
-                            <option value="{{ b.name }}"
-                                {% if core.barangay and core.barangay|lower == b.name|lower %}selected{% endif %}>{{ b.name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label small fw-semibold">Disaster Type</label>
-                        <select name="disaster_type" class="form-select">
-                            {% for dt in disaster_types %}
-                            <option value="{{ dt }}"
-                                {% if core.disaster_type == dt %}selected{% endif %}>{{ dt | replace('_', ' ') | title }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label small fw-semibold">Date Occurred</label>
-                        <input type="date" name="date_occurred" class="form-control"
-                               value="{{ core.date_occurred }}">
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label small fw-semibold">Affected Families</label>
-                        <input type="number" name="affected_families" min="0" class="form-control"
-                               value="{{ core.affected_families if core.affected_families is not none else 0 }}">
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label small fw-semibold">Casualties</label>
-                        <input type="number" name="casualties" min="0" class="form-control"
-                               value="{{ core.casualties if core.casualties is not none else 0 }}">
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label small fw-semibold">Incident Description</label>
-                        <input type="text" name="incident_description" class="form-control"
-                               value="{{ core.description if core.description else '' }}"
-                               placeholder="Short description of the disaster event">
-                    </div>
-                </div>
-                <div class="form-text small mt-2">
-                    These describe the disaster event itself. They are only used when no
-                    incident is selected above. An existing incident is never overwritten.
-                </div>
+                No matching incident? It must be recorded in the Incident module first —
+                this avoids creating duplicate disaster records.
             </div>
         </div>
 
         <div class="col-12">
             <label class="form-label small fw-semibold">Operations Summary</label>
             <textarea name="operations_summary" rows="3" class="form-control"
-                      placeholder="Overview of the response operation…">{{ prefill.operations_summary }}</textarea>
+                      placeholder="Overview of the response operation…"></textarea>
         </div>
         <div class="col-12">
             <label class="form-label small fw-semibold">Actions Taken</label>
             <textarea name="actions_taken" rows="3" class="form-control"
-                      placeholder="Concrete actions carried out during the response…">{{ prefill.actions_taken }}</textarea>
+                      placeholder="Concrete actions carried out during the response…"></textarea>
         </div>
         <div class="col-md-6">
             <label class="form-label small fw-semibold">Equipment Used</label>
             <textarea name="equipment_used" rows="2" class="form-control"
-                      placeholder="e.g. Rescue Truck 02, 2 rescue boats…">{{ prefill.equipment_used }}</textarea>
+                      placeholder="e.g. Rescue Truck 02, 2 rescue boats…"></textarea>
         </div>
         <div class="col-md-2">
             <label class="form-label small fw-semibold">Personnel Deployed</label>
-            <input type="number" name="personnel_count" min="0" class="form-control"
-                   value="{{ prefill.personnel_count if prefill.personnel_count else '' }}"
-                   placeholder="—">
+            <input type="number" name="personnel_count" min="0" class="form-control" value="0">
         </div>
         <div class="col-md-4">
             <label class="form-label small fw-semibold">Personnel Notes</label>
             <input type="text" name="personnel_notes" class="form-control"
-                   value="{{ prefill.personnel_notes }}"
                    placeholder="e.g. 2 medics, 1 driver">
         </div>
         <div class="col-12">
             <label class="form-label small fw-semibold">Challenges Encountered</label>
             <textarea name="challenges_encountered" rows="3" class="form-control"
-                      placeholder="Obstacles, field risks, resource gaps…">{{ prefill.challenges_encountered }}</textarea>
+                      placeholder="Obstacles, field risks, resource gaps…"></textarea>
         </div>
         <div class="col-12">
             <label class="form-label small fw-semibold">Recommendations</label>
             <textarea name="recommendations" rows="3" class="form-control"
-                      placeholder="Suggested improvements for future responses…">{{ prefill.recommendations }}</textarea>
+                      placeholder="Suggested improvements for future responses…"></textarea>
         </div>
 
         <div class="col-12 d-flex justify-content-end gap-2 pt-2">
