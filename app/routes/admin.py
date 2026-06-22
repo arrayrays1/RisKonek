@@ -18,7 +18,6 @@ from app.utils.geo import BARANGAY_COORDS
 from typing import Optional
 from datetime import date, datetime, timedelta, timezone
 from urllib.parse import urlencode
-import json
 
 router = APIRouter(prefix="/admin")
 templates = Jinja2Templates(directory="app/templates")
@@ -76,7 +75,9 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
         r for r in resources
         if r.expiry_date and r.expiry_date <= date.today() + timedelta(days=30)
     ]
-    active_alerts = len(low_stock) + len(expiring)
+    # Distinct assets with an overdue / due-today repair reminder.
+    repair_attention_count = len(assets_needing_repair_attention(db))
+    active_alerts = len(low_stock) + len(expiring) + repair_attention_count
 
     # ── Charts ───────────────────────────────────────────────────────
     disaster_counts = {}
@@ -144,16 +145,20 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
             "readiness_score": readiness_score,
             "data_relevance": data_relevance,
             "active_alerts": active_alerts,
-            "disaster_counts": json.dumps(disaster_counts),
-            "yearly_data": json.dumps(yearly_data),
+            # Pass raw objects; the template renders them with the |tojson
+            # filter, which HTML-escapes <, >, & so values can't break out of
+            # the inline <script> block (XSS-safe).
+            "disaster_counts": disaster_counts,
+            "yearly_data": yearly_data,
             "top5": top5,
             "all_scores": all_scores,
-            "map_markers": json.dumps(map_markers),
+            "map_markers": map_markers,
             "recent_logs": recent_logs,
             "serviceable_count": serviceable,
             "total_equip": total_equip,
             "low_stock_count": len(low_stock),
             "expiring_count": len(expiring),
+            "repair_attention_count": repair_attention_count,
         }
     )
 
@@ -1334,8 +1339,13 @@ def equipment_list(
 
     rows = query.order_by(Equipment.name).all()
 
+    # Repair-follow-up reminders, keyed by equipment id (archived excluded
+    # by the helper). Reused as-is for both the badges and the count.
+    reminders = equipment_repair_reminders(db)
+
     view_rows = []
     for e in rows:
+        reminder = reminders.get(e.id)
         view_rows.append({
             "id": e.id,
             "name": e.name,
@@ -1351,6 +1361,7 @@ def equipment_list(
             "assigned": e.assigned_to_user.username if e.assigned_to_user else "—",
             "last_inspected": e.last_inspected,
             "is_archived": e.is_archived,
+            "repair_reminder": reminder["state"] if reminder else None,
         })
 
     # Summary cards for at-a-glance fleet readiness.
@@ -1367,6 +1378,8 @@ def equipment_list(
             1 for x in active
             if x.status and x.status.value in ("unserviceable", "not_serviceable")
         ),
+        # Distinct non-archived assets with an active repair reminder.
+        "repair_attention": len(reminders),
     }
 
     return templates.TemplateResponse(
@@ -1481,6 +1494,9 @@ def equipment_edit_form(equipment_id: int, request: Request, db: Session = Depen
     e = db.query(Equipment).filter(Equipment.id == equipment_id).first()
     if not e:
         return RedirectResponse(url="/admin/equipment", status_code=302)
+
+    # Repair follow-up for this unit (most-relevant report, if any).
+    reminder = equipment_repair_reminders(db).get(e.id)
     return templates.TemplateResponse(
         request=request,
         name="admin/equipment_form.html",
@@ -1493,6 +1509,11 @@ def equipment_edit_form(equipment_id: int, request: Request, db: Session = Depen
                       for t in EquipmentType],
             "status_choices": [(v, EQUIPMENT_STATUS_LABELS[v]) for v in EQUIPMENT_STATUS_CHOICES],
             "error": None,
+            "repair_reminder": reminder["state"] if reminder else None,
+            "repair_report": reminder["report"] if reminder else None,
+            "live_status_label": EQUIPMENT_STATUS_LABELS.get(
+                e.status.value if e.status else "", "—"
+            ),
         },
     )
 
@@ -1660,6 +1681,88 @@ FINDING_TO_LIVE_STATUS = {
 # critical report (e.g. an unserviceable ambulance) is seen immediately.
 URGENCY_RANK = {"critical": 3, "high": 2, "moderate": 1, "low": 0}
 
+# Live equipment statuses that mean a unit is still out of service. Repair
+# reminders only fire while the equipment sits in one of these (the legacy
+# not_serviceable value is included).
+_REPAIR_OPEN_STATUSES = {"under_repair", "unserviceable", "not_serviceable"}
+
+
+def repair_reminder_state(report, today=None):
+    """Repair-reminder state for an EquipmentReport — one of:
+        "overdue"   — repair_scheduled_date is before today
+        "due_today" — repair_scheduled_date is today
+        None        — no reminder
+
+    A reminder applies only while a scheduled repair date has arrived
+    (today or past) AND the linked equipment is still out of service
+    (under_repair / unserviceable / legacy not_serviceable). It clears by
+    itself once the unit is returned to service — Equipment.status stays
+    the source of truth and is never changed here. Report workflow state
+    is intentionally ignored: a resolved report whose equipment was never
+    returned to service keeps reminding.
+    """
+    if report is None or report.repair_scheduled_date is None:
+        return None
+    equipment = report.equipment
+    if not equipment or not equipment.status:
+        return None
+    if equipment.status.value not in _REPAIR_OPEN_STATUSES:
+        return None
+    today = today or date.today()
+    if report.repair_scheduled_date < today:
+        return "overdue"
+    if report.repair_scheduled_date == today:
+        return "due_today"
+    return None
+
+
+# Reminder severity for picking the "most relevant" report per asset.
+_REPAIR_REMINDER_RANK = {"overdue": 2, "due_today": 1}
+
+
+def equipment_repair_reminders(db, today=None):
+    """Map of {equipment_id: {"state", "report"}} for active, non-archived
+    equipment with at least one due/overdue repair whose unit is still out
+    of service. Deduped per asset: when a unit has several qualifying
+    reports the most relevant one wins — Overdue over Due Today, then the
+    earliest repair date. Reuses repair_reminder_state() for the rule so no
+    business logic is duplicated."""
+    today = today or date.today()
+    reports = (
+        db.query(EquipmentReport)
+        .join(Equipment, EquipmentReport.equipment_id == Equipment.id)
+        .filter(Equipment.is_archived == False)
+        .filter(EquipmentReport.repair_scheduled_date.isnot(None))
+        .filter(EquipmentReport.repair_scheduled_date <= today)
+        .all()
+    )
+    best = {}
+    for r in reports:
+        state = repair_reminder_state(r, today)
+        if state is None:
+            continue
+        current = best.get(r.equipment_id)
+        candidate = (_REPAIR_REMINDER_RANK[state], r.repair_scheduled_date, r)
+        if current is None:
+            best[r.equipment_id] = candidate
+        else:
+            # Higher rank wins; tie broken by the earliest repair date.
+            if (candidate[0] > current[0]
+                    or (candidate[0] == current[0] and candidate[1] < current[1])):
+                best[r.equipment_id] = candidate
+    return {
+        eid: {"state": ("overdue" if rank == 2 else "due_today"), "report": rep}
+        for eid, (rank, _d, rep) in best.items()
+    }
+
+
+def assets_needing_repair_attention(db, today=None):
+    """Set of distinct (non-archived) Equipment ids with an active repair
+    reminder. Single source of truth derived from
+    equipment_repair_reminders() so the dashboard, serviceability list and
+    equipment module all agree."""
+    return set(equipment_repair_reminders(db, today).keys())
+
 
 @router.get("/serviceability", response_class=HTMLResponse)
 def serviceability_review_list(
@@ -1692,6 +1795,8 @@ def serviceability_review_list(
             "id": r.id,
             "title": r.title or "(untitled)",
             "equipment": r.equipment.name if r.equipment else "—",
+            "repair_scheduled_date": r.repair_scheduled_date,
+            "repair_reminder": repair_reminder_state(r),
             "report_type": SERVICEABILITY_TYPE_LABELS.get(r.report_type, r.report_type or "—"),
             "finding": SERVICEABILITY_FINDING_LABELS.get(
                 r.status.value if r.status else "", "—"
@@ -1735,6 +1840,8 @@ def serviceability_review_list(
             if x.report_status == ServiceabilityStatus.submitted
             and x.urgency and x.urgency.value in ("high", "critical")
         ),
+        # Distinct assets (not reports) with an active repair reminder.
+        "repair_attention": len(assets_needing_repair_attention(db)),
     }
 
     return templates.TemplateResponse(
@@ -1797,11 +1904,15 @@ def serviceability_review_detail(report_id: int, request: Request, db: Session =
             "can_review": r.report_status in (
                 ServiceabilityStatus.submitted, ServiceabilityStatus.reviewed
             ),
+            # A resolved report can be reopened back to Reviewed.
+            "can_reopen": r.report_status == ServiceabilityStatus.resolved,
             # Live-status sync context.
             "live_status_label": EQUIPMENT_STATUS_LABELS.get(live_status_value or "", "—"),
             "mapped_live_label": EQUIPMENT_STATUS_LABELS.get(mapped_live or "", "—"),
             "can_apply_finding": can_apply,
             "finding_applied": r.finding_applied_at is not None,
+            # Repair-scheduling reminder ("overdue" / "due_today" / None).
+            "repair_reminder": repair_reminder_state(r),
         },
     )
 
@@ -1869,6 +1980,8 @@ def serviceability_review_action(
     db: Session = Depends(get_db),
     new_status: str = Form(...),     # "reviewed" or "resolved"
     admin_remarks: str = Form(""),
+    repair_scheduled_date: str = Form(""),   # optional ISO date, may be blank
+    repair_notes: str = Form(""),
 ):
     user = require_role(request, ["admin"])
     if isinstance(user, RedirectResponse):
@@ -1890,6 +2003,22 @@ def serviceability_review_action(
             status_code=302,
         )
 
+    # Optional repair scheduling. Blank clears the date; a present value
+    # must parse as an ISO date. This is a reminder aid only and never
+    # touches Equipment.status.
+    sched = repair_scheduled_date.strip()
+    if sched:
+        try:
+            r.repair_scheduled_date = date.fromisoformat(sched)
+        except ValueError:
+            return RedirectResponse(
+                url=f"/admin/serviceability/{report_id}?error=Invalid+repair+date",
+                status_code=302,
+            )
+    else:
+        r.repair_scheduled_date = None
+    r.repair_notes = repair_notes.strip() or None
+
     old = r.report_status.value if r.report_status else "—"
     r.report_status = ServiceabilityStatus(new_status)
     if admin_remarks.strip():
@@ -1901,6 +2030,8 @@ def serviceability_review_action(
     db.commit()
 
     note = f" — remarks: {admin_remarks.strip()}" if admin_remarks.strip() else ""
+    if r.repair_scheduled_date:
+        note += f" — repair scheduled {r.repair_scheduled_date.isoformat()}"
     log_action(
         db, user["id"], new_status, "equipment_reports", r.id,
         f"Serviceability report '{r.title}' {old} → {new_status}{note}",
@@ -1908,6 +2039,40 @@ def serviceability_review_action(
 
     return RedirectResponse(
         url=f"/admin/serviceability?success=Report+marked+{new_status}",
+        status_code=302,
+    )
+
+
+@router.post("/serviceability/{report_id}/reopen")
+def serviceability_reopen(report_id: int, request: Request, db: Session = Depends(get_db)):
+    """Reopen a resolved report back to Reviewed — a lightweight guard
+    against accidental resolution. Reuses the existing workflow states (no
+    new enum) and never touches Equipment.status; repair reminders are
+    driven by Equipment.status, so they are unaffected."""
+    user = require_role(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
+
+    r = db.query(EquipmentReport).filter(EquipmentReport.id == report_id).first()
+    if not r:
+        return RedirectResponse(url="/admin/serviceability", status_code=302)
+
+    if r.report_status != ServiceabilityStatus.resolved:
+        return RedirectResponse(
+            url=f"/admin/serviceability/{report_id}?error=Only+resolved+reports+can+be+reopened",
+            status_code=302,
+        )
+
+    r.report_status = ServiceabilityStatus.reviewed
+    db.commit()
+
+    log_action(
+        db, user["id"], "reopened", "equipment_reports", r.id,
+        f"Serviceability report '{r.title}' reopened (resolved → reviewed)",
+    )
+
+    return RedirectResponse(
+        url=f"/admin/serviceability/{report_id}?success=Report+reopened",
         status_code=302,
     )
 

@@ -15,11 +15,58 @@ models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="RisKonek")
 
-#session middleware, what makes login sessions work
+# Fail closed: never sign sessions with a hardcoded fallback secret. A missing
+# SECRET_KEY is a configuration error, not something to silently work around.
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    raise RuntimeError(
+        "SECRET_KEY is not set. Define it in your .env before starting RisKonek."
+    )
+
+# COOKIE_SECURE / HTTPS toggle. Default False so local HTTP and OWASP ZAP
+# testing work; set COOKIE_SECURE=true in .env when deploying over HTTPS so
+# session cookies get the Secure flag and HSTS is sent.
+COOKIE_SECURE = os.getenv("COOKIE_SECURE", "false").strip().lower() in ("1", "true", "yes")
+
+# session middleware, what makes login sessions work
 app.add_middleware(
     SessionMiddleware,
-    secret_key=os.getenv("SECRET_KEY", "fallback-secret-change-this")
+    secret_key=SECRET_KEY,
+    same_site="lax",        # mitigates CSRF-style cross-site cookie sending
+    https_only=COOKIE_SECURE,  # Secure flag only when serving over HTTPS
+    max_age=60 * 60 * 8,    # 8-hour session lifetime
 )
+
+# Content-Security-Policy host allowlist mirrors the CDN/tile hosts actually
+# referenced by the templates: jsDelivr (Bootstrap, Bootstrap Icons, Chart.js),
+# unpkg (Leaflet), and OpenStreetMap tiles. 'unsafe-inline' is required because
+# the dashboard and Leaflet markers use inline <script> and style attributes.
+CSP_POLICY = (
+    "default-src 'self'; "
+    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com; "
+    "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com; "
+    "img-src 'self' data: https://unpkg.com https://*.tile.openstreetmap.org; "
+    "font-src 'self' https://cdn.jsdelivr.net; "
+    "connect-src 'self'; "
+    "frame-ancestors 'none'; "
+    "base-uri 'self'; "
+    "form-action 'self'"
+)
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    """Add baseline security headers to every response (OWASP ZAP baseline)."""
+    response = await call_next(request)
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Content-Security-Policy"] = CSP_POLICY
+    # HSTS is only meaningful over HTTPS; sending it on plain HTTP is ignored by
+    # browsers and can cause issues, so gate it on the HTTPS/secure-cookie flag.
+    if COOKIE_SECURE:
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return response
 
 
 app.mount("/static", StaticFiles(directory="app/static"), name="static")

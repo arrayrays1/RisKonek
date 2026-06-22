@@ -14,13 +14,20 @@ from app.models import (
 from typing import Optional
 from datetime import datetime, timezone, timedelta
 import os
+from urllib.parse import quote_plus
 
 # Reuse the Week 6 ETL building blocks rather than rebuilding them.
 from app.routes.uploads import (
     _safe_filename, _ext_of, ALLOWED_EXTS, UPLOAD_SUBDIR,
+    save_validated_upload, find_matching_incident, resolve_or_create_incident,
 )
 from app.etl.extract_pdf import extract_pdf
 from app.etl.extract_excel import extract_excel, extract_csv
+from app.etl.structure import (
+    structure_text, structure_rows,
+    structure_incident_report_rows, structure_incident_report_text,
+    empty_incident_report_fields,
+)
 from app.etl.ai_pipeline import summarize as ai_summarize, is_available as ai_available
 
 router = APIRouter(prefix="/cfau")
@@ -660,13 +667,11 @@ async def incident_upload_submit(
     os.makedirs(UPLOAD_SUBDIR, exist_ok=True)
     stored_name = _safe_filename(original_name)
     stored_path = os.path.join(UPLOAD_SUBDIR, stored_name)
-    try:
-        contents = await file.read()
-        with open(stored_path, "wb") as f:
-            f.write(contents)
-    except Exception as e:
+
+    ok, err = await save_validated_upload(file, ext, stored_path)
+    if not ok:
         return RedirectResponse(
-            url=f"/cfau/incident-reports/upload?error=Failed+to+save+file:+{e}",
+            url="/cfau/incident-reports/upload?error=" + quote_plus(err),
             status_code=302,
         )
 
@@ -691,24 +696,47 @@ async def incident_upload_submit(
     )
     db.commit()
 
-    # ── Silver: extract raw text/rows as a reference for the assisted form ──
+    # ── Silver: extract raw text/rows + pre-fill the assisted report form ──
     # Tagged as a post-incident upload in JSON (no schema change).
+    # report_fields → CFAU operational fields (IncidentReport); core_fields
+    # → the incident triple used to strict-match an existing Incident.
     extracted = {
         "report_kind": UPLOAD_KIND_POST_INCIDENT,
         "raw_text": "", "rows": [], "columns": [], "error": None,
+        "report_fields": empty_incident_report_fields(),
+        "core_fields": {
+            "barangay": "", "disaster_type": "", "date_occurred": "",
+            "affected_families": 0, "casualties": 0, "description": "",
+        },
+        "matched_incident_id": None,
     }
     try:
         if file_type_enum == FileType.pdf:
             out = extract_pdf(stored_path)
             extracted["raw_text"] = out.get("text", "")
-        elif file_type_enum == FileType.excel:
-            out = extract_excel(stored_path)
+            # Free narrative — derive the incident triple for matching, and
+            # pre-fill operational fields from any 'Label:' sections present.
+            # operations_summary still falls back to the AI summary / raw text
+            # below when no 'Operations Summary:' label is found.
+            known_barangays = [b.name for b in db.query(Barangay).all()]
+            core_row = structure_text(extracted["raw_text"], known_barangays)
+            extracted["core_fields"] = {
+                k: core_row.get(k, "") for k in extracted["core_fields"]
+            }
+            extracted["report_fields"] = structure_incident_report_text(
+                extracted["raw_text"]
+            )
+        elif file_type_enum in (FileType.excel, FileType.csv):
+            out = extract_excel(stored_path) if file_type_enum == FileType.excel \
+                else extract_csv(stored_path)
             extracted["columns"] = out["columns"]
             extracted["rows"] = out["rows"]
-        elif file_type_enum == FileType.csv:
-            out = extract_csv(stored_path)
-            extracted["columns"] = out["columns"]
-            extracted["rows"] = out["rows"]
+            extracted["report_fields"] = structure_incident_report_rows(out["rows"])
+            core_rows = structure_rows(out["rows"])
+            if core_rows:
+                extracted["core_fields"] = {
+                    k: core_rows[0].get(k, "") for k in extracted["core_fields"]
+                }
         report.status = ReportStatus.reviewed
     except Exception as e:
         extracted["error"] = str(e)
@@ -726,6 +754,24 @@ async def incident_upload_submit(
         ai_text = ai_summarize(preview) if preview else None
     if ai_text:
         report.ai_summary = ai_text
+
+    # Pre-fill operations_summary when no structured value was found — prefer
+    # the AI summary, else a trimmed copy of the raw text. This keeps PDF
+    # narrative uploads from arriving completely blank.
+    if not extracted["report_fields"].get("operations_summary"):
+        if ai_text:
+            extracted["report_fields"]["operations_summary"] = ai_text
+        elif extracted.get("raw_text"):
+            extracted["report_fields"]["operations_summary"] = \
+                extracted["raw_text"].strip()[:2000]
+
+    # Strict incident match (barangay + disaster_type + date_occurred).
+    core = extracted["core_fields"]
+    matched = find_matching_incident(
+        db, core.get("barangay"), core.get("disaster_type"),
+        core.get("date_occurred"),
+    )
+    extracted["matched_incident_id"] = matched.id if matched else None
 
     report.extracted_data = extracted
     db.commit()
@@ -760,6 +806,14 @@ def incident_upload_review(report_id: int, request: Request, db: Session = Depen
             url=f"/cfau/incident-reports/{produced_id}", status_code=302
         )
 
+    # Strict-match result: only pre-select if the matched incident still
+    # exists (it may have been deleted since extraction).
+    matched_id = data.get("matched_incident_id")
+    matched_incident = None
+    if matched_id:
+        matched_incident = db.query(Incident).filter(Incident.id == matched_id).first()
+    selected_incident_id = matched_incident.id if matched_incident else None
+
     return templates.TemplateResponse(
         request=request,
         name="cfau/incident_upload_review.html",
@@ -775,6 +829,18 @@ def incident_upload_review(report_id: int, request: Request, db: Session = Depen
             "columns_preview": data.get("columns") or [],
             "extraction_error": data.get("error"),
             "error": request.query_params.get("error"),
+            # Pre-fill: operational fields + the matched incident selection.
+            "prefill": data.get("report_fields") or empty_incident_report_fields(),
+            "selected_incident_id": selected_incident_id,
+            "matched_incident_label": _incident_label(matched_incident) if matched_incident else None,
+            # Core incident fields — editable so an Incident can be auto-created
+            # (resolve-or-create) when no existing match is selected.
+            "core": data.get("core_fields") or {
+                "barangay": "", "disaster_type": "", "date_occurred": "",
+                "affected_families": 0, "casualties": 0, "description": "",
+            },
+            "barangays": db.query(Barangay).order_by(Barangay.name).all(),
+            "disaster_types": [dt.value for dt in DisasterType],
         },
     )
 
@@ -795,11 +861,21 @@ def incident_upload_convert(
     report_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    incident_id: int = Form(...),
+    # Optional: a manually selected existing incident takes precedence.
+    # Empty/blank means "resolve-or-create from the core fields below".
+    incident_id: Optional[str] = Form(None),
+    # Core incident fields — used to strict-match or auto-create an Incident.
+    barangay: str = Form(""),
+    disaster_type: str = Form(""),
+    date_occurred: str = Form(""),
+    affected_families: int = Form(0),
+    casualties: int = Form(0),
+    incident_description: str = Form(""),
     operations_summary: str = Form(""),
     actions_taken: str = Form(""),
     equipment_used: str = Form(""),
-    personnel_count: int = Form(0),
+    # Blank means "not reported" — kept NULL rather than a misleading 0.
+    personnel_count: Optional[str] = Form(None),
     personnel_notes: str = Form(""),
     challenges_encountered: str = Form(""),
     recommendations: str = Form(""),
@@ -812,6 +888,10 @@ def incident_upload_convert(
     if not report:
         return RedirectResponse(url="/cfau/incident-reports", status_code=302)
 
+    # Personnel deployed is optional: blank/invalid → NULL (not 0).
+    _pc = (personnel_count or "").strip()
+    personnel_value = max(0, int(_pc)) if _pc.isdigit() else None
+
     data = dict(report.extracted_data or {})
     if data.get("produced_incident_report_id"):
         # Idempotency guard — already converted.
@@ -820,13 +900,44 @@ def incident_upload_convert(
             status_code=302,
         )
 
-    incident = db.query(Incident).filter(Incident.id == incident_id).first()
-    if not incident:
+    def _review_error(msg: str):
         return RedirectResponse(
-            url=f"/cfau/incident-reports/upload/{report.id}/review"
-                "?error=Please+select+the+disaster+incident+this+report+covers",
+            url=f"/cfau/incident-reports/upload/{report.id}/review?error={quote_plus(msg)}",
             status_code=302,
         )
+
+    # ── Resolve the Incident this report attaches to ──────────────────
+    # 1) A manually selected incident always wins.
+    # 2) Otherwise resolve-or-create from the core fields: strict match an
+    #    existing Incident, else auto-create one (incidents emerge from
+    #    uploads). resolve_or_create_incident never mutates a matched
+    #    Incident — canonical impact data is preserved.
+    incident = None
+    incident_created = False
+    selected_id = (incident_id or "").strip()
+    if selected_id:
+        try:
+            incident = db.query(Incident).filter(Incident.id == int(selected_id)).first()
+        except ValueError:
+            incident = None
+        if not incident:
+            return _review_error("Selected incident could not be found. Please choose again.")
+    else:
+        try:
+            incident, incident_created = resolve_or_create_incident(
+                db, user["id"],
+                core={
+                    "barangay": barangay,
+                    "disaster_type": disaster_type,
+                    "date_occurred": date_occurred,
+                    "affected_families": affected_families,
+                    "casualties": casualties,
+                    "description": incident_description,
+                },
+                source=f"cfau_upload:{report.id}",
+            )
+        except ValueError as e:
+            return _review_error(str(e))
 
     submitting = (action == "submit")
     # Same model + fields as the manual path — both converge here.
@@ -836,7 +947,7 @@ def incident_upload_convert(
         operations_summary=operations_summary.strip() or None,
         actions_taken=actions_taken.strip() or None,
         equipment_used=equipment_used.strip() or None,
-        personnel_count=max(0, personnel_count or 0),
+        personnel_count=personnel_value,
         personnel_notes=personnel_notes.strip() or None,
         challenges_encountered=challenges_encountered.strip() or None,
         recommendations=recommendations.strip() or None,
@@ -847,19 +958,34 @@ def incident_upload_convert(
     db.commit()
     db.refresh(r)
 
-    # Link the produced report back to the upload (JSON) and close the
-    # upload lifecycle as confirmed (= converted).
+    # Link the produced report back to the upload (JSON, Option A) and close
+    # the upload lifecycle as confirmed (= converted). Provenance records the
+    # resolved Incident and whether this upload created it.
     data["produced_incident_report_id"] = r.id
+    data["linked_incident_id"] = incident.id
+    data["incident_created"] = incident_created
     report.extracted_data = data
+    # First-class contribution linkage (mirrors linked_incident_id JSON).
+    report.incident_id = incident.id
     report.lifecycle_status = LifecycleStatus.confirmed
     report.status = ReportStatus.confirmed
     db.commit()
 
+    # Audit the canonical Incident when this upload created it.
+    if incident_created:
+        log_action(
+            db, user["id"], "created", "incidents", incident.id,
+            f"Incident auto-created from CFAU upload '{report.file_name}' — "
+            f"{_incident_label(incident)} (no existing match).",
+        )
+
+    _link_note = (f"new incident #{incident.id} auto-created" if incident_created
+                  else f"linked to existing incident #{incident.id}")
     add_upload_history(
         db, report_id=report.id, user_id=user["id"],
         event_type=UploadEvent.confirmed,
         new_value=f"Converted to post-incident report #{r.id} "
-                  f"({'submitted' if submitting else 'draft'}).",
+                  f"({'submitted' if submitting else 'draft'}) — {_link_note}.",
     )
     db.commit()
 

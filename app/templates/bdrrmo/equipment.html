@@ -1,17 +1,18 @@
 {% extends "admin/base.html" %}
 
-{% block title %}Critical Facilities — RisKonek{% endblock %}
+{% block title %}Equipment & Vehicles — RisKonek{% endblock %}
 
-{% set active_nav = 'bdrrmo_facilities' %}
+{% set active_nav = 'bdrrmo_equipment' %}
 
 {% block content %}
 {% set status_labels = {'available': 'Available', 'under_maintenance': 'Under Maintenance', 'unavailable': 'Unavailable'} %}
 {% set status_classes = {'available': 'status-operational', 'under_maintenance': 'status-maintenance', 'unavailable': 'status-unavailable'} %}
 
 <div class="page-header">
-    <h1>Critical Facilities</h1>
-    <p>Manage evacuation centers and critical facility points in
-       {% if barangay %}Barangay {{ barangay.name }}{% else %}your barangay{% endif %}.</p>
+    <h1>Equipment &amp; Vehicles</h1>
+    <p>Manage equipment and vehicles owned by
+       {% if barangay %}Barangay {{ barangay.name }}{% else %}your barangay{% endif %}.
+       Separate from city logistics — barangay-scoped only.</p>
 </div>
 
 {% if success %}
@@ -34,78 +35,86 @@
 </div>
 {% else %}
 
-{# Resolve the facility being edited (if any) so the form can pre-fill.
+{# Resolve the item being edited (if any) so the form can pre-fill.
    Use a namespace: a plain {% set %} inside a {% for %} loop does not survive
    the loop in Jinja2, so the result is copied back to `editing` at top level. #}
 {% set ns = namespace(editing=none) %}
 {% if edit_id %}
-    {% for f in facilities %}
-        {% if f.id|string == edit_id %}{% set ns.editing = f %}{% endif %}
+    {% for e in equipment %}
+        {% if e.id|string == edit_id %}{% set ns.editing = e %}{% endif %}
     {% endfor %}
 {% endif %}
 {% set editing = ns.editing %}
 
 {% if not show_archived %}
-<!-- ── Add / Edit facility (TR-BDR-03/04) ─────────────────────── -->
+<!-- ── Add / Edit equipment ───────────────────────────────────── -->
 <div class="dash-card mb-4">
     <div class="card-title-row">
         <i class="bi bi-{{ 'pencil-square' if editing else 'plus-circle' }}" style="color:var(--rk-green)"></i>
-        <h6>{{ 'Edit Facility' if editing else 'Add Critical Facility' }}</h6>
+        <h6>{{ 'Edit Equipment / Vehicle' if editing else 'Add Equipment / Vehicle' }}</h6>
     </div>
     <form method="POST"
-          action="/bdrrmo/facilities{{ '/' ~ editing.id ~ '/edit' if editing else '' }}"
+          action="/bdrrmo/equipment{{ '/' ~ editing.id ~ '/edit' if editing else '' }}"
           class="row g-3">
-        <div class="col-md-6">
-            <label class="form-label small fw-semibold mb-1">Facility Name</label>
+        <div class="col-md-5">
+            <label class="form-label small fw-semibold mb-1">Name</label>
             <input type="text" name="name" maxlength="150" class="form-control form-control-sm"
-                   value="{{ editing.name if editing else '' }}" required>
+                   value="{{ editing.name if editing else '' }}"
+                   placeholder="e.g. Rescue Boat 01, Standby Generator" required>
         </div>
         <div class="col-md-3">
             <label class="form-label small fw-semibold mb-1">Type</label>
-            <select name="facility_type" class="form-select form-select-sm" required>
-                {% for t in facility_types %}
+            <select name="equipment_type" class="form-select form-select-sm" required>
+                {% for t in equipment_types %}
                 <option value="{{ t }}"
-                    {{ 'selected' if editing and editing.facility_type.value == t else '' }}>
+                    {{ 'selected' if editing and editing.equipment_type.value == t else '' }}>
                     {{ t.replace('_', ' ').title() }}
                 </option>
                 {% endfor %}
             </select>
         </div>
-        <div class="col-md-3">
+        <div class="col-md-2">
+            <label class="form-label small fw-semibold mb-1">Quantity</label>
+            <input type="number" name="quantity" min="0" class="form-control form-control-sm"
+                   value="{{ editing.quantity if editing else 1 }}">
+        </div>
+        <div class="col-md-2">
             <label class="form-label small fw-semibold mb-1">Status</label>
-            <select name="operational_status" class="form-select form-select-sm">
-                {% for s in facility_statuses %}
+            <select name="status" class="form-select form-select-sm">
+                {% for s in equipment_statuses %}
                 <option value="{{ s }}"
-                    {{ 'selected' if (editing and editing.operational_status.value == s) or (not editing and s == 'available') else '' }}>
+                    {{ 'selected' if (editing and editing.status.value == s) or (not editing and s == 'available') else '' }}>
                     {{ status_labels[s] }}
                 </option>
                 {% endfor %}
             </select>
         </div>
         <div class="col-md-4">
-            <label class="form-label small fw-semibold mb-1">Latitude</label>
-            <input type="number" step="any" name="latitude" class="form-control form-control-sm"
-                   value="{{ editing.latitude if editing else '' }}" placeholder="14.3500" required>
+            <label class="form-label small fw-semibold mb-1">Plate / Serial <span class="text-muted">(optional)</span></label>
+            <input type="text" name="plate_or_serial" maxlength="50" class="form-control form-control-sm"
+                   value="{{ editing.plate_or_serial or '' if editing else '' }}"
+                   placeholder="Plate for vehicles, serial for gear">
         </div>
-        <div class="col-md-4">
-            <label class="form-label small fw-semibold mb-1">Longitude</label>
-            <input type="number" step="any" name="longitude" class="form-control form-control-sm"
-                   value="{{ editing.longitude if editing else '' }}" placeholder="121.0500" required>
+        <div class="col-md-3">
+            <label class="form-label small fw-semibold mb-1">Last Inspected <span class="text-muted">(optional)</span></label>
+            <input type="date" name="last_inspected" class="form-control form-control-sm"
+                   value="{{ editing.last_inspected.isoformat() if editing and editing.last_inspected else '' }}">
         </div>
-        <div class="col-md-4">
-            <label class="form-label small fw-semibold mb-1">Address <span class="text-muted">(optional)</span></label>
-            <input type="text" name="address" maxlength="255" class="form-control form-control-sm"
-                   value="{{ editing.address or '' if editing else '' }}">
+        <div class="col-md-5">
+            <label class="form-label small fw-semibold mb-1">Maintenance Notes <span class="text-muted">(optional)</span></label>
+            <input type="text" name="maintenance_notes" class="form-control form-control-sm"
+                   value="{{ editing.maintenance_notes or '' if editing else '' }}"
+                   placeholder="e.g. Due for oil change, minor hull repair">
         </div>
         <div class="col-12">
             <button type="submit" class="btn btn-rk btn-sm">
-                <i class="bi bi-save"></i> {{ 'Save Changes' if editing else 'Add Facility' }}
+                <i class="bi bi-save"></i> {{ 'Save Changes' if editing else 'Add Equipment' }}
             </button>
             {% if editing %}
-            <a href="/bdrrmo/facilities" class="btn btn-outline-secondary btn-sm">Cancel</a>
+            <a href="/bdrrmo/equipment" class="btn btn-outline-secondary btn-sm">Cancel</a>
             {% endif %}
             <span class="text-muted small ms-2">
-                Duplicate names or near-identical coordinates in your barangay are blocked.
+                Track vehicles individually (quantity 1 + plate/serial); gear may use a bulk quantity.
             </span>
         </div>
     </form>
@@ -115,68 +124,74 @@
 <!-- ── View toggle (active / archived) ────────────────────────── -->
 <div class="d-flex justify-content-between align-items-center mb-2">
     <div class="btn-group btn-group-sm" role="group">
-        <a href="/bdrrmo/facilities"
+        <a href="/bdrrmo/equipment"
            class="btn btn-outline-secondary {{ 'active' if not show_archived else '' }}">
             Active
         </a>
-        <a href="/bdrrmo/facilities?archived=1"
+        <a href="/bdrrmo/equipment?archived=1"
            class="btn btn-outline-secondary {{ 'active' if show_archived else '' }}">
             Archived{% if archived_count %} ({{ archived_count }}){% endif %}
         </a>
     </div>
 </div>
 
-<!-- ── Facility list ──────────────────────────────────────────── -->
+<!-- ── Equipment list ─────────────────────────────────────────── -->
 <div class="dash-card p-0">
     <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
             <thead style="background:#f9fafb">
                 <tr style="font-size:12px;color:var(--rk-muted);text-transform:uppercase;letter-spacing:0.04em">
-                    <th class="px-3 py-3">Facility Name</th>
+                    <th class="px-3 py-3">Name</th>
                     <th class="py-3">Type</th>
-                    <th class="py-3">Coordinates</th>
+                    <th class="py-3 text-end">Qty</th>
+                    <th class="py-3">Plate / Serial</th>
                     <th class="py-3">Status</th>
                     <th class="py-3 px-3 text-end">Actions</th>
                 </tr>
             </thead>
             <tbody>
-                {% for f in facilities %}
-                {% set sval = f.operational_status.value %}
+                {% for e in equipment %}
+                {% set sval = e.status.value %}
                 <tr style="font-size:13px">
                     <td class="px-3 fw-semibold">
-                        {{ f.name }}
-                        {% if f.address %}<div class="text-muted" style="font-size:11px">{{ f.address }}</div>{% endif %}
+                        {{ e.name }}
+                        {% if e.maintenance_notes %}<div class="text-muted" style="font-size:11px"><i class="bi bi-wrench me-1"></i>{{ e.maintenance_notes }}</div>{% endif %}
                     </td>
-                    <td>{{ f.facility_type.value.replace('_', ' ').title() }}</td>
-                    <td class="text-muted">{{ "%.5f"|format(f.latitude) }}, {{ "%.5f"|format(f.longitude) }}</td>
+                    <td>
+                        {{ e.equipment_type.value.replace('_', ' ').title() }}
+                        {% if e.equipment_type.value in vehicle_types %}
+                        <span class="badge bg-light text-dark border ms-1" style="font-size:10px">Vehicle</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end">{{ e.quantity if e.quantity is not none else 1 }}</td>
+                    <td class="text-muted">{{ e.plate_or_serial or '—' }}</td>
                     <td>
                         <span class="status-pill {{ status_classes[sval] }}">{{ status_labels[sval] }}</span>
                     </td>
                     <td class="px-3 text-end">
                         {% if show_archived %}
-                        <form method="POST" action="/bdrrmo/facilities/{{ f.id }}/archive" class="d-inline">
+                        <form method="POST" action="/bdrrmo/equipment/{{ e.id }}/archive" class="d-inline">
                             <button type="submit" class="btn btn-outline-secondary btn-sm">
                                 <i class="bi bi-arrow-counterclockwise"></i> Restore
                             </button>
                         </form>
                         {% else %}
-                        <form method="POST" action="/bdrrmo/facilities/{{ f.id }}/status"
-                              class="d-inline">
+                        <form method="POST" action="/bdrrmo/equipment/{{ e.id }}/status" class="d-inline">
                             <div class="input-group input-group-sm d-inline-flex" style="width:auto;vertical-align:middle">
-                                <select name="operational_status" class="form-select form-select-sm"
+                                <select name="status" class="form-select form-select-sm"
                                         onchange="this.form.submit()" style="width:auto">
-                                    {% for s in facility_statuses %}
+                                    {% for s in equipment_statuses %}
                                     <option value="{{ s }}" {{ 'selected' if s == sval else '' }}>{{ status_labels[s] }}</option>
                                     {% endfor %}
                                 </select>
                             </div>
                         </form>
-                        <a href="/bdrrmo/facilities?edit={{ f.id }}" class="btn btn-outline-secondary btn-sm" title="Edit">
+                        <a href="/bdrrmo/equipment?edit={{ e.id }}" class="btn btn-outline-secondary btn-sm" title="Edit">
                             <i class="bi bi-pencil"></i>
                         </a>
-                        <form method="POST" action="/bdrrmo/facilities/{{ f.id }}/archive"
+                        <form method="POST" action="/bdrrmo/equipment/{{ e.id }}/archive"
                               class="d-inline"
-                              onsubmit="return confirm('Archive {{ f.name }}? It will be hidden from the active list but kept on record.')">
+                              onsubmit="return confirm('Archive {{ e.name }}? It will be hidden from the active list but kept on record.')">
                             <button type="submit" class="btn btn-outline-secondary btn-sm" title="Archive">
                                 <i class="bi bi-archive"></i>
                             </button>
@@ -185,11 +200,11 @@
                     </td>
                 </tr>
                 {% else %}
-                <tr><td colspan="5" class="text-center text-muted py-4">
+                <tr><td colspan="6" class="text-center text-muted py-4">
                     {% if show_archived %}
-                    No archived facilities.
+                    No archived equipment.
                     {% else %}
-                    No critical facilities recorded for this barangay yet. Use the form above to add one.
+                    No equipment or vehicles recorded for this barangay yet. Use the form above to add one.
                     {% endif %}
                 </td></tr>
                 {% endfor %}

@@ -159,6 +159,7 @@ class Barangay(Base):
     facilities = relationship("Facility", back_populates="barangay")
     incidents = relationship("Incident", back_populates="barangay")
     uploaded_reports = relationship("UploadedReport", back_populates="barangay")
+    equipment_items = relationship("BarangayEquipment", back_populates="barangay")
 
 # ==========================
 # TABLE 2: Users (4 roles)
@@ -264,6 +265,46 @@ class Facility(Base):
     barangay = relationship("Barangay", back_populates="facilities")
 
 # ==========================
+# TABLE 4b: Barangay Equipment & Vehicles
+# ==========================
+
+class BarangayEquipment(Base):
+    """Barangay-owned equipment and vehicles, maintained by the BDRRMO
+    Chairperson. Deliberately SEPARATE from the admin/CFAU `Equipment`
+    inventory and the admin `Resource` logistics — barangay-scoped only,
+    never shared with or visible to those modules.
+
+    One table holds both vehicles (fire_truck, ambulance, rescue_vehicle,
+    rescue_boat) and gear (generator, chainsaw, radio, life_vest, …) via the
+    reused EquipmentType enum. Two tracking modes by convention:
+      - individual asset → one row, quantity=1, plate_or_serial set;
+      - bulk gear        → one row, quantity=N, plate_or_serial blank.
+    """
+    __tablename__ = "barangay_equipment"
+
+    id              = Column(Integer, primary_key=True, index=True)
+    barangay_id     = Column(Integer, ForeignKey("barangays.id"), nullable=False)
+    updated_by      = Column(Integer, ForeignKey("users.id"), nullable=True)
+    name            = Column(String(150), nullable=False)
+    equipment_type  = Column(Enum(EquipmentType), nullable=False)
+    # Reuses FacilityStatus (available / under_maintenance / unavailable) —
+    # values map cleanly to operational status + availability.
+    status          = Column(
+        Enum(FacilityStatus), default=FacilityStatus.available, nullable=False
+    )
+    quantity        = Column(Integer, default=1)
+    plate_or_serial = Column(String(50))   # plate (vehicles) or serial (gear)
+    maintenance_notes = Column(Text)
+    last_inspected  = Column(Date, nullable=True)
+    is_archived     = Column(Boolean, default=False)   # soft delete
+    created_at      = Column(DateTime, server_default=func.now())
+    last_updated    = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    # relationships
+    barangay = relationship("Barangay", back_populates="equipment_items")
+    updated_by_user = relationship("User")
+
+# ==========================
 # TABLE 5: Incident reporting
 # ==========================
 
@@ -286,6 +327,10 @@ class Incident(Base):
     barangay = relationship("Barangay", back_populates="incidents")
     reported_by_user = relationship("User", back_populates="reported_incidents")
     incident_reports = relationship("IncidentReport", back_populates="incident")
+    # Upload-based contributions (CFAU / BDRRMO single-incident uploads) that
+    # resolved to this canonical Incident. Provenance lives on the upload; the
+    # Incident itself is never mutated by a contribution.
+    contributions = relationship("UploadedReport", back_populates="incident")
 
 # ==========================
 # TABLE 6: Resource Inventory
@@ -364,6 +409,14 @@ class EquipmentReport(Base):
     # Equipment.status (admin-assisted sync). NULL = not yet applied.
     finding_applied_at = Column(DateTime, nullable=True)
 
+    # ── Week 8 enhancement — optional repair scheduling (additive) ────
+    # Lightweight reminder aid only: the system NEVER changes
+    # Equipment.status when this date arrives. Reminders surface while the
+    # date is due/past and the equipment is still under_repair /
+    # unserviceable; they clear once the unit is returned to service.
+    repair_scheduled_date = Column(Date, nullable=True)
+    repair_notes = Column(Text, nullable=True)
+
     # relationships
     equipment = relationship("Equipment", back_populates="equipment_reports")
     reported_by_user = relationship(
@@ -413,6 +466,10 @@ class UploadedReport(Base):
     id = Column(Integer, primary_key=True, index=True)
     uploaded_by = Column(Integer, ForeignKey("users.id"), nullable=False)
     barangay_id = Column(Integer, ForeignKey("barangays.id"), nullable=True)
+    # Canonical Incident this upload contributed to (CFAU / BDRRMO single-
+    # incident uploads). Nullable: admin medallion uploads produce many
+    # incidents (tracked in extracted_data) and drafts have none yet.
+    incident_id = Column(Integer, ForeignKey("incidents.id"), nullable=True, index=True)
     file_name = Column(String(255), nullable=False)
     file_path = Column(String(500), nullable=False)  # path to raw file in /uploads
     file_type = Column(Enum(FileType), nullable=False)
@@ -438,6 +495,7 @@ class UploadedReport(Base):
         "User", back_populates="uploaded_reports", foreign_keys=[uploaded_by]
     )
     barangay = relationship("Barangay", back_populates="uploaded_reports")
+    incident = relationship("Incident", back_populates="contributions")
     history = relationship(
         "UploadHistory",
         back_populates="report",

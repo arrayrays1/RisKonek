@@ -18,6 +18,14 @@
     {% endif %}
 {%- endmacro %}
 
+{% macro repair_badge(state) -%}
+    {% if state == 'overdue' %}
+        <span class="status-pill status-unavailable"><i class="bi bi-tools"></i> Repair overdue</span>
+    {% elif state == 'due_today' %}
+        <span class="status-pill status-maintenance"><i class="bi bi-tools"></i> Repair due today</span>
+    {% endif %}
+{%- endmacro %}
+
 {% macro urgency_badge(v, label) -%}
     {% if v == 'critical' %}
         <span class="status-pill" style="background:#fde8e8;color:#c0392b;border:1px solid #f4c2bd">
@@ -58,6 +66,18 @@
         <strong>{{ summary.priority }}</strong> high/critical-urgency
         report{{ 's' if summary.priority != 1 else '' }} awaiting review.
         <a href="/admin/serviceability?status=submitted&urgency=critical" class="alert-link ms-1">View critical</a>
+    </div>
+</div>
+{% endif %}
+
+{% if summary.repair_attention %}
+<div class="alert alert-warning d-flex align-items-center">
+    <i class="bi bi-tools me-2 fs-5"></i>
+    <div>
+        <strong>{{ summary.repair_attention }}</strong>
+        asset{{ 's' if summary.repair_attention != 1 else '' }} with a repair date due or passed
+        {{ 'are' if summary.repair_attention != 1 else 'is' }} still under repair / unserviceable.
+        Please verify whether {{ 'they' if summary.repair_attention != 1 else 'it' }} can be returned to service.
     </div>
 </div>
 {% endif %}
@@ -132,7 +152,10 @@
                     <td class="text-muted">{{ r.report_type }}</td>
                     <td>{{ r.finding }}</td>
                     <td class="text-muted">{{ r.reporter }}</td>
-                    <td>{{ workflow_pill(r.report_status, r.report_status_label) }}</td>
+                    <td>
+                        {{ workflow_pill(r.report_status, r.report_status_label) }}
+                        {% if r.repair_reminder %}<div class="mt-1">{{ repair_badge(r.repair_reminder) }}</div>{% endif %}
+                    </td>
                     <td class="text-end px-3">
                         <a href="/admin/serviceability/{{ r.id }}" class="btn btn-outline-primary btn-sm">
                             <i class="bi bi-eye"></i> Review

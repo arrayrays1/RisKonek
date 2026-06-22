@@ -247,9 +247,16 @@
                 {% if not editable %}<input type="hidden" name="disaster_type" value="{{ f.disaster_type }}">{% endif %}
             </td>
             <td>
-                <input type="date" name="date_occurred" class="form-control form-control-sm"
+                <input type="date" name="date_occurred"
+                       class="form-control form-control-sm{% if f.date_ambiguous %} border-warning{% endif %}"
                        value="{{ f.date_occurred or '' }}"
                        {% if not editable %}readonly{% endif %}>
+                {% if f.date_ambiguous %}
+                <div class="small text-danger mt-1">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    Ambiguous date “{{ f.date_raw }}” — please set the correct date.
+                </div>
+                {% endif %}
             </td>
             <td><input type="number" min="0" name="affected_families" class="form-control form-control-sm"
                        value="{{ f.affected_families or 0 }}" {% if not editable %}readonly{% endif %}></td>

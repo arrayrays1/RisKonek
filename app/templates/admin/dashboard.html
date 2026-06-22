@@ -80,6 +80,14 @@
         <a href="/admin/resources" class="fw-medium text-decoration-none" style="color:#856404">
             View Resources <i class="bi bi-arrow-right"></i>
         </a>
+        {% if repair_attention_count %}
+        <br>
+        {{ repair_attention_count }} asset{{ 's' if repair_attention_count != 1 else '' }}
+        with a repair date due or passed still under repair / unserviceable.
+        <a href="/admin/serviceability" class="fw-medium text-decoration-none" style="color:#856404">
+            View Serviceability <i class="bi bi-arrow-right"></i>
+        </a>
+        {% endif %}
     </span>
 </div>
 {% endif %}
@@ -357,7 +365,7 @@ function updateDateTime() {
 updateDateTime();
 
 // ── Disaster type chart ───────────────────────────────────────────
-const disasterData = {{ disaster_counts | safe }};
+const disasterData = {{ disaster_counts | tojson }};
 new Chart(document.getElementById('disasterChart'), {
     type: 'bar',
     data: {
@@ -382,7 +390,7 @@ new Chart(document.getElementById('disasterChart'), {
 });
 
 // ── Trend line chart ─────────────────────────────────────────────
-const yearlyData = {{ yearly_data | safe }};
+const yearlyData = {{ yearly_data | tojson }};
 new Chart(document.getElementById('trendChart'), {
     type: 'line',
     data: {
@@ -424,7 +432,18 @@ const markerColors = {
     low:      '#1a6b47'
 };
 
-const markers = {{ map_markers | safe }};
+// HTML-escape attacker-controlled strings before they enter popup innerHTML.
+// Output-layer encoding only — stored values are never modified.
+function esc(s) {
+    return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+const markers = {{ map_markers | tojson }};
 markers.forEach(m => {
     const color = markerColors[m.level] || '#888';
     const icon = L.divIcon({
@@ -442,7 +461,7 @@ markers.forEach(m => {
     L.marker([m.lat, m.lng], { icon })
         .addTo(map)
         .bindPopup(`
-            <strong>${m.name}</strong><br>
+            <strong>${esc(m.name)}</strong><br>
             Planning Priority Score: ${m.score}<br>
             Priority: <span style="color:${color};font-weight:600">${m.level.charAt(0).toUpperCase() + m.level.slice(1)}</span><br>
             <span style="font-size:10px;color:#666">System-generated for planning support only; not an official hazard or risk classification.</span>

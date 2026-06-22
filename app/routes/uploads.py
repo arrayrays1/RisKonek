@@ -20,13 +20,15 @@ import os
 import re
 import uuid
 import json
+from urllib.parse import quote_plus
 
 from app.database import get_db
 from app.auth import require_role
 from app.models import (
     UploadedReport, UploadHistory, ReportStatus, FileType,
     LifecycleStatus, UploadEvent,
-    Incident, IncidentReport, DisasterType, Barangay, log_action, add_upload_history,
+    Incident, IncidentReport, DisasterType, Severity, Barangay,
+    log_action, add_upload_history,
 )
 from app.etl.extract_pdf import extract_pdf
 from app.etl.extract_excel import extract_excel, extract_csv
@@ -79,6 +81,110 @@ def _ext_of(name: str) -> str:
 
 
 # ─────────────────────────────────────────────────────────────────────
+# Upload validation (shared by admin + CFAU). Enforces — before the file
+# is permanently kept — a configurable size cap, chunked streaming (no
+# full-file in-memory read), and a magic-byte/text signature check so a
+# renamed binary cannot pass the extension gate. Any partial file written
+# during a failed validation is deleted.
+# ─────────────────────────────────────────────────────────────────────
+
+_UPLOAD_CHUNK = 64 * 1024  # 64 KB streaming chunks
+
+# Leading-byte signatures keyed by extension. CSV has no binary signature
+# and is validated as text instead (see _signature_ok).
+_FILE_SIGNATURES = {
+    ".pdf":  [b"%PDF"],
+    ".xlsx": [b"PK\x03\x04"],                       # OOXML = ZIP container
+    ".xls":  [b"\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1"],  # OLE2 compound document
+}
+
+
+class _UploadError(Exception):
+    """Validation failure carrying a user-facing message."""
+
+
+def _max_upload_bytes() -> int:
+    """Max allowed upload size in bytes. Configurable via MAX_UPLOAD_MB
+    (megabytes); defaults to 10 MB if unset, non-numeric, or non-positive."""
+    try:
+        mb = float(os.getenv("MAX_UPLOAD_MB", "10"))
+    except (TypeError, ValueError):
+        mb = 10.0
+    if mb <= 0:
+        mb = 10.0
+    return int(mb * 1024 * 1024)
+
+
+def _signature_ok(ext: str, head: bytes) -> bool:
+    """True if the leading bytes match the claimed extension.
+
+    Binary formats (PDF/XLSX/XLS) must start with their known signature.
+    CSV (no signature) must look like text: no NUL byte (a reliable binary
+    marker). Non-UTF-8 single-byte encodings (e.g. Windows-1252) are
+    tolerated so legitimate names with accented characters aren't rejected.
+    """
+    sigs = _FILE_SIGNATURES.get(ext)
+    if sigs is not None:
+        return any(head.startswith(s) for s in sigs)
+    # CSV / text path.
+    if b"\x00" in head:
+        return False
+    return True
+
+
+def _silent_remove(path: str) -> None:
+    try:
+        if path and os.path.exists(path):
+            os.remove(path)
+    except OSError:
+        pass
+
+
+async def save_validated_upload(file: UploadFile, ext: str, dest_path: str):
+    """Stream `file` to `dest_path`, validating size and signature before it
+    is permanently stored. Returns (ok: bool, error_message: Optional[str]).
+
+    On any failure the partial file at `dest_path` is removed.
+    """
+    max_bytes = _max_upload_bytes()
+    total = 0
+    first = True
+    try:
+        with open(dest_path, "wb") as out:
+            while True:
+                chunk = await file.read(_UPLOAD_CHUNK)
+                if not chunk:
+                    break
+                if first:
+                    # Signature is checked on the first chunk, before the
+                    # bulk of the file is written to disk.
+                    if not _signature_ok(ext, chunk):
+                        raise _UploadError(
+                            "File content does not match its extension "
+                            "(possible renamed or corrupt file)."
+                        )
+                    first = False
+                total += len(chunk)
+                if total > max_bytes:
+                    raise _UploadError(
+                        f"File too large. Maximum allowed size is "
+                        f"{max_bytes // (1024 * 1024)} MB."
+                    )
+                out.write(chunk)
+        if first:
+            raise _UploadError("Uploaded file is empty.")
+    except _UploadError as e:
+        _silent_remove(dest_path)
+        return False, str(e)
+    except Exception as e:
+        # Keep details server-side; show a generic message (OWASP info-leak).
+        print(f"[uploads] Failed to save upload to '{dest_path}': {e}")
+        _silent_remove(dest_path)
+        return False, "Failed to save the uploaded file. Please try again."
+    return True, None
+
+
+# ─────────────────────────────────────────────────────────────────────
 # Structured-field helpers (shared by save-draft and confirm)
 # ─────────────────────────────────────────────────────────────────────
 
@@ -127,6 +233,339 @@ def _diff_field_rows(old_rows: List[dict], new_rows: List[dict]):
 
 
 # ─────────────────────────────────────────────────────────────────────
+# Shared strict incident matcher (Week 8.1)
+#
+# Given the core fields derived by app.etl.structure, find an EXISTING
+# Incident that exactly matches on barangay + disaster_type + date. Strict
+# only: no fuzzy dates, no scoring, no AI. Returns the Incident or None.
+#
+# Reused by CFAU upload review (pre-select the linked incident) and kept
+# generic so future BDRRMO uploads and an Admin duplicate-warning can call
+# the same logic — one consistent matching rule across the ETL pipeline.
+# ─────────────────────────────────────────────────────────────────────
+
+def find_matching_incident(db: Session, barangay_name: str,
+                           disaster_value: str, date_str: str):
+    """Exact match on (barangay name, disaster_type, date_occurred).
+
+    All three must be present and valid; any miss returns None. Barangay is
+    matched case-insensitively by name. Date must be ISO 'YYYY-MM-DD'. If
+    several incidents share the same key, the earliest-created is returned.
+    """
+    if not (barangay_name and disaster_value and date_str):
+        return None
+    if disaster_value not in {dt.value for dt in DisasterType}:
+        return None
+    try:
+        d_obj = datetime.strptime(date_str.strip(), "%Y-%m-%d").date()
+    except (ValueError, TypeError, AttributeError):
+        return None
+
+    brgy = (
+        db.query(Barangay)
+        .filter(Barangay.name.ilike(barangay_name.strip()))
+        .first()
+    )
+    if not brgy:
+        return None
+
+    return (
+        db.query(Incident)
+        .filter(
+            Incident.barangay_id == brgy.id,
+            Incident.disaster_type == DisasterType(disaster_value),
+            Incident.date_occurred == d_obj,
+        )
+        .order_by(Incident.id.asc())
+        .first()
+    )
+
+
+def _core_int(v) -> int:
+    """Coerce an extracted/posted numeric core field to a non-negative int."""
+    try:
+        return max(0, int(float(str(v).strip())))
+    except (TypeError, ValueError):
+        return 0
+
+
+def resolve_or_create_incident(db: Session, user_id: int, core: dict, source: str):
+    """Strict-match an existing Incident on the core triple; create one only if
+    no match exists. Returns (incident, created: bool).
+
+    Enrichment policy: a match is returned UNCHANGED — callers attach their
+    role-specific data as child/provenance records and never mutate the
+    canonical Incident. Creation requires the NOT NULL core fields (barangay,
+    disaster_type, date_occurred); raises ValueError with a user-facing
+    message when they are insufficient.
+
+    `core` keys: barangay (name), disaster_type (value), date_occurred (ISO),
+    severity (value, optional — defaults to moderate), affected_families,
+    casualties, description. Reused by CFAU and BDRRMO ETL.
+    """
+    barangay_name = (core.get("barangay") or "").strip()
+    disaster_value = (core.get("disaster_type") or "").strip()
+    date_str = (core.get("date_occurred") or "").strip()
+    severity_value = (core.get("severity") or "").strip()
+
+    # Re-run the strict match at call time (submit), so an Incident created
+    # between extraction and submit links instead of duplicating.
+    match = find_matching_incident(db, barangay_name, disaster_value, date_str)
+    if match:
+        return match, False
+
+    # No match — validate the NOT NULL fields, then create.
+    brgy = (
+        db.query(Barangay).filter(Barangay.name.ilike(barangay_name)).first()
+        if barangay_name else None
+    )
+    if not brgy:
+        raise ValueError("A valid barangay is required to create the incident.")
+    if disaster_value not in {dt.value for dt in DisasterType}:
+        raise ValueError("A valid disaster type is required to create the incident.")
+    try:
+        d_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        raise ValueError(
+            "A valid incident date (YYYY-MM-DD) is required to create the incident."
+        )
+
+    # Severity is optional — an invalid/blank value falls back to moderate
+    # (same default as the Incident model column).
+    severity = (
+        Severity(severity_value)
+        if severity_value in {s.value for s in Severity}
+        else Severity.moderate
+    )
+
+    incident = Incident(
+        barangay_id=brgy.id,
+        reported_by=user_id,
+        disaster_type=DisasterType(disaster_value),
+        date_occurred=d_obj,
+        severity=severity,
+        affected_families=_core_int(core.get("affected_families")),
+        casualties=_core_int(core.get("casualties")),
+        description=(core.get("description") or "").strip() or None,
+        source=source,
+    )
+    db.add(incident)
+    db.flush()  # assign incident.id within the caller's transaction
+    return incident, True
+
+
+# ─────────────────────────────────────────────────────────────────────
+# DSS aggregation entry point (Week 8.1)
+#
+# Single-incident upload paths (CFAU post-incident, BDRRMO incident) set the
+# UploadedReport.incident_id FK to the canonical Incident they resolved to, in
+# ADDITION to the JSON provenance kept on extracted_data:
+#     report_kind            — which upload type produced the contribution
+#     linked_incident_id     — mirrors the FK (kept for backward compatibility)
+#     incident_created       — whether THIS upload created that Incident
+#     source                 — Incident.source provenance tag
+# CFAU adds `produced_incident_report_id`; BDRRMO adds `contributed_core`
+# (the uploader's submitted values).
+#
+# incident_contributions() is the single, source-agnostic place a future DSS
+# / analytics module reads from. It joins on the indexed FK (no full-table
+# JSON scan); the JSON payload is read only for per-kind detail. New upload
+# kinds participate automatically by setting incident_id — and the canonical
+# Incident is never mutated (contributions accumulate AROUND it).
+# ─────────────────────────────────────────────────────────────────────
+
+def incident_contributions(db: Session, incident_id: int) -> dict:
+    """Aggregate every upload-based contribution linked to one Incident.
+
+    Resolved via the indexed UploadedReport.incident_id FK. Returns a stable
+    structure regardless of which report kinds contributed:
+
+        {
+          "incident_id": int,
+          "total": int,                      # number of linked uploads
+          "by_kind": {report_kind: count},   # e.g. {"bdrrmo_incident": 2,
+                                             #        "post_incident": 1}
+          "created_by_upload_id": int|None,  # the upload that created it
+          "contributions": [                 # oldest → newest (by upload id)
+            {
+              "upload_id": int,
+              "report_kind": str,
+              "file_name": str,
+              "uploaded_by": int|None,
+              "uploaded_at": str|None,       # ISO-8601
+              "incident_created": bool,
+              "source": str|None,            # Incident.source provenance tag
+              "produced_incident_report_id": int|None,  # CFAU only
+              "contributed_core": dict|None, # BDRRMO uploader's values
+            }, ...
+          ],
+        }
+    """
+    reports = (
+        db.query(UploadedReport)
+        .filter(UploadedReport.incident_id == incident_id)
+        .order_by(UploadedReport.id.asc())
+        .all()
+    )
+    contributions = []
+    by_kind: dict = {}
+    created_by_upload_id = None
+    for r in reports:
+        data = r.extracted_data or {}
+        kind = data.get("report_kind") or "unknown"
+        by_kind[kind] = by_kind.get(kind, 0) + 1
+        if data.get("incident_created"):
+            created_by_upload_id = r.id
+        contributions.append({
+            "upload_id": r.id,
+            "report_kind": kind,
+            "file_name": r.file_name,
+            "uploaded_by": r.uploaded_by,
+            "uploaded_at": r.uploaded_at.isoformat() if r.uploaded_at else None,
+            "incident_created": bool(data.get("incident_created")),
+            "source": data.get("source"),
+            "produced_incident_report_id": data.get("produced_incident_report_id"),
+            "contributed_core": data.get("contributed_core"),
+        })
+    return {
+        "incident_id": incident_id,
+        "total": len(contributions),
+        "by_kind": by_kind,
+        "created_by_upload_id": created_by_upload_id,
+        "contributions": contributions,
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Canonical equipment-used contract (Week 8.1)
+#
+# BDRRMO contributions store equipment as a structured list:
+#     [{"name": str, "quantity": int, "barangay_equipment_id": int|None}]
+# CFAU stores it as free text on IncidentReport.equipment_used. Rather than
+# migrate CFAU, both shapes are unified at READ time into one canonical item
+# shape, so a DSS layer never has to know which module produced the data.
+# New structured sources slot in for free; CFAU may later adopt the same
+# structured shape with no change here.
+# ─────────────────────────────────────────────────────────────────────
+
+def normalize_equipment_used(value) -> List[dict]:
+    """Normalize any equipment-used value into the canonical item shape.
+
+    Accepts a structured list (BDRRMO), a free-text string (CFAU), or None.
+    Returns a list of:
+        {"name": str, "quantity": int|None,
+         "barangay_equipment_id": int|None, "origin": "structured"|"free_text"}
+
+    Read-only; never mutates the source. Empty/blank → [].
+    """
+    if not value:
+        return []
+    items: List[dict] = []
+
+    if isinstance(value, list):
+        for raw in value:
+            if isinstance(raw, dict):
+                name = str(raw.get("name") or "").strip()
+                if not name:
+                    continue
+                q = raw.get("quantity")
+                try:
+                    quantity = int(q) if q is not None and str(q).strip() != "" else None
+                except (ValueError, TypeError):
+                    quantity = None
+                beid = raw.get("barangay_equipment_id")
+                if not isinstance(beid, int):
+                    beid = None
+                items.append({
+                    "name": name, "quantity": quantity,
+                    "barangay_equipment_id": beid, "origin": "structured",
+                })
+            else:
+                # Tolerate a bare string element inside a list.
+                name = str(raw).strip()
+                if name:
+                    items.append({
+                        "name": name, "quantity": None,
+                        "barangay_equipment_id": None, "origin": "structured",
+                    })
+
+    elif isinstance(value, str):
+        # Split on common delimiters used in free-text equipment lists.
+        for part in re.split(r"[,;/\n]| and ", value):
+            name = part.strip(" \t\r\n-•").strip()
+            if name:
+                items.append({
+                    "name": name, "quantity": None,
+                    "barangay_equipment_id": None, "origin": "free_text",
+                })
+
+    return items
+
+
+def incident_equipment(db: Session, incident_id: int) -> dict:
+    """Unified equipment-used view for one Incident, across all contributors.
+
+    Sources (disjoint by design — no double counting):
+      - BDRRMO structured contributions:
+        UploadedReport.contributed_core.equipment_used (via incident_contributions)
+      - CFAU free text: IncidentReport.equipment_used for this incident
+
+    Both pass through normalize_equipment_used() and are grouped by
+    case-insensitive name. Quantities are summed where known; every appearance
+    is counted as a mention.
+
+    Returns:
+        {
+          "incident_id": int,
+          "items": [
+            {"name": str, "total_quantity": int|None, "mentions": int,
+             "barangay_equipment_id": int|None, "origins": [str, ...]},
+            ...
+          ],
+          "raw": [ <canonical item incl. origin>, ... ],   # flat, pre-grouping
+        }
+    """
+    raw: List[dict] = []
+
+    # BDRRMO structured contributions (CFAU uploads carry no contributed_core,
+    # so their equipment is not double-counted here).
+    contrib = incident_contributions(db, incident_id)
+    for c in contrib["contributions"]:
+        core = c.get("contributed_core") or {}
+        raw.extend(normalize_equipment_used(core.get("equipment_used")))
+
+    # CFAU free text lives on the IncidentReport child of the Incident.
+    reports = (
+        db.query(IncidentReport)
+        .filter(IncidentReport.incident_id == incident_id)
+        .all()
+    )
+    for r in reports:
+        raw.extend(normalize_equipment_used(r.equipment_used))
+
+    grouped: dict = {}
+    for it in raw:
+        key = it["name"].strip().lower()
+        g = grouped.setdefault(key, {
+            "name": it["name"],
+            "total_quantity": None,
+            "mentions": 0,
+            "barangay_equipment_id": None,
+            "origins": [],
+        })
+        g["mentions"] += 1
+        if it.get("quantity") is not None:
+            g["total_quantity"] = (g["total_quantity"] or 0) + it["quantity"]
+        if it.get("barangay_equipment_id") and g["barangay_equipment_id"] is None:
+            g["barangay_equipment_id"] = it["barangay_equipment_id"]
+        if it["origin"] not in g["origins"]:
+            g["origins"].append(it["origin"])
+
+    items = sorted(grouped.values(), key=lambda x: x["name"].lower())
+    return {"incident_id": incident_id, "items": items, "raw": raw}
+
+
+# ─────────────────────────────────────────────────────────────────────
 # LIST — upload history (TR-ADM-12..15)
 # ─────────────────────────────────────────────────────────────────────
 
@@ -145,12 +584,14 @@ def upload_list(request: Request, db: Session = Depends(get_db)):
         .all()
     )
 
-    # CFAU post-incident uploads (Week 8.1) reuse the same UploadedReport
-    # table but are tagged in extracted_data JSON and managed under /cfau.
-    # Keep this admin incident-upload list showing only incident-kind uploads.
+    # CFAU post-incident and BDRRMO incident uploads (Week 8.1) reuse the same
+    # UploadedReport table but are tagged in extracted_data JSON and managed
+    # under /cfau and /bdrrmo respectively. Keep this admin incident-upload
+    # list showing only the admin's own medallion uploads.
+    _MODULE_UPLOAD_KINDS = {"post_incident", "bdrrmo_incident"}
     reports = [
         r for r in reports
-        if (r.extracted_data or {}).get("report_kind") != "post_incident"
+        if (r.extracted_data or {}).get("report_kind") not in _MODULE_UPLOAD_KINDS
     ]
 
     # Split by lifecycle. Drafts always get their own section; archived and
@@ -229,13 +670,10 @@ async def upload_submit(
     stored_name = _safe_filename(original_name)
     stored_path = os.path.join(UPLOAD_SUBDIR, stored_name)
 
-    try:
-        contents = await file.read()
-        with open(stored_path, "wb") as f:
-            f.write(contents)
-    except Exception as e:
+    ok, err = await save_validated_upload(file, ext, stored_path)
+    if not ok:
         return RedirectResponse(
-            url=f"/admin/uploads/new?error=Failed+to+save+file:+{e}",
+            url="/admin/uploads/new?error=" + quote_plus(err),
             status_code=302,
         )
 
@@ -282,7 +720,9 @@ async def upload_submit(
             extracted["fields"] = structure_rows(out["rows"]) or [empty_field_row()]
         report.status = ReportStatus.reviewed
     except Exception as e:
-        extracted["error"] = str(e)
+        # Log details server-side; surface only a generic message to the UI.
+        print(f"[uploads] Extraction failed for report '{original_name}': {e}")
+        extracted["error"] = "Extraction failed. The file could not be read or was malformed."
         extracted["fields"] = [empty_field_row()]
         report.status = ReportStatus.failed
 
@@ -446,15 +886,16 @@ async def save_draft(report_id: int, request: Request, db: Session = Depends(get
 # ─────────────────────────────────────────────────────────────────────
 
 def _parse_date(s: str) -> Optional[date]:
+    """Accept ISO 'YYYY-MM-DD' only. The review screen submits dates via an
+    <input type="date">, which always emits ISO, so we never have to guess
+    between DD/MM and MM/DD here — ambiguous/blank values are rejected and the
+    reviewer is sent back to disambiguate."""
     if not s:
         return None
-    s = s.strip()
-    for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%d/%m/%Y"):
-        try:
-            return datetime.strptime(s, fmt).date()
-        except ValueError:
-            continue
-    return None
+    try:
+        return datetime.strptime(s.strip(), "%Y-%m-%d").date()
+    except ValueError:
+        return None
 
 
 @router.post("/{report_id}/confirm")

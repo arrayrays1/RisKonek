@@ -301,6 +301,17 @@ function markerIcon(facility) {
     });
 }
 
+// HTML-escape attacker-controlled strings before they enter popup innerHTML.
+// Output-layer encoding only — stored values are never modified.
+function esc(s) {
+    return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 function popupHtml(f) {
     const incidents = [];
     if (f.supports_tropical_cyclone) incidents.push('Tropical Cyclone');
@@ -314,16 +325,16 @@ function popupHtml(f) {
     if (f.is_approximate_location)
         badges.push('<span class="popup-badge approx">Approximate location</span>');
     if (f.status)
-        badges.push(`<span class="popup-badge">${f.status}</span>`);
+        badges.push(`<span class="popup-badge">${esc(f.status)}</span>`);
 
     function row(label, value) {
         if (value === null || value === undefined || value === '') return '';
-        return `<tr><th>${label}</th><td>${value}</td></tr>`;
+        return `<tr><th>${label}</th><td>${esc(value)}</td></tr>`;
     }
 
     return `
-        <div class="popup-name">${f.name}</div>
-        <div class="popup-sub">${f.barangay || ''} · ${f.facility_type_label || ''}</div>
+        <div class="popup-name">${esc(f.name)}</div>
+        <div class="popup-sub">${esc(f.barangay || '')} · ${esc(f.facility_type_label || '')}</div>
         ${badges.length ? `<div class="popup-badges">${badges.join('')}</div>` : ''}
         <table class="popup-table">
             ${row('Floor area',          f.floor_area_sqm ? f.floor_area_sqm + ' sqm' : null)}

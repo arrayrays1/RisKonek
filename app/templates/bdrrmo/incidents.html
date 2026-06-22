@@ -5,10 +5,17 @@
 {% set active_nav = 'bdrrmo_incidents' %}
 
 {% block content %}
-<div class="page-header">
-    <h1>Incident History</h1>
-    <p>Historical disaster incidents recorded for
-       {% if barangay %}Barangay {{ barangay.name }}{% else %}your barangay{% endif %}.</p>
+<div class="d-flex justify-content-between align-items-start page-header">
+    <div>
+        <h1>Incident History</h1>
+        <p>Historical disaster incidents recorded for
+           {% if barangay %}Barangay {{ barangay.name }}{% else %}your barangay{% endif %}.</p>
+    </div>
+    {% if barangay %}
+    <a href="/bdrrmo/incidents/upload" class="btn btn-outline-primary">
+        <i class="bi bi-cloud-upload"></i> Upload Report
+    </a>
+    {% endif %}
 </div>
 
 {% if success %}
