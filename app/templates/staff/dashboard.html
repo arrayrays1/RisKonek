@@ -1,0 +1,58 @@
+{% extends "admin/base.html" %}
+
+{% block title %}CDRRMO Logistics — RisKonek{% endblock %}
+
+{% set active_nav = 'staff_dashboard' %}
+
+{% block content %}
+<div class="page-header">
+    <h1>CDRRMO Logistics Dashboard</h1>
+    <p>Welcome, {{ user.username }}. You manage stockpile resources and share the Vehicle &amp; Equipment module with CFAU / Operations.</p>
+</div>
+
+<div class="row g-3">
+    <div class="col-md-6">
+        <div class="dash-card h-100">
+            <div class="card-title-row">
+                <i class="bi bi-box-seam-fill" style="color:var(--rk-green);font-size:18px"></i>
+                <h6>Resource Goods Inventory</h6>
+            </div>
+            <p class="text-muted small mb-3">
+                Track consumable disaster-response resources: food packs, bottled water, medicine,
+                hygiene kits, blankets, tarpaulins, and sleeping kits. Add stock, deduct stock, and
+                monitor low-stock and near-expiry alerts.
+            </p>
+            <div class="d-flex gap-2">
+                <a href="/admin/resources" class="btn btn-rk">
+                    <i class="bi bi-list-ul"></i> Open Inventory
+                </a>
+                <a href="/admin/resources/new" class="btn btn-outline-secondary">
+                    <i class="bi bi-plus-lg"></i> Add Resource
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="dash-card h-100">
+            <div class="card-title-row">
+                <i class="bi bi-wrench-adjustable" style="color:var(--rk-green);font-size:18px"></i>
+                <h6>Vehicle &amp; Equipment Monitoring</h6>
+            </div>
+            <p class="text-muted small mb-3">
+                Shared with CFAU / Operations. Monitor rescue trucks, ambulances, boats, generators,
+                chainsaws, radios, flashlights, and life vests. Track status changes
+                (Available / Deployed / Under Repair / Unserviceable).
+            </p>
+            <div class="d-flex gap-2">
+                <a href="/admin/equipment" class="btn btn-rk">
+                    <i class="bi bi-list-ul"></i> Open Equipment
+                </a>
+                <a href="/admin/equipment/new" class="btn btn-outline-secondary">
+                    <i class="bi bi-plus-lg"></i> Add Equipment
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
