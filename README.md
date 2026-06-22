@@ -166,7 +166,11 @@ If the CDRRMO critical-facilities Excel dataset is present, facilities are impor
 | `bdrrmo1` | bdrrmo (Cuyab) | `/bdrrmo/profile` |
 | `staff1` | cdrrmo_staff | `/staff/dashboard` |
 
+<<<<<<< HEAD
 > All seeded data is for demonstration only — replace with actual CDRRMO records before deployment.
+=======
+> All seeded data is for demonstration only — will replace with actual CDRRMO records before deployment.
+>>>>>>> 588c16af0e6ba683bc722118438f14184a5314dd
 
 ---
 
