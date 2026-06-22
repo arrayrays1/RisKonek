@@ -61,7 +61,7 @@
                 <div class="stat-label">Flood Risk Trend</div>
                 <div class="stat-icon" style="background:#fde8e8;color:#c0392b"><i class="bi bi-graph-up-arrow"></i></div>
             </div>
-            <div class="stat-value {{ 'trend-up' if flood_trend == 'Increasing' else 'trend-stable' }}">{{ flood_trend }}</div>
+            <div class="stat-value stat-value-lg {{ 'trend-up' if flood_trend == 'Increasing' else 'trend-stable' }}">{{ flood_trend }}</div>
             <div class="stat-change text-muted">Last 12 months vs prior</div>
         </div>
     </div>
@@ -71,7 +71,7 @@
                 <div class="stat-label">Fire Risk Trend</div>
                 <div class="stat-icon" style="background:#fef9e7;color:#b7950b"><i class="bi bi-fire"></i></div>
             </div>
-            <div class="stat-value {{ 'trend-up' if fire_trend == 'Increasing' else 'trend-stable' }}">{{ fire_trend }}</div>
+            <div class="stat-value stat-value-lg {{ 'trend-up' if fire_trend == 'Increasing' else 'trend-stable' }}">{{ fire_trend }}</div>
             <div class="stat-change text-muted">Last 12 months vs prior</div>
         </div>
     </div>

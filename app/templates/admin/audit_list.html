@@ -6,16 +6,16 @@
 
 {% macro category_badge(cat) -%}
     {% set m = {
-        'Authentication': 'bg-info text-dark',
-        'User Management': 'bg-primary',
-        'Uploads': 'bg-success',
-        'Incident Reports': 'bg-danger',
-        'Barangay Data': 'bg-warning text-dark',
-        'Resources': 'bg-secondary',
-        'Vehicle & Equipment': 'bg-dark',
-        'System Actions': 'bg-light text-dark border'
+        'Authentication': 'background:#e0f2fe;color:#0369a1',
+        'User Management': 'background:#dbeafe;color:#1d4ed8',
+        'Uploads': 'background:#d1fae5;color:#047857',
+        'Incident Reports': 'background:#fee2e2;color:#dc2626',
+        'Barangay Data': 'background:#fef3c7;color:#b45309',
+        'Resources': 'background:#fce7f3;color:#be185d',
+        'Vehicle & Equipment': 'background:#e2e8f0;color:#334155',
+        'System Actions': 'background:#f3f4f6;color:#6b7280'
     } %}
-    <span class="badge {{ m.get(cat, 'bg-light text-dark border') }}">{{ cat }}</span>
+    <span class="status-pill" style="{{ m.get(cat, 'background:#f3f4f6;color:#6b7280') }}">{{ cat }}</span>
 {%- endmacro %}
 
 {% block content %}
@@ -24,13 +24,16 @@
         <h1>Audit Trail</h1>
         <p>System-wide record of all logged actions. {{ total }} matching entr{{ 'y' if total == 1 else 'ies' }}.</p>
     </div>
+    <button class="btn btn-rk" disabled title="Export coming soon">
+        <i class="bi bi-download"></i> Export Logs
+    </button>
 </div>
 
 {% if focus_user %}
 <div class="alert alert-info d-flex justify-content-between align-items-center">
     <span><i class="bi bi-person-badge me-1"></i>
         Showing the audit trail for <strong>{{ focus_user.username }}</strong>.</span>
-    <a href="/admin/audit" class="btn btn-sm btn-outline-secondary">View all users</a>
+    <a href="/admin/audit" class="btn-soft">View all users</a>
 </div>
 {% endif %}
 
@@ -78,7 +81,7 @@
             <input type="date" name="date_to" value="{{ f_date_to }}" class="form-control form-control-sm">
         </div>
         <div class="col-md-3 d-flex align-items-end">
-            <a href="/admin/audit" class="btn btn-outline-secondary btn-sm w-100">
+            <a href="/admin/audit" class="btn-soft w-100 justify-content-center">
                 <i class="bi bi-x-circle"></i> Reset
             </a>
         </div>
@@ -120,7 +123,7 @@
                         </span>
                     </td>
                     <td class="text-end px-3">
-                        <a href="/admin/audit/{{ it.id }}" class="btn btn-outline-secondary btn-sm">
+                        <a href="/admin/audit/{{ it.id }}" class="btn-soft" title="View detail">
                             <i class="bi bi-eye"></i>
                         </a>
                     </td>

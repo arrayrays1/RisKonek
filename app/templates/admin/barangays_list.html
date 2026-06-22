@@ -14,7 +14,7 @@
 <div class="dash-card mb-4">
     <form method="GET" action="/admin/barangays" class="row g-2 align-items-center js-live-filter">
         <div class="col-md-8">
-            <div class="input-group">
+            <div class="input-group search-bar-rk">
                 <span class="input-group-text bg-white">
                     <i class="bi bi-search text-muted"></i>
                 </span>
@@ -24,7 +24,7 @@
             </div>
         </div>
         <div class="col-md-3">
-            <select name="risk" class="form-select">
+            <select name="risk" class="form-select" style="border-radius:10px">
                 <option value="">All Priority Levels</option>
                 {% for r in risk_levels %}
                 <option value="{{ r }}" {{ 'selected' if risk_filter == r else '' }}>
@@ -34,7 +34,7 @@
             </select>
         </div>
         <div class="col-md-1 d-grid">
-            <a href="/admin/barangays" class="btn btn-outline-secondary" title="Reset filters">
+            <a href="/admin/barangays" class="btn-soft justify-content-center" title="Reset filters">
                 <i class="bi bi-x-circle"></i>
             </a>
         </div>
@@ -70,7 +70,7 @@
                     </td>
                     <td class="text-end px-3">
                         <a href="/admin/barangays/{{ r.id }}"
-                           class="btn btn-outline-secondary btn-sm">
+                           class="btn-soft">
                             View Profile <i class="bi bi-chevron-right"></i>
                         </a>
                     </td>
