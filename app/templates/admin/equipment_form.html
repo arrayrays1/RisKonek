@@ -14,47 +14,6 @@
 <div class="alert alert-danger">{{ error }}</div>
 {% endif %}
 
-{% if edit_mode and repair_reminder %}
-<div class="alert {{ 'alert-danger' if repair_reminder == 'overdue' else 'alert-warning' }} d-flex align-items-start gap-2">
-    <i class="bi bi-tools" style="font-size:16px"></i>
-    <div>
-        {% if repair_reminder == 'overdue' %}
-        <strong>Repair date has passed.</strong>
-        {% else %}
-        <strong>Repair is due today.</strong>
-        {% endif %}
-        Please verify whether this equipment can be returned to service or remains under repair.
-        Scheduled for {{ repair_report.repair_scheduled_date.strftime('%B %d, %Y') }}; the unit is still marked
-        <strong>{{ live_status_label }}</strong>. Updating the status below to an operational state clears this reminder.
-    </div>
-</div>
-{% endif %}
-
-{% if edit_mode and repair_report %}
-<div class="dash-card mb-3">
-    <div class="card-title-row">
-        <i class="bi bi-calendar-event" style="color:var(--rk-green);font-size:16px"></i>
-        <h6>Repair Schedule</h6>
-    </div>
-    <div class="row g-3">
-        <div class="col-sm-4">
-            <div class="stat-label">Scheduled Date</div>
-            <div class="fw-semibold">{{ repair_report.repair_scheduled_date.strftime('%B %d, %Y') }}</div>
-        </div>
-        <div class="col-sm-8">
-            <div class="stat-label">Repair Notes</div>
-            <div style="white-space:pre-wrap">{{ repair_report.repair_notes or '—' }}</div>
-        </div>
-    </div>
-    <p class="small text-muted mt-2 mb-0">
-        From serviceability report
-        <a href="/admin/serviceability/{{ repair_report.id }}">#{{ repair_report.id }}{% if repair_report.title %} — {{ repair_report.title }}{% endif %}</a>.
-        Status changes are logged from the
-        <a href="/admin/equipment">equipment list</a> — the source of truth for operational status.
-    </p>
-</div>
-{% endif %}
-
 <div class="dash-card">
     <form method="POST"
           action="{{ '/admin/equipment/' ~ target.id ~ '/edit' if edit_mode else '/admin/equipment/new' }}"

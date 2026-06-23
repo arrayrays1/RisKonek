@@ -34,16 +34,13 @@
 </div>
 {% else %}
 
-{# Resolve the facility being edited (if any) so the form can pre-fill.
-   Use a namespace: a plain {% set %} inside a {% for %} loop does not survive
-   the loop in Jinja2, so the result is copied back to `editing` at top level. #}
-{% set ns = namespace(editing=none) %}
+{# Resolve the facility being edited (if any) so the form can pre-fill. #}
+{% set editing = none %}
 {% if edit_id %}
     {% for f in facilities %}
-        {% if f.id|string == edit_id %}{% set ns.editing = f %}{% endif %}
+        {% if f.id|string == edit_id %}{% set editing = f %}{% endif %}
     {% endfor %}
 {% endif %}
-{% set editing = ns.editing %}
 
 {% if not show_archived %}
 <!-- ── Add / Edit facility (TR-BDR-03/04) ─────────────────────── -->

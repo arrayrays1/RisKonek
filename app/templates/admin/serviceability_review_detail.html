@@ -15,34 +15,10 @@
     </a>
 </div>
 
-{% if request.query_params.get('success') %}
-<div class="alert alert-success alert-dismissible fade show">
-    <i class="bi bi-check-circle-fill me-1"></i>{{ request.query_params.get('success') }}
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-</div>
-{% endif %}
 {% if request.query_params.get('error') %}
 <div class="alert alert-danger alert-dismissible fade show">
     <i class="bi bi-exclamation-triangle-fill me-1"></i>{{ request.query_params.get('error') }}
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-</div>
-{% endif %}
-
-{% if repair_reminder %}
-<div class="alert {{ 'alert-danger' if repair_reminder == 'overdue' else 'alert-warning' }} d-flex align-items-start gap-2">
-    <i class="bi bi-tools" style="font-size:16px"></i>
-    <div>
-        {% if repair_reminder == 'overdue' %}
-        <strong>Repair date has passed.</strong>
-        {% else %}
-        <strong>Repair is due today.</strong>
-        {% endif %}
-        Please verify whether the equipment can be returned to service or remains under repair.
-        Scheduled for {{ r.repair_scheduled_date.strftime('%B %d, %Y') }}; this unit is still marked
-        <strong>{{ live_status_label }}</strong>. Update it in the
-        <a href="/admin/equipment" class="alert-link">Vehicle &amp; Equipment</a> module — this reminder
-        clears once the status is no longer under repair / unserviceable.
-    </div>
 </div>
 {% endif %}
 
@@ -102,8 +78,7 @@
                 <h6>Review Action</h6>
             </div>
             {% if can_review %}
-            <form method="POST" action="/admin/serviceability/{{ r.id }}/review"
-                  onsubmit="return this.new_status.value !== 'resolved' || confirm('Mark this report as RESOLVED?\n\n• The report will be marked Resolved.\n• Equipment status will NOT be changed automatically.\n• Repair reminders are based on the equipment status, not the report status.');">
+            <form method="POST" action="/admin/serviceability/{{ r.id }}/review">
                 <div class="mb-3">
                     <label class="form-label small fw-semibold">Update Status</label>
                     <select name="new_status" class="form-select" required>
@@ -116,49 +91,10 @@
                     <textarea name="admin_remarks" rows="4" class="form-control"
                               placeholder="Notes for the reporter — repair scheduled, parts ordered, closed out…">{{ r.admin_remarks or '' }}</textarea>
                 </div>
-
-                <!-- ── Optional repair scheduling ─────────────────── -->
-                <div class="mb-3">
-                    <label class="form-label small fw-semibold">
-                        Repair Scheduled Date <span class="text-muted fw-normal">(optional)</span>
-                    </label>
-                    <input type="date" name="repair_scheduled_date" class="form-control"
-                           value="{{ r.repair_scheduled_date.isoformat() if r.repair_scheduled_date else '' }}">
-                    <div class="form-text">
-                        A reminder appears once this date arrives and the equipment is still
-                        under repair / unserviceable. This never changes the live equipment status. Clear the field to remove it.
-                    </div>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label small fw-semibold">
-                        Repair Notes <span class="text-muted fw-normal">(optional)</span>
-                    </label>
-                    <textarea name="repair_notes" rows="2" class="form-control"
-                              placeholder="Parts needed, vendor, expected turnaround…">{{ r.repair_notes or '' }}</textarea>
-                </div>
-
                 <div class="d-grid">
                     <button type="submit" class="btn btn-rk"><i class="bi bi-check2"></i> Save Review</button>
                 </div>
             </form>
-            {% elif can_reopen %}
-            <p class="small text-muted mb-2">
-                This report is marked <strong>Resolved</strong>. If it was closed by mistake — or the
-                equipment was not actually returned to service — you can reopen it for further review.
-                Reopening moves it back to <strong>Reviewed</strong> and does not change the equipment status.
-            </p>
-            <form method="POST" action="/admin/serviceability/{{ r.id }}/reopen"
-                  onsubmit="return confirm('Reopen this report back to Reviewed?');">
-                <div class="d-grid">
-                    <button type="submit" class="btn btn-outline-secondary">
-                        <i class="bi bi-arrow-counterclockwise"></i> Reopen Report
-                    </button>
-                </div>
-            </form>
-            {% if r.admin_remarks %}
-            <div class="stat-label mt-3">Existing Remarks</div>
-            <p class="mb-0" style="white-space:pre-wrap">{{ r.admin_remarks }}</p>
-            {% endif %}
             {% else %}
             <p class="small text-muted mb-2">
                 This report is still a draft with CFAU and cannot be reviewed until it is submitted.
@@ -166,18 +102,6 @@
             {% if r.admin_remarks %}
             <div class="stat-label">Existing Remarks</div>
             <p class="mb-0" style="white-space:pre-wrap">{{ r.admin_remarks }}</p>
-            {% endif %}
-            {% endif %}
-
-            {% if r.repair_scheduled_date or r.repair_notes %}
-            <hr class="my-3">
-            <div class="stat-label">Repair Schedule</div>
-            {% if r.repair_scheduled_date %}
-            <p class="mb-1"><i class="bi bi-calendar-event"></i>
-                Scheduled for {{ r.repair_scheduled_date.strftime('%B %d, %Y') }}</p>
-            {% endif %}
-            {% if r.repair_notes %}
-            <p class="mb-0 small" style="white-space:pre-wrap">{{ r.repair_notes }}</p>
             {% endif %}
             {% endif %}
 

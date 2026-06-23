@@ -112,7 +112,7 @@
                     <i class="bi bi-graph-up-arrow"></i>
                 </div>
             </div>
-            <div class="stat-value stat-value-lg {{ 'trend-up' if flood_trend == 'Increasing' else 'trend-stable' }}">
+            <div class="stat-value {{ 'trend-up' if flood_trend == 'Increasing' else 'trend-stable' }}">
                 {{ flood_trend }}
             </div>
             <div class="stat-change text-muted">Last 12 months vs prior</div>
@@ -127,7 +127,7 @@
                     <i class="bi bi-fire"></i>
                 </div>
             </div>
-            <div class="stat-value stat-value-lg {{ 'trend-up' if fire_trend == 'Increasing' else 'trend-stable' }}">
+            <div class="stat-value {{ 'trend-up' if fire_trend == 'Increasing' else 'trend-stable' }}">
                 {{ fire_trend }}
             </div>
             <div class="stat-change text-muted">Last 12 months vs prior</div>
