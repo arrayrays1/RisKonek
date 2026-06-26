@@ -82,7 +82,8 @@
                         {% if u.id != user.id %}
                         <form method="POST" action="/admin/users/{{ u.id }}/toggle"
                               style="display:inline"
-                              onsubmit="return confirm('Are you sure?')">
+                              data-confirm='Are you sure?'>
+            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                             <button type="submit"
                                 class="btn btn-sm {{ 'btn-outline-danger' if u.is_active else 'btn-outline-success' }}">
                                 {% if u.is_active %}

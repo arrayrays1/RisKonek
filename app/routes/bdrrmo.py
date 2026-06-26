@@ -1293,14 +1293,13 @@ def population_create(
             status_code=302,
         )
 
-    # Integrity guard: a snapshot with zero total population but a non-zero
-    # vulnerable count is logically impossible and usually signals an
+    # Integrity guard: total population and households must be positive — a
+    # zero/blank snapshot is never a valid census and usually signals an
     # accidental partial submission. Reject it before it becomes the latest.
-    if (total_population or 0) <= 0 and any(
-        (c or 0) > 0 for c in (pwd_count, elderly_count, children_count)
-    ):
+    # (PWD/elderly/children may legitimately be 0.)
+    if (total_population or 0) <= 0 or (total_households or 0) <= 0:
         return RedirectResponse(
-            url="/bdrrmo/population?error=Total+population+cannot+be+0+when+PWD%2C+elderly%2C+or+children+counts+are+greater+than+0.+Please+enter+the+total+population.",
+            url="/bdrrmo/population?error=Total+population+and+total+households+must+be+greater+than+0.",
             status_code=302,
         )
 

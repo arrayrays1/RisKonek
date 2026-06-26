@@ -74,7 +74,8 @@
                     <i class="bi bi-pencil"></i> Edit Draft
                 </a>
                 <form method="POST" action="/cfau/serviceability/{{ r.id }}/submit"
-                      onsubmit="return confirm('Submit this report for review? You will no longer be able to edit it.')">
+                      data-confirm='Submit this report for review? You will no longer be able to edit it.'>
+            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                     <button type="submit" class="btn btn-rk btn-sm w-100"><i class="bi bi-send"></i> Submit for Review</button>
                 </form>
             </div>

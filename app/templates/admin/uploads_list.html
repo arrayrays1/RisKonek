@@ -93,7 +93,8 @@
                         </a>
                         <form method="POST" action="/admin/uploads/{{ r.id }}/discard"
                               class="d-inline"
-                              onsubmit="return confirm('Discard this unconfirmed draft? This cannot be undone.');">
+                              data-confirm='Discard this unconfirmed draft? This cannot be undone.'>
+            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                             <button type="submit" class="btn btn-outline-danger btn-sm" title="Discard draft">
                                 <i class="bi bi-trash"></i>
                             </button>
@@ -167,7 +168,8 @@
                         </a>
                         <form method="POST" action="/admin/uploads/{{ r.id }}/archive"
                               class="d-inline"
-                              onsubmit="return confirm('Archive this upload? It stays searchable and auditable and can be restored later.');">
+                              data-confirm='Archive this upload? It stays searchable and auditable and can be restored later.'>
+            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                             <button type="submit" class="btn btn-outline-secondary btn-sm" title="Archive">
                                 <i class="bi bi-archive"></i>
                             </button>
@@ -209,7 +211,8 @@
                         {% if r.lifecycle_status.value == 'archived' %}
                         <form method="POST" action="/admin/uploads/{{ r.id }}/restore"
                               class="d-inline"
-                              onsubmit="return confirm('Restore this upload from the archive?');">
+                              data-confirm='Restore this upload from the archive?'>
+            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                             <button type="submit" class="btn btn-outline-success btn-sm" title="Restore">
                                 <i class="bi bi-arrow-counterclockwise"></i> Restore
                             </button>

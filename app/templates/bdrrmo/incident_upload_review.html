@@ -131,7 +131,8 @@
     {% endif %}
 
     <form method="POST" action="/bdrrmo/incidents/upload/{{ report.id }}/submit" class="row g-3"
-          onsubmit="return confirm('Save this incident for your barangay?')">
+          data-confirm='Save this incident for your barangay?'>
+            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
 
         <div class="col-md-4">
             <label class="form-label small fw-semibold">Barangay</label>
@@ -164,13 +165,13 @@
         </div>
         <div class="col-md-4">
             <label class="form-label small fw-semibold">Affected Families</label>
-            <input type="number" name="affected_families" min="0" class="form-control"
-                   value="{{ core.affected_families if core.affected_families is not none else 0 }}">
+            <input type="number" name="affected_families" min="0" class="form-control" required
+                   value="{{ core.affected_families if core.affected_families is not none else '' }}">
         </div>
         <div class="col-md-4">
             <label class="form-label small fw-semibold">Casualties</label>
-            <input type="number" name="casualties" min="0" class="form-control"
-                   value="{{ core.casualties if core.casualties is not none else 0 }}">
+            <input type="number" name="casualties" min="0" class="form-control" required
+                   value="{{ core.casualties if core.casualties is not none else '' }}">
         </div>
         <div class="col-12">
             <label class="form-label small fw-semibold">Description</label>
@@ -209,7 +210,7 @@
                     </div>
                     {% endfor %}
                 </div>
-                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="rkAddEquipmentRow()">
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="rkAddEquipmentBtn">
                     <i class="bi bi-plus"></i> Add another
                 </button>
                 <div class="form-text small">
@@ -230,7 +231,7 @@
     </form>
 </div>
 
-<script>
+<script nonce="{{ request.state.csp_nonce }}">
 // Clone the first equipment row (vanilla JS — no framework).
 function rkAddEquipmentRow() {
     var rows = document.getElementById('equipment-rows');
@@ -242,6 +243,7 @@ function rkAddEquipmentRow() {
     clone.querySelectorAll('select').forEach(function (s) { s.selectedIndex = 0; });
     rows.appendChild(clone);
 }
+document.getElementById('rkAddEquipmentBtn').addEventListener('click', rkAddEquipmentRow);
 // Picking an inventory item autofills the name when it's still blank.
 document.addEventListener('change', function (ev) {
     if (ev.target && ev.target.classList.contains('equipment-select')) {

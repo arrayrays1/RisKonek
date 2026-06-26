@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ request.session.get('csrf_token', '') }}">
     <title>{% block title %}Admin — RisKonek{% endblock %}</title>
-    <script>
+    <script nonce="{{ request.state.csp_nonce }}">
     // Apply the saved sidebar state BEFORE any CSS paints so the
     // collapsed/expanded layout is correct on first frame (no flash).
     // Also add rk-no-anim to suppress transitions on initial render;
@@ -19,8 +20,10 @@
         } catch (e) { /* localStorage unavailable — ignore */ }
     })();
     </script>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"
+          integrity="sha384-9ndCyUaIbzAi2FUVXJi0CjmCapSmO7SnpJef0486qhLnuZ2cdeRhO02iuK6FUUVM" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css"
+          integrity="sha384-tViUnnbYAV00FLIhhi3v/dWt3Jxw4gZQcNoSCxCIFNJVCx7/D55/wXsrNIRANwdD" crossorigin="anonymous">
     <style>
         :root {
             --rk-green: #10b981;
@@ -526,8 +529,33 @@
     {% block content %}{% endblock %}
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz" crossorigin="anonymous"></script>
+<script src="/static/js/rk-forms.js" nonce="{{ request.state.csp_nonce }}"></script>
+<script nonce="{{ request.state.csp_nonce }}">
+// ── CSRF token injection (fallback) ────────────────────────────────
+// Every server-rendered POST form already ships a hidden csrf_token field
+// (so the token is present in the raw HTML for passive scanners and works
+// without JS). This script is a belt-and-suspenders fallback that stamps the
+// token onto any form that lacks it — e.g. forms created dynamically at
+// runtime. Forged cross-site POSTs carry no token and are rejected with 403.
+(function () {
+    var meta = document.querySelector('meta[name="csrf-token"]');
+    var token = meta ? meta.getAttribute('content') : '';
+    if (!token) return;
+    document.querySelectorAll('form').forEach(function (form) {
+        var method = (form.getAttribute('method') || 'get').toLowerCase();
+        if (method === 'get') return;                       // safe method
+        if (form.querySelector('input[name="csrf_token"]')) return;  // already present
+        var input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'csrf_token';
+        input.value = token;
+        form.appendChild(input);
+    });
+})();
+</script>
+<script nonce="{{ request.state.csp_nonce }}">
 // ── Collapsible sidebar (state persisted in localStorage) ──────────
 (function () {
     const html   = document.documentElement;
@@ -559,7 +587,7 @@
     });
 })();
 </script>
-<script>
+<script nonce="{{ request.state.csp_nonce }}">
 // ── Live filtering ────────────────────────────────────────────────
 // Any <form class="js-live-filter"> auto-applies its filters: selects and
 // date inputs submit immediately on change; text inputs submit after a short

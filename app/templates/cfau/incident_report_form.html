@@ -19,6 +19,7 @@
     <form method="POST"
           action="{{ '/cfau/incident-reports/' ~ target.id ~ '/edit' if edit_mode else '/cfau/incident-reports/new' }}"
           class="row g-3">
+            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
 
         <div class="col-12">
             <label class="form-label small fw-semibold">Incident *</label>
@@ -55,8 +56,8 @@
 
         <div class="col-md-2">
             <label class="form-label small fw-semibold">Personnel Deployed</label>
-            <input type="number" name="personnel_count" min="0" class="form-control"
-                   value="{{ target.personnel_count if (target and target.personnel_count is not none) else 0 }}">
+            <input type="number" name="personnel_count" min="0" class="form-control" required
+                   value="{{ target.personnel_count if (target and target.personnel_count is not none) else '' }}">
         </div>
 
         <div class="col-md-4">
@@ -84,7 +85,7 @@
                 <i class="bi bi-save"></i> {{ 'Save Draft' if not edit_mode else 'Save Changes' }}
             </button>
             <button type="submit" name="action" value="submit" class="btn btn-rk"
-                    onclick="return confirm('Submit this report? You will no longer be able to edit it.')">
+                    data-confirm='Submit this report? You will no longer be able to edit it.'>
                 <i class="bi bi-send"></i> Submit
             </button>
         </div>

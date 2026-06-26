@@ -159,7 +159,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
+<script nonce="{{ request.state.csp_nonce }}">
 // Live filtering — vanilla JS, no framework.
 // Dropdowns/dates submit immediately; the text search submits after a short
 // debounce so the page doesn't reload on every keystroke.

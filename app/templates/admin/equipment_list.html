@@ -168,13 +168,15 @@
                             <i class="bi bi-pencil"></i>
                         </a>
                         <form method="POST" action="/admin/equipment/{{ e.id }}/archive" class="d-inline"
-                              onsubmit="return confirm('Archive {{ e.name }}?')">
+                              data-confirm='Archive {{ e.name }}?'>
+            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                             <button type="submit" class="btn btn-outline-warning btn-sm">
                                 <i class="bi bi-archive"></i>
                             </button>
                         </form>
                         {% else %}
                         <form method="POST" action="/admin/equipment/{{ e.id }}/archive" class="d-inline">
+            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                             <button type="submit" class="btn btn-outline-success btn-sm">
                                 <i class="bi bi-arrow-counterclockwise"></i> Restore
                             </button>
@@ -203,6 +205,7 @@
 <div class="modal fade" id="statusModal-{{ e.id }}" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog">
     <form method="POST" action="/admin/equipment/{{ e.id }}/status" class="modal-content">
+            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
       <div class="modal-header">
         <h6 class="modal-title">Change status — {{ e.name }}</h6>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>

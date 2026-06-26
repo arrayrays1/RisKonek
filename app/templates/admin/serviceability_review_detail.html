@@ -79,6 +79,7 @@
             </div>
             {% if can_review %}
             <form method="POST" action="/admin/serviceability/{{ r.id }}/review">
+            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                 <div class="mb-3">
                     <label class="form-label small fw-semibold">Update Status</label>
                     <select name="new_status" class="form-select" required>
@@ -139,7 +140,8 @@
                 <strong>{{ mapped_live_label }}</strong> and record it in the audit trail.
             </p>
             <form method="POST" action="/admin/serviceability/{{ r.id }}/apply-finding"
-                  onsubmit="return confirm('Set the live equipment status to {{ mapped_live_label }}?')">
+                  data-confirm='Set the live equipment status to {{ mapped_live_label }}?'>
+            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                 <button type="submit" class="btn btn-outline-primary btn-sm">
                     <i class="bi bi-arrow-right-circle"></i> Apply Finding to Live Equipment
                 </button>

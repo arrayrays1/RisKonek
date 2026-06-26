@@ -34,13 +34,16 @@
 </div>
 {% else %}
 
-{# Resolve the facility being edited (if any) so the form can pre-fill. #}
-{% set editing = none %}
+{# Resolve the facility being edited (if any) so the form can pre-fill.
+   Use a namespace: a plain {% set %} inside a {% for %} loop does not survive
+   the loop in Jinja2, so the result is copied back to `editing` at top level. #}
+{% set ns = namespace(editing=none) %}
 {% if edit_id %}
     {% for f in facilities %}
-        {% if f.id|string == edit_id %}{% set editing = f %}{% endif %}
+        {% if f.id|string == edit_id %}{% set ns.editing = f %}{% endif %}
     {% endfor %}
 {% endif %}
+{% set editing = ns.editing %}
 
 {% if not show_archived %}
 <!-- ── Add / Edit facility (TR-BDR-03/04) ─────────────────────── -->
@@ -52,6 +55,7 @@
     <form method="POST"
           action="/bdrrmo/facilities{{ '/' ~ editing.id ~ '/edit' if editing else '' }}"
           class="row g-3">
+            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
         <div class="col-md-6">
             <label class="form-label small fw-semibold mb-1">Facility Name</label>
             <input type="text" name="name" maxlength="150" class="form-control form-control-sm"
@@ -152,6 +156,7 @@
                     <td class="px-3 text-end">
                         {% if show_archived %}
                         <form method="POST" action="/bdrrmo/facilities/{{ f.id }}/archive" class="d-inline">
+            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                             <button type="submit" class="btn btn-outline-secondary btn-sm">
                                 <i class="bi bi-arrow-counterclockwise"></i> Restore
                             </button>
@@ -159,9 +164,10 @@
                         {% else %}
                         <form method="POST" action="/bdrrmo/facilities/{{ f.id }}/status"
                               class="d-inline">
+            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                             <div class="input-group input-group-sm d-inline-flex" style="width:auto;vertical-align:middle">
                                 <select name="operational_status" class="form-select form-select-sm"
-                                        onchange="this.form.submit()" style="width:auto">
+                                        data-submit-on-change style="width:auto">
                                     {% for s in facility_statuses %}
                                     <option value="{{ s }}" {{ 'selected' if s == sval else '' }}>{{ status_labels[s] }}</option>
                                     {% endfor %}
@@ -173,7 +179,8 @@
                         </a>
                         <form method="POST" action="/bdrrmo/facilities/{{ f.id }}/archive"
                               class="d-inline"
-                              onsubmit="return confirm('Archive {{ f.name }}? It will be hidden from the active list but kept on record.')">
+                              data-confirm='Archive {{ f.name }}? It will be hidden from the active list but kept on record.'>
+            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                             <button type="submit" class="btn btn-outline-secondary btn-sm" title="Archive">
                                 <i class="bi bi-archive"></i>
                             </button>

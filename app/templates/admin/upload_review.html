@@ -98,14 +98,16 @@
             </a>
             {% if is_confirmed %}
             <form method="POST" action="/admin/uploads/{{ report.id }}/archive"
-                  onsubmit="return confirm('Archive this upload? It stays searchable and auditable and can be restored later.');">
+                  data-confirm='Archive this upload? It stays searchable and auditable and can be restored later.'>
+            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                 <button type="submit" class="btn btn-outline-secondary btn-sm w-100">
                     <i class="bi bi-archive"></i> Archive Upload
                 </button>
             </form>
             {% elif is_archived %}
             <form method="POST" action="/admin/uploads/{{ report.id }}/restore"
-                  onsubmit="return confirm('Restore this upload from the archive?');">
+                  data-confirm='Restore this upload from the archive?'>
+            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                 <button type="submit" class="btn btn-outline-success btn-sm w-100">
                     <i class="bi bi-arrow-counterclockwise"></i> Restore Upload
                 </button>
@@ -170,6 +172,7 @@
 
 <!-- ── Editable structured fields → save draft / confirm ──────────── -->
 <form method="POST" action="/admin/uploads/{{ report.id }}/confirm">
+            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
 <div class="dash-card mb-3">
     <div class="card-title-row">
         <i class="bi bi-pencil-square"></i>
@@ -251,12 +254,12 @@
                        value="{{ f.date_occurred or '' }}"
                        {% if not editable %}readonly{% endif %}>
             </td>
-            <td><input type="number" min="0" name="affected_families" class="form-control form-control-sm"
-                       value="{{ f.affected_families or 0 }}" {% if not editable %}readonly{% endif %}></td>
-            <td><input type="number" min="0" name="affected_individuals" class="form-control form-control-sm"
-                       value="{{ f.affected_individuals or 0 }}" {% if not editable %}readonly{% endif %}></td>
-            <td><input type="number" min="0" name="casualties" class="form-control form-control-sm"
-                       value="{{ f.casualties or 0 }}" {% if not editable %}readonly{% endif %}></td>
+            <td><input type="number" min="0" name="affected_families" class="form-control form-control-sm" required
+                       value="{{ f.affected_families if f.affected_families is not none else '' }}" {% if not editable %}readonly{% endif %}></td>
+            <td><input type="number" min="0" name="affected_individuals" class="form-control form-control-sm" required
+                       value="{{ f.affected_individuals if f.affected_individuals is not none else '' }}" {% if not editable %}readonly{% endif %}></td>
+            <td><input type="number" min="0" name="casualties" class="form-control form-control-sm" required
+                       value="{{ f.casualties if f.casualties is not none else '' }}" {% if not editable %}readonly{% endif %}></td>
             <td>
                 <textarea name="description" rows="2" class="form-control form-control-sm"
                           {% if not editable %}readonly{% endif %}>{{ f.description or '' }}</textarea>
@@ -312,7 +315,8 @@
             </p>
         </div>
         <form method="POST" action="/admin/uploads/{{ report.id }}/discard"
-              onsubmit="return confirm('Discard this unconfirmed upload? This cannot be undone.');">
+              data-confirm='Discard this unconfirmed upload? This cannot be undone.'>
+            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
             <button type="submit" class="btn btn-outline-danger">
                 <i class="bi bi-trash"></i> Discard Unconfirmed Upload
             </button>
