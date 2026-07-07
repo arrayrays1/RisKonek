@@ -187,13 +187,19 @@
                             <i class="bi bi-pencil"></i>
                         </a>
                         <form method="POST" action="/admin/resources/{{ r.id }}/archive" class="d-inline"
+<<<<<<< HEAD
                               onsubmit="event.preventDefault(); rkConfirm('Archive {{ r.name }}?', this)">
+=======
+                              data-confirm='Archive {{ r.name }}?'>
+            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+>>>>>>> aa883f2290374c162e641153acce1e951f979382
                             <button type="submit" class="btn-soft" style="color:#b45309" title="Archive">
                                 <i class="bi bi-archive"></i>
                             </button>
                         </form>
                         {% else %}
                         <form method="POST" action="/admin/resources/{{ r.id }}/archive" class="d-inline">
+            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                             <button type="submit" class="btn-soft" style="color:#047857">
                                 <i class="bi bi-arrow-counterclockwise"></i> Restore
                             </button>
@@ -222,6 +228,7 @@
 <div class="modal fade" id="stockModal-{{ r.id }}" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog">
     <form method="POST" action="/admin/resources/{{ r.id }}/stock" class="modal-content">
+            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
       <div class="modal-header">
         <h6 class="modal-title">Stock change — {{ r.name }}</h6>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>

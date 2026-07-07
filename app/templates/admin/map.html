@@ -3,7 +3,8 @@
 {% block title %}Hazard Reference & Facility Map — RisKonek{% endblock %}
 
 {% block head_extra %}
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous"/>
 <style>
     .map-wrap {
         display: grid;
@@ -264,8 +265,9 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin="anonymous"></script>
+<script nonce="{{ request.state.csp_nonce }}">
 // ── Map initialization ─────────────────────────────────────────────
 const map = L.map('facilityMap').setView([14.356, 121.052], 13);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -301,6 +303,19 @@ function markerIcon(facility) {
     });
 }
 
+// Escape any DB-sourced string before it is interpolated into the popup's
+// innerHTML. Leaflet renders bindPopup() content as HTML, so unescaped
+// facility names / hazard text would otherwise allow stored XSS.
+function esc(v) {
+    if (v === null || v === undefined) return '';
+    return String(v)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 function popupHtml(f) {
     const incidents = [];
     if (f.supports_tropical_cyclone) incidents.push('Tropical Cyclone');
@@ -314,16 +329,16 @@ function popupHtml(f) {
     if (f.is_approximate_location)
         badges.push('<span class="popup-badge approx">Approximate location</span>');
     if (f.status)
-        badges.push(`<span class="popup-badge">${f.status}</span>`);
+        badges.push(`<span class="popup-badge">${esc(f.status)}</span>`);
 
     function row(label, value) {
         if (value === null || value === undefined || value === '') return '';
-        return `<tr><th>${label}</th><td>${value}</td></tr>`;
+        return `<tr><th>${esc(label)}</th><td>${esc(value)}</td></tr>`;
     }
 
     return `
-        <div class="popup-name">${f.name}</div>
-        <div class="popup-sub">${f.barangay || ''} · ${f.facility_type_label || ''}</div>
+        <div class="popup-name">${esc(f.name)}</div>
+        <div class="popup-sub">${esc(f.barangay) || ''} · ${esc(f.facility_type_label) || ''}</div>
         ${badges.length ? `<div class="popup-badges">${badges.join('')}</div>` : ''}
         <table class="popup-table">
             ${row('Floor area',          f.floor_area_sqm ? f.floor_area_sqm + ' sqm' : null)}

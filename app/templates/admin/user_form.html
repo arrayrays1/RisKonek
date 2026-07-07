@@ -33,6 +33,7 @@
 
             <form method="POST"
                   action="{{ '/admin/users/' + target_user.id|string + '/edit' if edit_mode else '/admin/users/create' }}">
+            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
 
                 {% if not edit_mode %}
                 <div class="mb-3">
@@ -80,8 +81,7 @@
                         'bdrrmo': 'BDRRMO / Barangay Focal',
                         'cdrrmo_staff': 'CDRRMO Logistics Staff'
                     } %}
-                    <select name="role" class="form-select" required id="roleSelect"
-                            onchange="toggleBarangayField()">
+                    <select name="role" class="form-select" required id="roleSelect">
                         <option value="">-- Select role --</option>
                         {% for r in roles %}
                         <option value="{{ r }}"
@@ -129,11 +129,15 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
-function toggleBarangayField() {
-    const role = document.getElementById('roleSelect').value;
-    const field = document.getElementById('barangayField');
-    field.style.display = (role === 'bdrrmo') ? 'block' : 'none';
-}
+<script nonce="{{ request.state.csp_nonce }}">
+(function () {
+    var roleSelect = document.getElementById('roleSelect');
+    function toggleBarangayField() {
+        var field = document.getElementById('barangayField');
+        field.style.display = (roleSelect.value === 'bdrrmo') ? 'block' : 'none';
+    }
+    roleSelect.addEventListener('change', toggleBarangayField);
+    toggleBarangayField();  // reflect the initial/selected role on load
+})();
 </script>
 {% endblock %}

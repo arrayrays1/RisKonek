@@ -37,6 +37,7 @@
         <h6>Officials &amp; Emergency Responders</h6>
     </div>
     <form method="POST" action="/bdrrmo/contacts" class="row g-3">
+            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
         <div class="col-md-6">
             <label class="form-label small fw-semibold mb-1">Barangay Captain</label>
             <input type="text" name="captain_name" maxlength="100" class="form-control form-control-sm"

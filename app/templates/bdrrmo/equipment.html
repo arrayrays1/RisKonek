@@ -56,6 +56,7 @@
     <form method="POST"
           action="/bdrrmo/equipment{{ '/' ~ editing.id ~ '/edit' if editing else '' }}"
           class="row g-3">
+            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
         <div class="col-md-5">
             <label class="form-label small fw-semibold mb-1">Name</label>
             <input type="text" name="name" maxlength="150" class="form-control form-control-sm"
@@ -75,8 +76,8 @@
         </div>
         <div class="col-md-2">
             <label class="form-label small fw-semibold mb-1">Quantity</label>
-            <input type="number" name="quantity" min="0" class="form-control form-control-sm"
-                   value="{{ editing.quantity if editing else 1 }}">
+            <input type="number" name="quantity" min="0" class="form-control form-control-sm" required
+                   value="{{ editing.quantity if editing else '' }}">
         </div>
         <div class="col-md-2">
             <label class="form-label small fw-semibold mb-1">Status</label>
@@ -171,15 +172,17 @@
                     <td class="px-3 text-end">
                         {% if show_archived %}
                         <form method="POST" action="/bdrrmo/equipment/{{ e.id }}/archive" class="d-inline">
+            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                             <button type="submit" class="btn btn-outline-secondary btn-sm">
                                 <i class="bi bi-arrow-counterclockwise"></i> Restore
                             </button>
                         </form>
                         {% else %}
                         <form method="POST" action="/bdrrmo/equipment/{{ e.id }}/status" class="d-inline">
+            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                             <div class="input-group input-group-sm d-inline-flex" style="width:auto;vertical-align:middle">
                                 <select name="status" class="form-select form-select-sm"
-                                        onchange="this.form.submit()" style="width:auto">
+                                        data-submit-on-change style="width:auto">
                                     {% for s in equipment_statuses %}
                                     <option value="{{ s }}" {{ 'selected' if s == sval else '' }}>{{ status_labels[s] }}</option>
                                     {% endfor %}
@@ -191,7 +194,8 @@
                         </a>
                         <form method="POST" action="/bdrrmo/equipment/{{ e.id }}/archive"
                               class="d-inline"
-                              onsubmit="return confirm('Archive {{ e.name }}? It will be hidden from the active list but kept on record.')">
+                              data-confirm='Archive {{ e.name }}? It will be hidden from the active list but kept on record.'>
+            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                             <button type="submit" class="btn btn-outline-secondary btn-sm" title="Archive">
                                 <i class="bi bi-archive"></i>
                             </button>

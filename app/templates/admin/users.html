@@ -82,7 +82,12 @@
                         {% if u.id != user.id %}
                         <form method="POST" action="/admin/users/{{ u.id }}/toggle"
                               style="display:inline"
+<<<<<<< HEAD
                               onsubmit="event.preventDefault(); rkConfirm('Are you sure?', this)">
+=======
+                              data-confirm='Are you sure?'>
+            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+>>>>>>> aa883f2290374c162e641153acce1e951f979382
                             <button type="submit"
                                 class="btn btn-sm {{ 'btn-outline-danger' if u.is_active else 'btn-outline-success' }}">
                                 {% if u.is_active %}
