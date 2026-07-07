@@ -38,7 +38,7 @@
         <h6>Submit Disaster / Risk Report</h6>
     </div>
     <form method="POST" action="/bdrrmo/incidents" class="row g-3"
-          onsubmit="return confirm('Submit this incident report for your barangay?')">
+          onsubmit="event.preventDefault(); rkConfirm('Submit this incident report for your barangay?', this)">
         <div class="col-md-4">
             <label class="form-label small fw-semibold mb-1">Disaster Type</label>
             <select name="disaster_type" class="form-select form-select-sm" required>

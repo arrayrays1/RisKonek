@@ -173,7 +173,7 @@
                         </a>
                         <form method="POST" action="/bdrrmo/facilities/{{ f.id }}/archive"
                               class="d-inline"
-                              onsubmit="return confirm('Archive {{ f.name }}? It will be hidden from the active list but kept on record.')">
+                              onsubmit="event.preventDefault(); rkConfirm('Archive {{ f.name }}? It will be hidden from the active list but kept on record.', this)">
                             <button type="submit" class="btn btn-outline-secondary btn-sm" title="Archive">
                                 <i class="bi bi-archive"></i>
                             </button>

@@ -187,7 +187,7 @@
                             <i class="bi bi-pencil"></i>
                         </a>
                         <form method="POST" action="/admin/resources/{{ r.id }}/archive" class="d-inline"
-                              onsubmit="return confirm('Archive {{ r.name }}?')">
+                              onsubmit="event.preventDefault(); rkConfirm('Archive {{ r.name }}?', this)">
                             <button type="submit" class="btn-soft" style="color:#b45309" title="Archive">
                                 <i class="bi bi-archive"></i>
                             </button>

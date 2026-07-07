@@ -139,7 +139,7 @@
                 <strong>{{ mapped_live_label }}</strong> and record it in the audit trail.
             </p>
             <form method="POST" action="/admin/serviceability/{{ r.id }}/apply-finding"
-                  onsubmit="return confirm('Set the live equipment status to {{ mapped_live_label }}?')">
+                  onsubmit="event.preventDefault(); rkConfirm('Set the live equipment status to {{ mapped_live_label }}?', this)">
                 <button type="submit" class="btn btn-outline-primary btn-sm">
                     <i class="bi bi-arrow-right-circle"></i> Apply Finding to Live Equipment
                 </button>

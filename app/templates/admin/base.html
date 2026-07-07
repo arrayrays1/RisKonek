@@ -587,5 +587,123 @@
 })();
 </script>
 {% block scripts %}{% endblock %}
+
+<!-- ── RisKonek Confirm Modal (replaces browser confirm() system-wide) ── -->
+<div id="rkConfirmOverlay" style="
+    display:none; position:fixed; inset:0; z-index:9999;
+    background:rgba(15,23,42,0.45); backdrop-filter:blur(2px);
+    align-items:center; justify-content:center;">
+    <div style="
+        background:white; border-radius:16px; width:100%; max-width:400px;
+        margin:16px; box-shadow:0 8px 32px rgba(15,23,42,0.18);
+        font-family:'Segoe UI',sans-serif; overflow:hidden;">
+        <div id="rkConfirmHeader" style="
+            padding:18px 20px 14px; border-bottom:1px solid #f1f5f9;
+            display:flex; align-items:center; gap:12px;">
+            <div id="rkConfirmIconWrap" style="
+                width:38px; height:38px; border-radius:10px; flex-shrink:0;
+                display:flex; align-items:center; justify-content:center; font-size:18px;">
+            </div>
+            <div>
+                <div style="font-weight:700; font-size:14px; color:#1a1a2e;" id="rkConfirmTitle">Confirm Action</div>
+                <div style="font-size:11px; color:#6c757d; margin-top:1px;">RisKonek &middot; Action requires confirmation</div>
+            </div>
+        </div>
+        <div style="padding:18px 20px;">
+            <p id="rkConfirmMsg" style="margin:0; font-size:13.5px; color:#334155; line-height:1.55;"></p>
+        </div>
+        <div style="padding:0 20px 18px; display:flex; justify-content:flex-end; gap:8px;">
+            <button id="rkConfirmCancel" type="button" style="
+                padding:8px 18px; border-radius:9px; border:1px solid #e2e8f0;
+                background:white; color:#475569; font-size:13px; font-weight:500; cursor:pointer;">
+                Cancel
+            </button>
+            <button id="rkConfirmOk" type="button" style="
+                padding:8px 18px; border-radius:9px; border:none;
+                font-size:13px; font-weight:500; color:white; cursor:pointer;">
+                Confirm
+            </button>
+        </div>
+    </div>
+</div>
+<script>
+(function () {
+    var overlay   = document.getElementById('rkConfirmOverlay');
+    var msgEl     = document.getElementById('rkConfirmMsg');
+    var titleEl   = document.getElementById('rkConfirmTitle');
+    var iconWrap  = document.getElementById('rkConfirmIconWrap');
+    var okBtn     = document.getElementById('rkConfirmOk');
+    var cancelBtn = document.getElementById('rkConfirmCancel');
+    var _resolve  = null;
+
+    var VARIANTS = {
+        danger:  { icon:'&#9888;', iconColor:'#dc2626', iconBg:'#fef2f2', title:'Confirm Action',  okBg:'#dc2626', okLabel:'Confirm' },
+        warning: { icon:'&#9888;', iconColor:'#d97706', iconBg:'#fffbeb', title:'Are you sure?',   okBg:'#d97706', okLabel:'Proceed' },
+        info:    { icon:'&#8505;', iconColor:'#2563eb', iconBg:'#eff6ff', title:'Confirm Action',  okBg:'#2563eb', okLabel:'Confirm' },
+        success: { icon:'&#10003;',iconColor:'#059669', iconBg:'#ecfdf5', title:'Confirm Action',  okBg:'#059669', okLabel:'Confirm' }
+    };
+
+    function applyVariant(v) {
+        var p = VARIANTS[v] || VARIANTS.danger;
+        iconWrap.innerHTML = '<span style="color:'+p.iconColor+';font-size:20px;">'+p.icon+'</span>';
+        iconWrap.style.background = p.iconBg;
+        titleEl.textContent = p.title;
+        okBtn.style.background = p.okBg;
+        okBtn.textContent = p.okLabel;
+    }
+
+    function openModal(msg, variant) {
+        msgEl.textContent = msg;
+        applyVariant(variant || 'danger');
+        overlay.style.display = 'flex';
+        setTimeout(function(){ okBtn.focus(); }, 50);
+        return new Promise(function (res) { _resolve = res; });
+    }
+
+    function closeModal(result) {
+        overlay.style.display = 'none';
+        if (_resolve) { _resolve(result); _resolve = null; }
+    }
+
+    okBtn.addEventListener('click',     function () { closeModal(true);  });
+    cancelBtn.addEventListener('click', function () { closeModal(false); });
+    overlay.addEventListener('mousedown', function (e) {
+        if (e.target === overlay) { e.preventDefault(); closeModal(false); }
+    });
+    document.addEventListener('keydown', function (e) {
+        if (overlay.style.display !== 'none') {
+            if (e.key === 'Enter')  closeModal(true);
+            if (e.key === 'Escape') closeModal(false);
+        }
+    });
+
+    // rkConfirm(message, formElementOrCallback, variant?)
+    // Also accepts a submit button as target — carries its name/value through.
+    window.rkConfirm = function (msg, target, variant) {
+        openModal(msg, variant).then(function (ok) {
+            if (!ok) return;
+            if (typeof target === 'function') {
+                target();
+            } else if (target && target.tagName === 'BUTTON' && target.type === 'submit') {
+                // Submit button — carry its name/value so the server sees it
+                var form = target.closest('form');
+                if (!form) return;
+                form.onsubmit = null;
+                if (target.name) {
+                    var hidden = document.createElement('input');
+                    hidden.type = 'hidden';
+                    hidden.name = target.name;
+                    hidden.value = target.value || '';
+                    form.appendChild(hidden);
+                }
+                form.submit();
+            } else if (target && target.tagName === 'FORM') {
+                target.onsubmit = null;
+                target.submit();
+            }
+        });
+    };
+})();
+</script>
 </body>
 </html>

@@ -82,7 +82,7 @@
                         {% if u.id != user.id %}
                         <form method="POST" action="/admin/users/{{ u.id }}/toggle"
                               style="display:inline"
-                              onsubmit="return confirm('Are you sure?')">
+                              onsubmit="event.preventDefault(); rkConfirm('Are you sure?', this)">
                             <button type="submit"
                                 class="btn btn-sm {{ 'btn-outline-danger' if u.is_active else 'btn-outline-success' }}">
                                 {% if u.is_active %}

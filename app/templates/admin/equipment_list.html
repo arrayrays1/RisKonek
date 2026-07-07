@@ -168,7 +168,7 @@
                             <i class="bi bi-pencil"></i>
                         </a>
                         <form method="POST" action="/admin/equipment/{{ e.id }}/archive" class="d-inline"
-                              onsubmit="return confirm('Archive {{ e.name }}?')">
+                              onsubmit="event.preventDefault(); rkConfirm('Archive {{ e.name }}?', this)">
                             <button type="submit" class="btn btn-outline-warning btn-sm">
                                 <i class="bi bi-archive"></i>
                             </button>

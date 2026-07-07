@@ -93,7 +93,7 @@
                         </a>
                         <form method="POST" action="/admin/uploads/{{ r.id }}/discard"
                               class="d-inline"
-                              onsubmit="return confirm('Discard this unconfirmed draft? This cannot be undone.');">
+                              onsubmit="event.preventDefault(); rkConfirm('Discard this unconfirmed draft? This cannot be undone.', this)">
                             <button type="submit" class="btn btn-outline-danger btn-sm" title="Discard draft">
                                 <i class="bi bi-trash"></i>
                             </button>
@@ -167,7 +167,7 @@
                         </a>
                         <form method="POST" action="/admin/uploads/{{ r.id }}/archive"
                               class="d-inline"
-                              onsubmit="return confirm('Archive this upload? It stays searchable and auditable and can be restored later.');">
+                              onsubmit="event.preventDefault(); rkConfirm('Archive this upload? It stays searchable and auditable and can be restored later.', this)">
                             <button type="submit" class="btn btn-outline-secondary btn-sm" title="Archive">
                                 <i class="bi bi-archive"></i>
                             </button>
@@ -209,7 +209,7 @@
                         {% if r.lifecycle_status.value == 'archived' %}
                         <form method="POST" action="/admin/uploads/{{ r.id }}/restore"
                               class="d-inline"
-                              onsubmit="return confirm('Restore this upload from the archive?');">
+                              onsubmit="event.preventDefault(); rkConfirm('Restore this upload from the archive?', this)">
                             <button type="submit" class="btn btn-outline-success btn-sm" title="Restore">
                                 <i class="bi bi-arrow-counterclockwise"></i> Restore
                             </button>
