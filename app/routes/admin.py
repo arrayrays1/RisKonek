@@ -65,9 +65,11 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
     readiness_score = round((equip_ratio * 0.5) + (resource_ratio * 0.5))
 
     six_months_ago = date.today() - timedelta(days=180)
-    recent_pops = db.query(Population).filter(
+    recent_pops = db.query(
+        func.count(func.distinct(Population.barangay_id))
+    ).filter(
         Population.recorded_at >= six_months_ago
-    ).count()
+    ).scalar() or 0
     data_relevance = round((recent_pops / total_barangays * 100)) if total_barangays > 0 else 0
 
     low_stock = [r for r in resources if r.quantity < r.restock_threshold]
