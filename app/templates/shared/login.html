@@ -112,31 +112,33 @@
             font-size: 13px; color: #6c757d; margin-bottom: 26px;
         }
         .form-label-rk {
-            font-size: 13px; font-weight: 600; margin-bottom: 6px; display: block;
+            font-size: 13px; font-weight: 600; margin-bottom: 6px; display: block; color: #374151;
         }
         .input-group-rk {
-            margin-bottom: 18px;
+            display: flex; align-items: center;
+            border: 1px solid #d1d5db; border-radius: 10px;
+            overflow: hidden; margin-bottom: 18px; background: white;
         }
         .input-group-rk .input-group-text {
-            background: white; border-right: 0; color: #9ca3af;
-            border-radius: 10px 0 0 10px;
+            background: white; border: none; color: #9ca3af;
+            padding: 11px 12px; flex-shrink: 0;
         }
         .input-group-rk .form-control {
-            border-left: 0; border-radius: 0 10px 10px 0; padding: 11px 12px;
+            border: none; outline: none; padding: 11px 4px;
+            font-size: 14px; color: #1a1a2e; flex: 1; background: transparent;
         }
-        .input-group-rk .form-control:focus { box-shadow: none; border-color: #ced4da; }
+        .input-group-rk:focus-within { border-color: #10b981; box-shadow: 0 0 0 3px rgba(16,185,129,0.1); }
         .input-group-rk .toggle-pw {
-            background: white; border-left: 0; color: #9ca3af; cursor: pointer;
+            background: white; border: none; color: #9ca3af; cursor: pointer; padding: 11px 12px;
         }
         .forgot-pw {
-            font-size: 12.5px; color: #9ca3af; text-decoration: none;
-            cursor: default;
+            font-size: 12.5px; color: #9ca3af; text-decoration: none; cursor: default;
         }
         .btn-login {
             background: linear-gradient(135deg, var(--rk-green), var(--rk-green-dark));
-            color: white; border: none; border-radius: 10px;
+            color: white; border: none; border-radius: 10px; width: 100%;
             padding: 12px; font-weight: 600; font-size: 15px;
-            box-shadow: 0 4px 14px rgba(4,120,87,0.3);
+            box-shadow: 0 4px 14px rgba(4,120,87,0.3); cursor: pointer;
         }
         .btn-login:hover { color: white; background: linear-gradient(135deg, var(--rk-green-mid), var(--rk-green-dark)); }
 
@@ -162,38 +164,38 @@
             <div class="subtext">Enter your credentials to access the system</div>
 
             {% if error %}
-            <div class="alert alert-danger alert-dismissible fade show py-2" role="alert" style="font-size:13px">
+            <div class="rk-alert rk-alert-red py-2" role="alert" style="font-size:13px">
                 {{ error }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                <button type="button" class="-close" data-bs-dismiss="alert"></button>
             </div>
             {% endif %}
 
             <form method="POST" action="/login">
                 <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
-                <label class="form-label-rk">Username</label>
-                <div class="input-group input-group-rk">
+                <label class="rk-label-rk">Username</label>
+                <div class="input-group-rk">
                     <span class="input-group-text"><i class="bi bi-person-fill"></i></span>
-                    <input type="text" name="username" class="form-control"
+                    <input type="text" name="username" class="rk-input"
                            placeholder="username" required autofocus autocomplete="username">
                 </div>
 
-                <label class="form-label-rk">Password</label>
-                <div class="input-group input-group-rk">
+                <label class="rk-label-rk">Password</label>
+                <div class="input-group-rk">
                     <span class="input-group-text"><i class="bi bi-lock-fill"></i></span>
-                    <input type="password" name="password" id="pwInput" class="form-control"
+                    <input type="password" name="password" id="pwInput" class="rk-input"
                            placeholder="••••••••" required autocomplete="current-password">
                     <button type="button" class="input-group-text toggle-pw" id="togglePw" tabindex="-1" aria-label="Show password">
                         <i class="bi bi-eye" id="togglePwIcon"></i>
                     </button>
                 </div>
 
-                <div class="d-flex justify-content-end mb-3">
+                <div class="flex justify-end mb-3">
                     <span class="forgot-pw" title="Account recovery isn't available yet — please contact your system administrator.">
                         Forgot your password? Contact your administrator
                     </span>
                 </div>
 
-                <button type="submit" class="btn btn-login w-100">Login</button>
+                <button type="submit" class="btn-login w-full">Login</button>
             </form>
         </div>
     </div>

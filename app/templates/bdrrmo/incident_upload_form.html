@@ -1,61 +1,117 @@
 {% extends "admin/base.html" %}
-
 {% block title %}Upload Incident Report — RisKonek{% endblock %}
-
 {% set active_nav = 'bdrrmo_incidents' %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-start page-header">
+<div class="flex justify-between items-start mb-5">
     <div>
         <h1>Upload Incident Report</h1>
-        <p>Upload an externally prepared document (PDF, XLSX, XLS, CSV) for
-           {% if barangay %}Barangay {{ barangay.name }}{% else %}your barangay{% endif %}.
-           The raw file is stored unchanged and its contents are extracted as a
-           reference — you'll then review and verify the core incident details before saving.</p>
+        <p>Upload an externally prepared document for
+           {% if barangay %}Barangay <strong>{{ barangay.name }}</strong>{% else %}your barangay{% endif %}.
+           The file is stored and extracted — you'll review and verify the incident details before saving.</p>
     </div>
-    <a href="/bdrrmo/incidents" class="btn btn-outline-secondary">
+    <a href="/bdrrmo/incidents" class="rk-btn-secondary rk-btn-sm">
         <i class="bi bi-arrow-left"></i> Back
     </a>
 </div>
 
 {% if error %}
-<div class="alert alert-danger">
-    <i class="bi bi-exclamation-triangle-fill me-1"></i> {{ error }}
+<div class="flex items-center gap-2 mb-3 p-3"
+     style="background:#fef2f2;border:1px solid #fecaca;border-radius:10px;color:#991b1b;font-size:13px;">
+    <i class="bi bi-exclamation-triangle-fill" style="flex-shrink:0;"></i>
+    <span>{{ error }}</span>
 </div>
 {% endif %}
 
-<div class="dash-card" style="max-width: 720px;">
-    <form method="POST" action="/bdrrmo/incidents/upload" enctype="multipart/form-data">
-            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
-        <div class="mb-3">
-            <label class="form-label fw-semibold">Report file</label>
-            <input type="file" name="file" class="form-control"
-                   accept=".pdf,.xlsx,.xls,.csv" required>
-            <div class="form-text">Supported: PDF, XLSX, XLS, CSV.</div>
-        </div>
+<!-- Guideline banner -->
+<div class="rk-alert rk-alert-amber mb-3">
+    <i class="bi bi-info-circle-fill"></i>
+    <span><strong>What happens after upload:</strong>
+    The raw file is saved and its text/tables are extracted.
+    You then review the extracted incident details, correct anything if needed, and save — a new incident is created or an existing one is reused automatically.</span>
+</div>
 
-        <div class="alert alert-secondary py-2 small mb-3">
-            <strong>What happens next:</strong>
-            <ol class="mb-0 ps-3">
-                <li>The raw file is saved and its text/tables are extracted.</li>
-                <li>You review the extracted core incident details.</li>
-                <li>If a matching incident already exists it is reused; otherwise a new
-                    one is created — all within your own barangay.</li>
-            </ol>
+<div class="rk-card" style="max-width:680px;">
+    <div class="rk-section-head mb-3">
+        <i class="bi bi-cloud-upload" style="color:var(--rk-green)"></i>
+        <h6>Select Report File</h6>
+    </div>
+
+    <form method="POST" action="/bdrrmo/incidents/upload" enctype="multipart/form-data" id="uploadForm">
+        <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+
+        <!-- Drop zone -->
+        <div id="dropZone" style="
+            border: 2px dashed #d1d5db; border-radius: 12px;
+            padding: 36px 24px; text-align: center;
+            background: #f9fafb; cursor: pointer;
+            transition: border-color 0.2s, background 0.2s;"
+            onclick="document.getElementById('fileInput').click()"
+            ondragover="event.preventDefault(); this.style.borderColor='var(--rk-green)'; this.style.background='#f0fdf4';"
+            ondragleave="this.style.borderColor='#d1d5db'; this.style.background='#f9fafb';"
+            ondrop="handleDrop(event)">
+            <i class="bi bi-file-earmark-arrow-up" style="font-size:32px;color:var(--rk-green);display:block;margin-bottom:8px;"></i>
+            <div style="font-weight:600;font-size:14px;color:#374151;">Drag &amp; drop your file here</div>
+            <div style="font-size:12px;color:#6b7280;margin-top:4px;">or click to browse</div>
+            <div id="fileLabel" style="margin-top:10px;font-size:12px;color:var(--rk-green);font-weight:600;display:none;"></div>
+        </div>
+        <input type="file" id="fileInput" name="file"
+               accept=".pdf,.xlsx,.xls,.csv" required style="display:none"
+               onchange="showFile(this)">
+        <div class="rk-field-hint mt-2">
+            <i class="bi bi-paperclip mr-1"></i>Accepted formats: <strong>PDF, XLSX, XLS, CSV</strong>
         </div>
 
         {% if not ai_available %}
-        <div class="alert alert-light border py-2 small mb-3">
-            <i class="bi bi-robot me-1"></i> AI summary unavailable — upload continues normally without it.
+        <div class="flex items-center gap-2 mt-3 p-2"
+             style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;font-size:12px;color:#64748b;">
+            <i class="bi bi-robot"></i>
+            AI summary unavailable — upload continues normally without it.
         </div>
         {% endif %}
 
-        <div class="d-flex gap-2">
-            <button type="submit" class="btn btn-rk">
+        <div class="flex justify-end gap-2 mt-4">
+            <a href="/bdrrmo/incidents" class="rk-btn-secondary">Cancel</a>
+            <button type="submit" class="rk-btn-primary" id="uploadBtn">
                 <i class="bi bi-cloud-upload"></i> Upload &amp; Extract
             </button>
-            <a href="/bdrrmo/incidents" class="btn btn-outline-secondary">Cancel</a>
         </div>
     </form>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function showFile(input) {
+    var label = document.getElementById('fileLabel');
+    var zone  = document.getElementById('dropZone');
+    if (input.files && input.files[0]) {
+        label.textContent = '✓ ' + input.files[0].name;
+        label.style.display = 'block';
+        zone.style.borderColor = 'var(--rk-green)';
+        zone.style.background  = '#f0fdf4';
+    }
+}
+function handleDrop(e) {
+    e.preventDefault();
+    var zone = document.getElementById('dropZone');
+    zone.style.borderColor = '#d1d5db';
+    zone.style.background  = '#f9fafb';
+    var files = e.dataTransfer.files;
+    if (files && files[0]) {
+        var input = document.getElementById('fileInput');
+        // Transfer dropped file to the real input
+        var dt = new DataTransfer();
+        dt.items.add(files[0]);
+        input.files = dt.files;
+        showFile(input);
+    }
+}
+// Show loading state on submit
+document.getElementById('uploadForm').addEventListener('submit', function () {
+    var btn = document.getElementById('uploadBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm mr-1"></span> Uploading…';
+});
+</script>
 {% endblock %}

@@ -5,91 +5,87 @@
 {% set active_nav = 'incident_reports' %}
 
 {% block content %}
-<div class="page-header">
+<div class="mb-5">
     <h1>{{ 'Edit Post-Incident Report' if edit_mode else 'New Post-Incident Report' }}</h1>
     <p>Document operations after a disaster response. The disaster type, date, and barangay
        come from the linked incident record — select it below.</p>
 </div>
 
 {% if error %}
-<div class="alert alert-danger">{{ error }}</div>
+<div class="rk-alert rk-alert-red">{{ error }}</div>
 {% endif %}
 
-<div class="dash-card">
+<div class="rk-card">
     <form method="POST"
           action="{{ '/cfau/incident-reports/' ~ target.id ~ '/edit' if edit_mode else '/cfau/incident-reports/new' }}"
-          class="row g-3">
+          class="grid grid-cols-12 gap-3">
             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
 
-        <div class="col-12">
-            <label class="form-label small fw-semibold">Incident *</label>
-            <select name="incident_id" required class="form-select">
+        <div class="col-span-12">
+            <label class="rk-label">Incident *</label>
+            <select name="incident_id" required class="rk-select">
                 <option value="">— Select the disaster incident this report covers —</option>
                 {% for iid, label in incidents %}
                 <option value="{{ iid }}"
                     {% if target and target.incident_id == iid %}selected{% endif %}>{{ label }}</option>
                 {% endfor %}
             </select>
-            <div class="form-text small">
+            <div class="rk-field-hint">
                 No matching incident? It must be recorded in the Incident module first —
                 this avoids creating duplicate disaster records.
             </div>
         </div>
 
-        <div class="col-12">
-            <label class="form-label small fw-semibold">Operations Summary</label>
-            <textarea name="operations_summary" rows="3" class="form-control"
+        <div class="col-span-12">
+            <label class="rk-label">Operations Summary</label>
+            <textarea name="operations_summary" rows="3" class="rk-input"
                       placeholder="Overview of the response operation…">{{ target.operations_summary if target else '' }}</textarea>
         </div>
 
-        <div class="col-12">
-            <label class="form-label small fw-semibold">Actions Taken</label>
-            <textarea name="actions_taken" rows="3" class="form-control"
+        <div class="col-span-12">
+            <label class="rk-label">Actions Taken</label>
+            <textarea name="actions_taken" rows="3" class="rk-input"
                       placeholder="Concrete actions carried out during the response…">{{ target.actions_taken if target else '' }}</textarea>
         </div>
 
-        <div class="col-md-6">
-            <label class="form-label small fw-semibold">Equipment Used</label>
-            <textarea name="equipment_used" rows="2" class="form-control"
+        <div class="col-span-6">
+            <label class="rk-label">Equipment Used</label>
+            <textarea name="equipment_used" rows="2" class="rk-input"
                       placeholder="e.g. Rescue Truck 02, 2 rescue boats, generators…">{{ target.equipment_used if target else '' }}</textarea>
         </div>
 
-        <div class="col-md-2">
-            <label class="form-label small fw-semibold">Personnel Deployed</label>
-            <input type="number" name="personnel_count" min="0" class="form-control" required
+        <div class="col-span-2">
+            <label class="rk-label">Personnel Deployed</label>
+            <input type="number" name="personnel_count" min="0" class="rk-input" required
                    value="{{ target.personnel_count if (target and target.personnel_count is not none) else '' }}">
         </div>
 
-        <div class="col-md-4">
-            <label class="form-label small fw-semibold">Personnel Notes</label>
-            <input type="text" name="personnel_notes" class="form-control"
+        <div class="col-span-4">
+            <label class="rk-label">Personnel Notes</label>
+            <input type="text" name="personnel_notes" class="rk-input"
                    value="{{ target.personnel_notes if target else '' }}"
                    placeholder="e.g. 2 medics, 1 driver, volunteers">
         </div>
 
-        <div class="col-12">
-            <label class="form-label small fw-semibold">Challenges Encountered</label>
-            <textarea name="challenges_encountered" rows="3" class="form-control"
+        <div class="col-span-12">
+            <label class="rk-label">Challenges Encountered</label>
+            <textarea name="challenges_encountered" rows="3" class="rk-input"
                       placeholder="Obstacles, field risks, resource gaps…">{{ target.challenges_encountered if target else '' }}</textarea>
         </div>
 
-        <div class="col-12">
-            <label class="form-label small fw-semibold">Recommendations</label>
-            <textarea name="recommendations" rows="3" class="form-control"
+        <div class="col-span-12">
+            <label class="rk-label">Recommendations</label>
+            <textarea name="recommendations" rows="3" class="rk-input"
                       placeholder="Suggested improvements for future responses…">{{ target.recommendations if target else '' }}</textarea>
         </div>
 
-        <div class="col-12 d-flex justify-content-end gap-2 pt-2">
-            <a href="/cfau/incident-reports" class="btn btn-outline-secondary">Cancel</a>
-            <button type="submit" name="action" value="draft" class="btn btn-outline-primary">
+        <div class="col-span-12 flex justify-end gap-2 pt-2">
+            <a href="/cfau/incident-reports" class="rk-btn-secondary">Cancel</a>
+            <button type="submit" name="action" value="draft" class="rk-btn-secondary">
                 <i class="bi bi-save"></i> {{ 'Save Draft' if not edit_mode else 'Save Changes' }}
             </button>
-            <button type="submit" name="action" value="submit" class="btn btn-rk"
-<<<<<<< HEAD
+            <button type="submit" name="action" value="submit" class="rk-btn-primary"
                     onclick="event.preventDefault(); rkConfirm('Submit this report? You will no longer be able to edit it.', this)">
-=======
-                    data-confirm='Submit this report? You will no longer be able to edit it.'>
->>>>>>> aa883f2290374c162e641153acce1e951f979382
                 <i class="bi bi-send"></i> Submit
             </button>
         </div>

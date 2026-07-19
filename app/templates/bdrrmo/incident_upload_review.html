@@ -1,89 +1,101 @@
 {% extends "admin/base.html" %}
-
 {% block title %}Review Uploaded Incident — RisKonek{% endblock %}
-
 {% set active_nav = 'bdrrmo_incidents' %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-start page-header">
+<div class="flex justify-between items-start mb-5">
     <div>
         <h1>Review Uploaded Incident</h1>
-        <p>Preview from <strong>{{ report.file_name }}</strong>. Use the extracted content
-           below as reference, then verify the core incident details and save. The incident
-           is recorded against
-           {% if barangay %}Barangay {{ barangay.name }}{% else %}your barangay{% endif %}.</p>
+        <p>Extracted from <strong>{{ report.file_name }}</strong> —
+           verify the details below and save to record this incident for
+           {% if barangay %}Barangay <strong>{{ barangay.name }}</strong>{% else %}your barangay{% endif %}.</p>
     </div>
-    <a href="/bdrrmo/incidents" class="btn btn-outline-secondary">
+    <a href="/bdrrmo/incidents" class="rk-btn-secondary rk-btn-sm">
         <i class="bi bi-arrow-left"></i> Back
     </a>
 </div>
 
 {% if error %}
-<div class="alert alert-danger alert-dismissible fade show">
-    <i class="bi bi-exclamation-triangle-fill me-1"></i>{{ error | replace('+', ' ') }}
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+<div class="flex items-center gap-2 mb-3 p-3"
+     style="background:#fef2f2;border:1px solid #fecaca;border-radius:10px;color:#991b1b;font-size:13px;">
+    <i class="bi bi-exclamation-triangle-fill" style="flex-shrink:0;"></i>
+    <span>{{ error | replace('+', ' ') }}</span>
 </div>
 {% endif %}
 
 {% if extraction_error %}
-<div class="alert alert-warning">
-    <strong>Extraction failed:</strong> {{ extraction_error }}<br>
-    The file was stored, but no content could be extracted. You can still complete the details manually below.
+<div class="flex items-center gap-2 mb-3 p-3"
+     style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;color:#92400e;font-size:13px;">
+    <i class="bi bi-exclamation-circle-fill" style="flex-shrink:0;"></i>
+    <span><strong>Extraction failed:</strong> {{ extraction_error }} — the file was stored but no content could be extracted. Fill the details manually below.</span>
 </div>
 {% endif %}
 
-<!-- ── Upload Metadata ─────────────────────────────────────────────── -->
-<div class="dash-card mb-3">
-    <div class="row g-3">
-        <div class="col-md-3">
-            <div class="text-muted small">File</div>
-            <div class="fw-semibold">{{ report.file_name }}</div>
-            <div class="small"><span class="badge bg-light text-dark border">{{ report.file_type.value | upper }}</span></div>
+<!-- ── File Metadata ──────────────────────────────────────────────── -->
+<div class="rk-card mb-3">
+    <div class="rk-section-head">
+        <i class="bi bi-paperclip" style="color:var(--rk-green)"></i>
+        <h6>Uploaded File</h6>
+    </div>
+    <div class="grid grid-cols-12 gap-3 mt-1">
+        <div class="col-span-3">
+            <div class="text-sm" style="color:var(--rk-muted)">File name</div>
+            <div class="font-semibold" style="font-size:13px;">{{ report.file_name }}</div>
+            <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate" style="background:#f1f5f9;color:#475569;font-size:11px;">
+                {{ report.file_type.value | upper }}
+            </span>
         </div>
-        <div class="col-md-3">
-            <div class="text-muted small">Uploaded</div>
-            <div>{{ report.uploaded_at | pht }}</div>
-            <div class="small text-muted">by {{ report.uploaded_by_user.username if report.uploaded_by_user else '—' }}</div>
+        <div class="col-span-3">
+            <div class="text-sm" style="color:var(--rk-muted)">Uploaded</div>
+            <div style="font-size:13px;">{{ report.uploaded_at | pht }}</div>
+            <div class="text-sm" style="color:var(--rk-muted)">by {{ report.uploaded_by_user.username if report.uploaded_by_user else '—' }}</div>
         </div>
-        <div class="col-md-3">
-            <div class="text-muted small">Barangay</div>
-            <div class="fw-semibold">{{ barangay.name if barangay else '—' }}</div>
-            <div class="small text-muted">locked to your account</div>
+        <div class="col-span-3">
+            <div class="text-sm" style="color:var(--rk-muted)">Barangay</div>
+            <div class="font-semibold" style="font-size:13px;">{{ barangay.name if barangay else '—' }}</div>
+            <div class="text-sm" style="color:var(--rk-muted)">locked to your account</div>
         </div>
-        <div class="col-md-3 d-flex flex-column gap-2">
-            <a href="/bdrrmo/incidents/upload/{{ report.id }}/file" class="btn btn-outline-secondary btn-sm">
+        <div class="col-span-3 flex items-end">
+            <a href="/bdrrmo/incidents/upload/{{ report.id }}/file"
+               class="rk-btn-secondary rk-btn-sm w-full">
                 <i class="bi bi-download"></i> View Original File
             </a>
         </div>
     </div>
 </div>
 
-<!-- ── AI summary ──────────────────────────────────────────────────── -->
-<div class="dash-card mb-3">
-    <div class="card-title-row">
-        <i class="bi bi-robot"></i>
+<!-- ── AI Summary ─────────────────────────────────────────────────── -->
+<div class="rk-card mb-3">
+    <div class="rk-section-head">
+        <i class="bi bi-robot" style="color:#7c3aed"></i>
         <h6>AI Summary</h6>
     </div>
     {% if ai_summary %}
-        <p class="mb-0" style="white-space:pre-line">{{ ai_summary }}</p>
+        <p class="mb-0 mt-2" style="white-space:pre-line;font-size:13px;color:var(--rk-text)">{{ ai_summary }}</p>
     {% elif not ai_available %}
-        <p class="text-muted mb-0 small">AI summary unavailable (GROQ_API_KEY not configured).</p>
+        <div class="flex items-center gap-2 mt-2"
+             style="font-size:12px;color:var(--rk-muted)">
+            <i class="bi bi-slash-circle"></i> AI summary unavailable (GROQ_API_KEY not configured).
+        </div>
     {% else %}
-        <p class="text-muted mb-0 small">No AI summary generated for this file.</p>
+        <div class="flex items-center gap-2 mt-2"
+             style="font-size:12px;color:var(--rk-muted)">
+            <i class="bi bi-dash-circle"></i> No AI summary generated for this file.
+        </div>
     {% endif %}
 </div>
 
-<!-- ── Extracted preview ───────────────────────────────────────────── -->
-<div class="dash-card mb-3">
-    <div class="card-title-row">
-        <i class="bi bi-file-text"></i>
+<!-- ── Extracted Preview ──────────────────────────────────────────── -->
+<div class="rk-card mb-3">
+    <div class="rk-section-head">
+        <i class="bi bi-file-text" style="color:#2563eb"></i>
         <h6>Extracted Preview</h6>
     </div>
     {% if columns_preview and rows_preview %}
-        <div class="table-responsive" style="max-height: 380px; overflow:auto;">
-            <table class="table table-sm table-bordered mb-0" style="font-size:12px">
-                <thead style="background:#f9fafb;position:sticky;top:0">
-                    <tr>{% for c in columns_preview %}<th>{{ c }}</th>{% endfor %}</tr>
+        <div class="overflow-x-auto mt-2" style="max-height:320px;overflow:auto;border-radius:8px;border:1px solid #e5e7eb;">
+            <table class="rk-table mb-0" style="font-size:12px;">
+                <thead style="background:#f9fafb;position:sticky;top:0;">
+                    <tr>{% for c in columns_preview %}<th class="text-slate-500 font-semibold">{{ c }}</th>{% endfor %}</tr>
                 </thead>
                 <tbody>
                     {% for row in rows_preview %}
@@ -96,164 +108,206 @@
                 </tbody>
             </table>
         </div>
-        <div class="form-text">Showing first {{ rows_preview | length }} rows — the details below have been pre-filled from this content; review and correct before saving.</div>
+        <div class="rk-field-hint mt-1">Showing first {{ rows_preview | length }} rows — details below have been pre-filled; review before saving.</div>
     {% elif raw_text_preview %}
-        <pre style="white-space:pre-wrap;font-size:12px;max-height:380px;overflow:auto;background:#f9fafb;padding:10px;border-radius:6px">{{ raw_text_preview }}</pre>
-        <div class="form-text">The details below have been pre-filled from this content; review and correct before saving.</div>
+        <pre class="mt-2" style="white-space:pre-wrap;font-size:12px;max-height:320px;overflow:auto;
+             background:#f9fafb;padding:12px;border-radius:8px;border:1px solid #e5e7eb;color:#374151;">{{ raw_text_preview }}</pre>
+        <div class="rk-field-hint">Details below have been pre-filled from this content; review before saving.</div>
     {% else %}
-        <p class="text-muted mb-0 small">No preview available.</p>
+        <div class="flex items-center gap-2 mt-2" style="font-size:12px;color:var(--rk-muted)">
+            <i class="bi bi-dash-circle"></i> No preview available.
+        </div>
     {% endif %}
 </div>
 
-<!-- ── Core Incident Details (resolve-or-create source) ────────────── -->
-<div class="dash-card mb-3">
-    <div class="card-title-row">
-        <i class="bi bi-clipboard-data"></i>
+<!-- ── Core Incident Details ──────────────────────────────────────── -->
+<div class="rk-card mb-3">
+    <div class="rk-section-head">
+        <i class="bi bi-clipboard-data" style="color:#d97706"></i>
         <h6>Core Incident Details — Verify &amp; Save</h6>
     </div>
 
     {% if matched_incident %}
-    <div class="alert alert-success py-2 px-3 small">
-        <i class="bi bi-check-circle-fill me-1"></i>
-        A matching incident already exists for this barangay, disaster type and date
+    <div class="flex items-start gap-2 mt-2 p-3"
+         style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;font-size:13px;color:#166534;">
+        <i class="bi bi-check-circle-fill mt-1" style="flex-shrink:0;"></i>
+        <span>A matching incident already exists for this barangay, disaster type and date
         (<strong>#{{ matched_incident.id }}</strong> —
         {{ matched_incident.disaster_type.value.replace('_', ' ').title() }},
         {{ matched_incident.date_occurred.strftime('%b %d, %Y') if matched_incident.date_occurred else '—' }}).
-        Saving will <strong>reuse</strong> it — the existing record is never overwritten,
-        and no duplicate is created.
+        Saving will <strong>reuse</strong> it — the existing record is never overwritten and no duplicate is created.</span>
     </div>
     {% else %}
-    <div class="alert alert-info py-2 px-3 small">
-        <i class="bi bi-info-circle-fill me-1"></i>
-        No matching incident found. A new incident will be created from the details
-        below when you save — review them carefully.
+    <div class="flex items-start gap-2 mt-2 p-3"
+         style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;font-size:13px;color:#1e40af;">
+        <i class="bi bi-info-circle-fill mt-1" style="flex-shrink:0;"></i>
+        <span>No matching incident found. A <strong>new incident</strong> will be created from the details below — review carefully before saving.</span>
     </div>
     {% endif %}
 
-    <form method="POST" action="/bdrrmo/incidents/upload/{{ report.id }}/submit" class="row g-3"
-          data-confirm='Save this incident for your barangay?'>
-            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+    <form method="POST" action="/bdrrmo/incidents/upload/{{ report.id }}/submit"
+          class="grid grid-cols-12 gap-3 mt-2" id="reviewForm" novalidate>
+        <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
 
-        <div class="col-md-4">
-            <label class="form-label small fw-semibold">Barangay</label>
-            <input type="text" class="form-control" value="{{ barangay.name if barangay else '' }}" disabled>
-            <div class="form-text small">Locked to your barangay.</div>
+        <div class="col-span-4">
+            <label class="rk-label">Barangay</label>
+            <input type="text" class="rk-input" value="{{ barangay.name if barangay else '' }}" disabled>
+            <div class="rk-field-hint">Locked to your barangay.</div>
         </div>
-        <div class="col-md-4">
-            <label class="form-label small fw-semibold">Disaster Type</label>
-            <select name="disaster_type" class="form-select">
+        <div class="col-span-4">
+            <label class="rk-label">Disaster Type</label>
+            <select name="disaster_type" class="rk-select">
                 {% for dt in disaster_types %}
-                <option value="{{ dt }}"
-                    {% if core.disaster_type == dt %}selected{% endif %}>{{ dt | replace('_', ' ') | title }}</option>
+                <option value="{{ dt }}" {% if core.disaster_type == dt %}selected{% endif %}>
+                    {{ dt | replace('_', ' ') | title }}
+                </option>
                 {% endfor %}
             </select>
         </div>
-        <div class="col-md-4">
-            <label class="form-label small fw-semibold">Date Occurred</label>
-            <input type="date" name="date_occurred" class="form-control"
+        <div class="col-span-4">
+            <label class="rk-label">Date Occurred <span class="text-red-600">*</span></label>
+            <input type="date" name="date_occurred" class="rk-input"
                    value="{{ core.date_occurred }}" required>
         </div>
 
-        <div class="col-md-4">
-            <label class="form-label small fw-semibold">Severity</label>
-            <select name="severity" class="form-select">
+        <div class="col-span-4">
+            <label class="rk-label">Severity</label>
+            <select name="severity" class="rk-select">
                 {% for s in severities %}
                 <option value="{{ s }}"
-                    {% if (core.severity and core.severity == s) or (not core.severity and s == 'moderate') %}selected{% endif %}>{{ s | title }}</option>
+                    {% if (core.severity and core.severity == s) or (not core.severity and s == 'moderate') %}selected{% endif %}>
+                    {{ s | title }}
+                </option>
                 {% endfor %}
             </select>
         </div>
-        <div class="col-md-4">
-            <label class="form-label small fw-semibold">Affected Families</label>
-            <input type="number" name="affected_families" min="0" class="form-control" required
+        <div class="col-span-4">
+            <label class="rk-label">Affected Families <span class="text-red-600">*</span></label>
+            <input type="number" name="affected_families" min="0" class="rk-input" required
                    value="{{ core.affected_families if core.affected_families is not none else '' }}">
         </div>
-        <div class="col-md-4">
-            <label class="form-label small fw-semibold">Casualties</label>
-            <input type="number" name="casualties" min="0" class="form-control" required
+        <div class="col-span-4">
+            <label class="rk-label">Casualties <span class="text-red-600">*</span></label>
+            <input type="number" name="casualties" min="0" class="rk-input" required
                    value="{{ core.casualties if core.casualties is not none else '' }}">
         </div>
-        <div class="col-12">
-            <label class="form-label small fw-semibold">Description</label>
-            <textarea name="description" rows="2" class="form-control"
+        <div class="col-span-12">
+            <label class="rk-label">Description</label>
+            <textarea name="description" rows="3" class="rk-input"
                       placeholder="What happened, areas affected, response taken…">{{ core.description if core.description else '' }}</textarea>
         </div>
 
-        <!-- ── Equipment & Vehicles Used (contribution, not the incident) ── -->
-        <div class="col-12">
-            <div class="border rounded p-3" style="background:#f9fafb">
-                <div class="text-muted small fw-semibold mb-2">
-                    <i class="bi bi-truck me-1"></i>Equipment &amp; Vehicles Used
-                    <span class="fw-normal">— optional; recorded against this contribution, never the canonical incident</span>
+        <!-- Equipment & Vehicles -->
+        <div class="col-span-12">
+            <div class="p-3" style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;">
+                <div class="rk-section-head mb-2">
+                    <i class="bi bi-truck" style="color:var(--rk-muted)"></i>
+                    <h6 style="font-size:12px;color:var(--rk-muted);">Equipment &amp; Vehicles Used
+                        <span class="font-normal">— optional</span>
+                    </h6>
                 </div>
                 <div id="equipment-rows">
                     {% for _ in range(2) %}
-                    <div class="row g-2 align-items-end mb-2 equipment-row">
-                        <div class="col-md-5">
-                            <label class="form-label small mb-1">From inventory <span class="text-muted">(optional)</span></label>
-                            <select name="equipment_id" class="form-select form-select-sm equipment-select">
-                                <option value="">— Not in inventory / free-text —</option>
+                    <div class="grid grid-cols-12 gap-2 items-end mb-2 equipment-grid grid-cols-12 gap-4">
+                        <div class="col-span-5">
+                            <label class="rk-label text-sm mb-1">From inventory <span class="text-slate-500">(optional)</span></label>
+                            <select name="equipment_id" class="rk-select text-xs py-1.5 equipment-select">
+                                <option value="">— Not in inventory —</option>
                                 {% for e in equipment_options %}
-                                <option value="{{ e.id }}" data-name="{{ e.name }}">{{ e.name }} ({{ e.equipment_type.value.replace('_', ' ').title() }})</option>
+                                <option value="{{ e.id }}" data-name="{{ e.name }}">
+                                    {{ e.name }} ({{ e.equipment_type.value.replace('_', ' ').title() }})
+                                </option>
                                 {% endfor %}
                             </select>
                         </div>
-                        <div class="col-md-5">
-                            <label class="form-label small mb-1">Name</label>
-                            <input type="text" name="equipment_name" class="form-control form-control-sm equipment-name"
-                                   placeholder="e.g. Rescue Boat, Patrol Vehicle, borrowed generator">
+                        <div class="col-span-5">
+                            <label class="rk-label text-sm mb-1">Name</label>
+                            <input type="text" name="equipment_name" class="rk-input text-xs py-1.5 equipment-name"
+                                   placeholder="e.g. Rescue Boat, Patrol Vehicle…">
                         </div>
-                        <div class="col-md-2">
-                            <label class="form-label small mb-1">Qty</label>
-                            <input type="number" name="equipment_quantity" min="1" value="1" class="form-control form-control-sm">
+                        <div class="col-span-2">
+                            <label class="rk-label text-sm mb-1">Qty</label>
+                            <input type="number" name="equipment_quantity" min="1" value="1"
+                                   class="rk-input text-xs py-1.5">
                         </div>
                     </div>
                     {% endfor %}
                 </div>
-                <button type="button" class="btn btn-outline-secondary btn-sm" id="rkAddEquipmentBtn">
+                <button type="button" class="rk-btn-secondary rk-btn-sm" id="rkAddEquipmentBtn">
                     <i class="bi bi-plus"></i> Add another
                 </button>
-                <div class="form-text small">
-                    Leave blank if none. Pick an inventory item or type any equipment used —
-                    including borrowed, mutual-aid, or city assets not in your inventory.
-                    Empty rows are ignored on save.
-                </div>
+                <div class="rk-field-hint mt-1">Leave blank if none. Empty rows are ignored on save.</div>
             </div>
         </div>
 
-        <div class="col-12 d-flex justify-content-end gap-2 pt-2">
-            <a href="/bdrrmo/incidents" class="btn btn-outline-secondary">Cancel</a>
-            <button type="submit" class="btn btn-rk">
+        <!-- Validation banner -->
+        <div class="col-span-12" id="validationBanner" style="display:none;">
+            <div class="flex items-center gap-2 p-3"
+                 style="background:#fef2f2;border:1px solid #fecaca;border-radius:10px;color:#991b1b;font-size:13px;">
+                <i class="bi bi-exclamation-triangle-fill" style="flex-shrink:0;"></i>
+                <span id="validationMsg"></span>
+            </div>
+        </div>
+
+        <div class="col-span-12 flex justify-end gap-2 pt-2">
+            <a href="/bdrrmo/incidents" class="rk-btn-secondary">Cancel</a>
+            <button type="button" class="rk-btn-primary" onclick="handleSave()">
                 <i class="bi bi-save"></i>
                 {% if matched_incident %}Reuse Existing Incident{% else %}Create Incident{% endif %}
             </button>
         </div>
     </form>
 </div>
+{% endblock %}
 
+{% block scripts %}
 <script nonce="{{ request.state.csp_nonce }}">
-// Clone the first equipment row (vanilla JS — no framework).
-function rkAddEquipmentRow() {
-    var rows = document.getElementById('equipment-rows');
+// ── Equipment row management ───────────────────────────────────────
+document.getElementById('rkAddEquipmentBtn').addEventListener('click', function () {
+    var rows  = document.getElementById('equipment-rows');
     var first = rows.querySelector('.equipment-row');
     var clone = first.cloneNode(true);
-    clone.querySelectorAll('input').forEach(function (i) {
-        i.value = (i.type === 'number') ? '1' : '';
-    });
+    clone.querySelectorAll('input').forEach(function (i) { i.value = i.type === 'number' ? '1' : ''; });
     clone.querySelectorAll('select').forEach(function (s) { s.selectedIndex = 0; });
     rows.appendChild(clone);
-}
-document.getElementById('rkAddEquipmentBtn').addEventListener('click', rkAddEquipmentRow);
-// Picking an inventory item autofills the name when it's still blank.
+});
 document.addEventListener('change', function (ev) {
     if (ev.target && ev.target.classList.contains('equipment-select')) {
-        var row = ev.target.closest('.equipment-row');
-        var nameInput = row.querySelector('.equipment-name');
-        var opt = ev.target.options[ev.target.selectedIndex];
-        if (opt && opt.value && nameInput && !nameInput.value.trim()) {
-            nameInput.value = opt.getAttribute('data-name') || '';
-        }
+        var row  = ev.target.closest('.equipment-row');
+        var name = row.querySelector('.equipment-name');
+        var opt  = ev.target.options[ev.target.selectedIndex];
+        if (opt && opt.value && name && !name.value.trim())
+            name.value = opt.getAttribute('data-name') || '';
     }
+});
+
+// ── Validation + confirm before save ──────────────────────────────
+function handleSave() {
+    var errors = [];
+    ['date_occurred','affected_families','casualties'].forEach(function (n) {
+        var el = document.querySelector('[name="' + n + '"]');
+        if (el && !el.value.trim()) {
+            el.classList.add('is-invalid');
+            errors.push(el.closest('.col-md-4, .col-12').querySelector('label').textContent.replace('*','').trim());
+        }
+    });
+    if (errors.length) {
+        var banner = document.getElementById('validationBanner');
+        document.getElementById('validationMsg').textContent = 'Please fill in: ' + errors.join(', ') + '.';
+        banner.style.display = 'block';
+        banner.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+    }
+    document.getElementById('validationBanner').style.display = 'none';
+    rkConfirm(
+        'Save this incident report for your barangay?',
+        function () { document.getElementById('reviewForm').submit(); },
+        'warning'
+    );
+}
+// Clear invalid on input
+document.getElementById('reviewForm').addEventListener('input', function (e) {
+    if (e.target.classList.contains('is-invalid')) e.target.classList.remove('is-invalid');
 });
 </script>
 {% endblock %}

@@ -5,35 +5,35 @@
 {% set active_nav = 'cfau_dashboard' %}
 
 {% block content %}
-<div class="page-header">
+<div class="mb-5">
     <h1>CFAU / Operations Dashboard</h1>
     <p>Welcome, {{ user.username }}. Manage equipment serviceability and post-incident operational reporting here.</p>
 </div>
 
-<div class="row g-3 mb-3">
+<div class="grid grid-cols-12 gap-3 mb-3">
     <!-- ── Serviceability Reports module ──────────────────────────── -->
-    <div class="col-md-6">
-        <div class="dash-card h-100">
-            <div class="card-title-row">
+    <div class="col-span-6">
+        <div class="rk-card h-full">
+            <div class="rk-section-head">
                 <i class="bi bi-clipboard2-check" style="color:var(--rk-green);font-size:18px"></i>
                 <h6>Equipment Serviceability Reports</h6>
             </div>
-            <p class="text-muted small mb-3">
+            <p class="text-slate-500 text-sm mb-3">
                 File inspection, maintenance, and serviceability findings for equipment.
                 Save as draft, then submit for admin review. Every action is audited.
             </p>
-            <div class="d-flex flex-wrap gap-3 mb-3">
-                <div><div class="stat-label">Total</div><div class="fw-bold fs-5">{{ svc_total }}</div></div>
-                <div><div class="stat-label">Drafts</div><div class="fw-bold fs-5">{{ svc_draft }}</div></div>
-                <div><div class="stat-label">Submitted</div><div class="fw-bold fs-5">{{ svc_submitted }}</div></div>
-                <div><div class="stat-label">Reviewed</div><div class="fw-bold fs-5">{{ svc_reviewed }}</div></div>
-                <div><div class="stat-label">Resolved</div><div class="fw-bold fs-5">{{ svc_resolved }}</div></div>
+            <div class="flex flex-wrap gap-3 mb-3">
+                <div><div class="rk-stat-label">Total</div><div class="font-bold fs-5">{{ svc_total }}</div></div>
+                <div><div class="rk-stat-label">Drafts</div><div class="font-bold fs-5">{{ svc_draft }}</div></div>
+                <div><div class="rk-stat-label">Submitted</div><div class="font-bold fs-5">{{ svc_submitted }}</div></div>
+                <div><div class="rk-stat-label">Reviewed</div><div class="font-bold fs-5">{{ svc_reviewed }}</div></div>
+                <div><div class="rk-stat-label">Resolved</div><div class="font-bold fs-5">{{ svc_resolved }}</div></div>
             </div>
-            <div class="d-flex gap-2">
-                <a href="/cfau/serviceability" class="btn btn-rk">
+            <div class="flex gap-2">
+                <a href="/cfau/serviceability" class="rk-btn-primary">
                     <i class="bi bi-list-ul"></i> View Reports
                 </a>
-                <a href="/cfau/serviceability/new" class="btn btn-outline-secondary">
+                <a href="/cfau/serviceability/new" class="rk-btn-secondary">
                     <i class="bi bi-plus-lg"></i> New Report
                 </a>
             </div>
@@ -41,27 +41,27 @@
     </div>
 
     <!-- ── Post-Incident Reports module ───────────────────────────── -->
-    <div class="col-md-6">
-        <div class="dash-card h-100">
-            <div class="card-title-row">
+    <div class="col-span-6">
+        <div class="rk-card h-full">
+            <div class="rk-section-head">
                 <i class="bi bi-journal-text" style="color:var(--rk-green);font-size:18px"></i>
                 <h6>Post-Incident Reports</h6>
             </div>
-            <p class="text-muted small mb-3">
+            <p class="text-slate-500 text-sm mb-3">
                 Document operations after a disaster response: summary, actions taken,
                 equipment and personnel deployed, challenges, and recommendations — linked
                 to an existing incident record.
             </p>
-            <div class="d-flex flex-wrap gap-3 mb-3">
-                <div><div class="stat-label">Total</div><div class="fw-bold fs-5">{{ inc_total }}</div></div>
-                <div><div class="stat-label">Drafts</div><div class="fw-bold fs-5">{{ inc_draft }}</div></div>
-                <div><div class="stat-label">Submitted</div><div class="fw-bold fs-5">{{ inc_submitted }}</div></div>
+            <div class="flex flex-wrap gap-3 mb-3">
+                <div><div class="rk-stat-label">Total</div><div class="font-bold fs-5">{{ inc_total }}</div></div>
+                <div><div class="rk-stat-label">Drafts</div><div class="font-bold fs-5">{{ inc_draft }}</div></div>
+                <div><div class="rk-stat-label">Submitted</div><div class="font-bold fs-5">{{ inc_submitted }}</div></div>
             </div>
-            <div class="d-flex gap-2">
-                <a href="/cfau/incident-reports" class="btn btn-rk">
+            <div class="flex gap-2">
+                <a href="/cfau/incident-reports" class="rk-btn-primary">
                     <i class="bi bi-list-ul"></i> View Reports
                 </a>
-                <a href="/cfau/incident-reports/new" class="btn btn-outline-secondary">
+                <a href="/cfau/incident-reports/new" class="rk-btn-secondary">
                     <i class="bi bi-plus-lg"></i> New Report
                 </a>
             </div>
@@ -69,16 +69,16 @@
     </div>
 </div>
 
-<div class="dash-card">
-    <div class="card-title-row">
+<div class="rk-card">
+    <div class="rk-section-head">
         <i class="bi bi-wrench-adjustable" style="color:var(--rk-green);font-size:18px"></i>
         <h6>Vehicle &amp; Equipment Monitoring</h6>
     </div>
-    <p class="text-muted small mb-3">
+    <p class="text-slate-500 text-sm mb-3">
         You also share the live equipment monitoring module with CDRRMO Logistics Staff —
         change unit status (Available, Deployed, Under Repair, Unserviceable) and view the fleet.
     </p>
-    <a href="/admin/equipment" class="btn btn-outline-secondary">
+    <a href="/admin/equipment" class="rk-btn-secondary">
         <i class="bi bi-list-ul"></i> Open Equipment Monitoring
     </a>
 </div>

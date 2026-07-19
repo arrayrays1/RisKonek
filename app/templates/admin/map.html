@@ -129,25 +129,25 @@
 {% set active_nav = 'map' %}
 
 {% block content %}
-<div class="page-header d-flex justify-content-between align-items-end">
+<div class="mb-5 flex justify-between items-end">
     <div>
-        <h1><i class="bi bi-map-fill me-2"></i>Hazard Reference &amp; Facility Map</h1>
+        <h1><i class="bi bi-map-fill mr-2"></i>Hazard Reference &amp; Facility Map</h1>
         <p>Critical facilities of San Pedro, Laguna — sourced from the CDRRMO master list.</p>
     </div>
-    <div class="last-updated">San Pedro, Laguna</div>
+    <div class="text-xs text-slate-500 text-right">San Pedro, Laguna</div>
 </div>
 
-<div class="stat-row">
+<div class="stat-grid grid-cols-12 gap-4">
     <div class="stat-pill">
-        <i class="bi bi-building text-success"></i>
+        <i class="bi bi-building text-emerald-700"></i>
         <span>Total facilities: <span id="statTotal" class="stat-pill-value">—</span></span>
     </div>
     <div class="stat-pill">
-        <i class="bi bi-funnel-fill text-success"></i>
+        <i class="bi bi-funnel-fill text-emerald-700"></i>
         <span>Visible: <span id="statVisible" class="stat-pill-value">—</span></span>
     </div>
     <div class="stat-pill">
-        <i class="bi bi-exclamation-triangle-fill text-warning"></i>
+        <i class="bi bi-exclamation-triangle-fill text-amber-600"></i>
         <span>Approximate location: <span id="statApprox" class="stat-pill-value">—</span></span>
     </div>
 </div>
@@ -157,13 +157,13 @@
     <aside class="filter-panel">
         <div class="filter-section">
             <h6>Search</h6>
-            <input type="search" id="filterSearch" class="form-control form-control-sm"
+            <input type="search" id="filterSearch" class="rk-input text-xs py-1.5"
                    placeholder="Facility name…">
         </div>
 
         <div class="filter-section">
             <h6>Barangay</h6>
-            <select id="filterBarangay" class="form-select form-select-sm">
+            <select id="filterBarangay" class="rk-select text-xs py-1.5">
                 <option value="">All barangays</option>
                 {% for b in barangays %}
                 <option value="{{ b.name }}">{{ b.name }}</option>
@@ -222,11 +222,11 @@
                        id="inc-fr" value="fire">
                 <label class="form-check-label" for="inc-fr">Fire</label>
             </div>
-            <small class="text-muted">Unchecked = no incident restriction.</small>
+            <small class="text-slate-500">Unchecked = no incident restriction.</small>
         </div>
 
-        <button type="button" id="resetFilters" class="btn-soft w-100 mt-2 justify-content-center">
-            <i class="bi bi-arrow-counterclockwise me-1"></i>Reset filters
+        <button type="button" id="resetFilters" class="rk-btn-ghost w-full mt-2 justify-center">
+            <i class="bi bi-arrow-counterclockwise mr-1"></i>Reset filters
         </button>
     </aside>
 
@@ -235,27 +235,27 @@
         <div id="facilityMap"></div>
         <div class="map-overlay">
             <div class="legend-title">Legend</div>
-            <div class="legend-row">
+            <div class="legend-grid grid-cols-12 gap-4">
                 <span class="legend-dot" style="background:#047857"></span>
                 <span>Evacuation Center</span>
             </div>
-            <div class="legend-row">
+            <div class="legend-grid grid-cols-12 gap-4">
                 <span class="legend-dot" style="background:#2980b9"></span>
                 <span>School</span>
             </div>
-            <div class="legend-row">
+            <div class="legend-grid grid-cols-12 gap-4">
                 <span class="legend-dot" style="background:#c0392b"></span>
                 <span>Hospital</span>
             </div>
-            <div class="legend-row">
+            <div class="legend-grid grid-cols-12 gap-4">
                 <span class="legend-dot" style="background:#8e44ad"></span>
                 <span>Health Clinic</span>
             </div>
-            <div class="legend-row">
+            <div class="legend-grid grid-cols-12 gap-4">
                 <span class="legend-dot" style="background:#d35400"></span>
                 <span>Staging Area</span>
             </div>
-            <div class="legend-row mt-2" style="border-top:1px solid #eee; padding-top:6px;">
+            <div class="legend-grid grid-cols-12 gap-4 mt-2" style="border-top:1px solid #eee; padding-top:6px;">
                 <span class="legend-dot" style="background:#f1c40f"></span>
                 <span>Approximate location (fallback)</span>
             </div>
@@ -325,11 +325,11 @@ function popupHtml(f) {
 
     const badges = [];
     if (f.is_city_level)
-        badges.push('<span class="popup-badge city">City-level</span>');
+        badges.push('<span class="popup-rk-badge rk-badge-slate city">City-level</span>');
     if (f.is_approximate_location)
-        badges.push('<span class="popup-badge approx">Approximate location</span>');
+        badges.push('<span class="popup-rk-badge rk-badge-slate approx">Approximate location</span>');
     if (f.status)
-        badges.push(`<span class="popup-badge">${esc(f.status)}</span>`);
+        badges.push(`<span class="popup-rk-badge rk-badge-slate">${esc(f.status)}</span>`);
 
     function row(label, value) {
         if (value === null || value === undefined || value === '') return '';
@@ -340,7 +340,7 @@ function popupHtml(f) {
         <div class="popup-name">${esc(f.name)}</div>
         <div class="popup-sub">${esc(f.barangay) || ''} · ${esc(f.facility_type_label) || ''}</div>
         ${badges.length ? `<div class="popup-badges">${badges.join('')}</div>` : ''}
-        <table class="popup-table">
+        <table class="popup-rk-table">
             ${row('Floor area',          f.floor_area_sqm ? f.floor_area_sqm + ' sqm' : null)}
             ${row('Capacity (families)', f.capacity_families)}
             ${row('Capacity (indiv.)',   f.capacity_individuals)}

@@ -31,55 +31,55 @@
 {% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-start page-header">
+<div class="flex justify-between items-start mb-5">
     <div>
         <h1>Audit Trail</h1>
         <p>Append-only history for <strong>{{ report.file_name }}</strong> (ID #{{ report.id }}).
         Every lifecycle change and field edit is recorded and never altered.</p>
     </div>
-    <a href="/admin/uploads/{{ report.id }}/review" class="btn btn-outline-secondary">
+    <a href="/admin/uploads/{{ report.id }}/review" class="rk-btn-secondary">
         <i class="bi bi-arrow-left"></i> Back to Review
     </a>
 </div>
 
-<div class="dash-card mb-3">
-    <div class="row g-3">
-        <div class="col-md-4">
-            <div class="text-muted small">File</div>
-            <div class="fw-semibold">{{ report.file_name }}</div>
-            <span class="badge bg-light text-dark border">{{ report.file_type.value | upper }}</span>
+<div class="rk-card mb-3">
+    <div class="grid grid-cols-12 gap-3">
+        <div class="col-span-4">
+            <div class="text-slate-500 text-sm">File</div>
+            <div class="font-semibold">{{ report.file_name }}</div>
+            <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate">{{ report.file_type.value | upper }}</span>
         </div>
-        <div class="col-md-4">
-            <div class="text-muted small">Lifecycle</div>
-            {% if lifecycle_status == 'draft' %}<span class="status-pill status-maintenance">Draft</span>
-            {% elif lifecycle_status == 'confirmed' %}<span class="status-pill status-operational">Confirmed</span>
-            {% elif lifecycle_status == 'archived' %}<span class="badge bg-secondary"><i class="bi bi-archive me-1"></i>Archived</span>
-            {% elif lifecycle_status == 'discarded' %}<span class="status-pill status-unavailable">Discarded</span>
+        <div class="col-span-4">
+            <div class="text-slate-500 text-sm">Lifecycle</div>
+            {% if lifecycle_status == 'draft' %}<span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-amber">Draft</span>
+            {% elif lifecycle_status == 'confirmed' %}<span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-green">Confirmed</span>
+            {% elif lifecycle_status == 'archived' %}<span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate"><i class="bi bi-archive mr-1"></i>Archived</span>
+            {% elif lifecycle_status == 'discarded' %}<span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-red">Discarded</span>
             {% endif %}
         </div>
-        <div class="col-md-4">
-            <div class="text-muted small">Total events</div>
-            <div class="fw-semibold">{{ events | length }}</div>
+        <div class="col-span-4">
+            <div class="text-slate-500 text-sm">Total events</div>
+            <div class="font-semibold">{{ events | length }}</div>
         </div>
     </div>
 </div>
 
 {% if produced_incident_report %}
 <!-- ── Round-trip traceability (Week 8.1 post-incident linkage) ───── -->
-<div class="dash-card mb-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+<div class="rk-card mb-3 flex justify-between items-center flex-wrap gap-2">
     <div>
-        <div class="card-title-row mb-1">
+        <div class="rk-section-head mb-1">
             <i class="bi bi-journal-text" style="color:var(--rk-green)"></i>
             <h6 class="mb-0">Produced Post-Incident Report</h6>
         </div>
-        <p class="small text-muted mb-0">
+        <p class="text-sm text-slate-500 mb-0">
             This upload was converted into Post-Incident Report
             <strong>#{{ produced_incident_report.id }}</strong>, managed in the
             Post-Incident Reports module. This screen remains the ETL / data
             lakehouse record for the uploaded file.
         </p>
     </div>
-    <a href="/admin/incident-reports/{{ produced_incident_report.id }}" class="btn btn-rk btn-sm">
+    <a href="/admin/incident-reports/{{ produced_incident_report.id }}" class="rk-btn-primary rk-btn-sm">
         <i class="bi bi-box-arrow-up-right"></i> Open Report #{{ produced_incident_report.id }}
     </a>
 </div>
@@ -87,17 +87,17 @@
 
 <!-- ── Originally extracted snapshot (for traceability) ───────────── -->
 {% if original_fields %}
-<div class="dash-card mb-3">
-    <div class="card-title-row">
+<div class="rk-card mb-3">
+    <div class="rk-section-head">
         <i class="bi bi-file-earmark-text"></i>
         <h6>Originally Extracted Values</h6>
     </div>
-    <p class="small text-muted">
+    <p class="text-sm text-slate-500">
         The as-extracted rows, preserved before the first manual edit. Compare against the
         current values to distinguish <strong>extracted</strong> data from <strong>manual corrections</strong>.
     </p>
-    <div class="table-responsive">
-        <table class="table table-sm table-bordered mb-0" style="font-size:12px">
+    <div class="overflow-x-auto">
+        <table class="rk-table mb-0" style="font-size:12px">
             <thead style="background:#f9fafb">
                 <tr>{% for k in field_keys %}<th>{{ k | replace('_', ' ') | title }}</th>{% endfor %}</tr>
             </thead>
@@ -111,13 +111,13 @@
 </div>
 {% endif %}
 
-<div class="dash-card">
-    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
-        <span class="small">
-            <span class="badge" style="background:#b7950b">Edit</span>
-            <span class="badge" style="background:#1a6b47">Confirm / Restore</span>
-            <span class="badge bg-secondary">Archive</span>
-            <span class="badge" style="background:#c0392b">Discard</span>
+<div class="rk-card">
+    <div class="flex justify-between items-center flex-wrap gap-2 mb-2">
+        <span class="text-sm">
+            <span class="rk-badge rk-badge-slate" style="background:#b7950b">Edit</span>
+            <span class="rk-badge rk-badge-slate" style="background:#1a6b47">Confirm / Restore</span>
+            <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate">Archive</span>
+            <span class="rk-badge rk-badge-slate" style="background:#c0392b">Discard</span>
         </span>
     </div>
     {% if events %}
@@ -134,7 +134,7 @@
         {% else %}{% set icon = 'bi-dot' %}{% set bg = '#6c757d' %}{% endif %}
         <div class="tl-item">
             <span class="tl-dot" style="background:{{ bg }}"><i class="bi {{ icon }}"></i></span>
-            <div class="d-flex justify-content-between align-items-start">
+            <div class="flex justify-between items-start">
                 <div class="tl-title">
                     {% if et == 'edited' %}
                         Edited &mdash; {{ e.field_changed }}
@@ -144,33 +144,33 @@
                 </div>
                 <div class="tl-time">{{ e.timestamp | pht }}</div>
             </div>
-            <div class="text-muted small mb-1">
+            <div class="text-slate-500 text-sm mb-1">
                 by {{ e.user.username if e.user else 'system' }}
             </div>
 
             {% if et == 'edited' %}
-            <div class="row g-2 mt-1">
-                <div class="col-md-6">
+            <div class="grid grid-cols-12 gap-2 mt-1">
+                <div class="col-span-6">
                     <div class="diff-label mb-1">Before</div>
                     <div class="diff-box diff-old">{{ e.old_value if e.old_value else '(empty)' }}</div>
                 </div>
-                <div class="col-md-6">
+                <div class="col-span-6">
                     <div class="diff-label mb-1">After</div>
                     <div class="diff-box diff-new">{{ e.new_value if e.new_value else '(empty)' }}</div>
                 </div>
             </div>
             {% if e.reason %}
-            <div class="small text-muted mt-1"><i class="bi bi-chat-left-text me-1"></i>Reason: {{ e.reason }}</div>
+            <div class="text-sm text-slate-500 mt-1"><i class="bi bi-chat-left-text mr-1"></i>Reason: {{ e.reason }}</div>
             {% endif %}
             {% elif e.new_value %}
-            <div class="small">{{ e.new_value }}</div>
+            <div class="text-sm">{{ e.new_value }}</div>
             {% endif %}
         </div>
         {% endfor %}
     </div>
     {% else %}
-    <p class="text-muted mb-0 text-center py-4">
-        <i class="bi bi-clock-history fs-3 d-block mb-2"></i>
+    <p class="text-slate-500 mb-0 text-center py-4">
+        <i class="bi bi-clock-history fs-3 block mb-2"></i>
         No history recorded for this upload yet.
     </p>
     {% endif %}

@@ -15,73 +15,73 @@
         'Vehicle & Equipment': 'background:#e2e8f0;color:#334155',
         'System Actions': 'background:#f3f4f6;color:#6b7280'
     } %}
-    <span class="status-pill" style="{{ m.get(cat, 'background:#f3f4f6;color:#6b7280') }}">{{ cat }}</span>
+    <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate" style="{{ m.get(cat, 'background:#f3f4f6;color:#6b7280') }}">{{ cat }}</span>
 {%- endmacro %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-start page-header">
+<div class="flex justify-between items-start mb-5">
     <div>
         <h1>Audit Trail</h1>
         <p>System-wide record of all logged actions. {{ total }} matching entr{{ 'y' if total == 1 else 'ies' }}.</p>
     </div>
-    <button class="btn btn-rk" disabled title="Export coming soon">
+    <button class="rk-btn-primary" disabled title="Export coming soon">
         <i class="bi bi-download"></i> Export Logs
     </button>
 </div>
 
 {% if focus_user %}
-<div class="alert alert-info d-flex justify-content-between align-items-center">
-    <span><i class="bi bi-person-badge me-1"></i>
+<div class="rk-alert rk-alert-blue flex justify-between items-center">
+    <span><i class="bi bi-person-rk-badge rk-badge-slate mr-1"></i>
         Showing the audit trail for <strong>{{ focus_user.username }}</strong>.</span>
-    <a href="/admin/audit" class="btn-soft">View all users</a>
+    <a href="/admin/audit" class="rk-btn-ghost">View all users</a>
 </div>
 {% endif %}
 
 <!-- ── Filter bar (auto-applies — no submit button needed) ────────── -->
-<div class="dash-card mb-3">
-    <form method="GET" action="/admin/audit" id="auditFilterForm" class="row g-2 align-items-end">
-        <div class="col-md-6">
-            <label class="form-label small fw-semibold mb-1">Search</label>
-            <input type="text" name="q" value="{{ f_q }}" class="form-control form-control-sm"
+<div class="rk-card mb-3">
+    <form method="GET" action="/admin/audit" id="auditFilterForm" class="grid grid-cols-12 gap-2 items-end">
+        <div class="col-span-6">
+            <label class="rk-label mb-1">Search</label>
+            <input type="text" name="q" value="{{ f_q }}" class="rk-input text-xs py-1.5"
                    placeholder="Search description or username…" autocomplete="off">
         </div>
-        <div class="col-md-3">
-            <label class="form-label small fw-semibold mb-1">User</label>
-            <select name="user_id" class="form-select form-select-sm">
+        <div class="col-span-3">
+            <label class="rk-label mb-1">User</label>
+            <select name="user_id" class="rk-select text-xs py-1.5">
                 <option value="">All users</option>
                 {% for u in users %}
                 <option value="{{ u.id }}" {% if f_user_id|string == u.id|string %}selected{% endif %}>{{ u.username }}</option>
                 {% endfor %}
             </select>
         </div>
-        <div class="col-md-3">
-            <label class="form-label small fw-semibold mb-1">Category / Module</label>
-            <select name="category" class="form-select form-select-sm">
+        <div class="col-span-3">
+            <label class="rk-label mb-1">Category / Module</label>
+            <select name="category" class="rk-select text-xs py-1.5">
                 <option value="">All categories</option>
                 {% for c in categories %}
                 <option value="{{ c }}" {% if f_category == c %}selected{% endif %}>{{ c }}</option>
                 {% endfor %}
             </select>
         </div>
-        <div class="col-md-3">
-            <label class="form-label small fw-semibold mb-1">Action</label>
-            <select name="action" class="form-select form-select-sm">
+        <div class="col-span-3">
+            <label class="rk-label mb-1">Action</label>
+            <select name="action" class="rk-select text-xs py-1.5">
                 <option value="">All actions</option>
                 {% for a in actions %}
                 <option value="{{ a }}" {% if f_action == a %}selected{% endif %}>{{ a }}</option>
                 {% endfor %}
             </select>
         </div>
-        <div class="col-md-3">
-            <label class="form-label small fw-semibold mb-1">From</label>
-            <input type="date" name="date_from" value="{{ f_date_from }}" class="form-control form-control-sm">
+        <div class="col-span-3">
+            <label class="rk-label mb-1">From</label>
+            <input type="date" name="date_from" value="{{ f_date_from }}" class="rk-input text-xs py-1.5">
         </div>
-        <div class="col-md-3">
-            <label class="form-label small fw-semibold mb-1">To</label>
-            <input type="date" name="date_to" value="{{ f_date_to }}" class="form-control form-control-sm">
+        <div class="col-span-3">
+            <label class="rk-label mb-1">To</label>
+            <input type="date" name="date_to" value="{{ f_date_to }}" class="rk-input text-xs py-1.5">
         </div>
-        <div class="col-md-3 d-flex align-items-end">
-            <a href="/admin/audit" class="btn-soft w-100 justify-content-center">
+        <div class="col-span-3 flex items-end">
+            <a href="/admin/audit" class="rk-btn-ghost w-full justify-center">
                 <i class="bi bi-x-circle"></i> Reset
             </a>
         </div>
@@ -89,9 +89,9 @@
 </div>
 
 <!-- ── Results ────────────────────────────────────────────────────── -->
-<div class="dash-card p-0">
-    <div class="table-responsive">
-        <table class="table table-hover mb-0 align-middle">
+<div class="rk-card p-0">
+    <div class="overflow-x-auto">
+        <table class="rk-table mb-0 align-middle">
             <thead style="background:#f9fafb">
                 <tr style="font-size:12px;color:var(--rk-muted);text-transform:uppercase;letter-spacing:0.04em">
                     <th class="px-3 py-3">Time</th>
@@ -100,30 +100,30 @@
                     <th class="py-3">Action</th>
                     <th class="py-3">Entity</th>
                     <th class="py-3">Description</th>
-                    <th class="py-3 text-end px-3">Detail</th>
+                    <th class="py-3 text-right px-3">Detail</th>
                 </tr>
             </thead>
             <tbody>
                 {% for day_label, items in grouped %}
-                <tr><td colspan="7" class="bg-light text-muted small fw-semibold px-3 py-2">
-                    <i class="bi bi-calendar3 me-1"></i>{{ day_label }}
+                <tr><td colspan="7" class="bg-slate-50 text-slate-500 text-sm font-semibold px-3 py-2">
+                    <i class="bi bi-calendar3 mr-1"></i>{{ day_label }}
                 </td></tr>
                 {% for it in items %}
                 <tr style="font-size:13px">
                     <td class="px-3 text-nowrap">{{ it.timestamp | pht }}</td>
                     <td>{{ it.username }}</td>
                     <td>{{ category_badge(it.category) }}</td>
-                    <td><span class="badge bg-light text-dark border">{{ it.action }}</span></td>
-                    <td class="small text-muted">
+                    <td><span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate">{{ it.action }}</span></td>
+                    <td class="text-sm text-slate-500">
                         {{ it.target_table or '—' }}{% if it.target_id %} #{{ it.target_id }}{% endif %}
                     </td>
-                    <td class="small" style="max-width:340px">
-                        <span class="d-inline-block text-truncate" style="max-width:340px" title="{{ it.description }}">
+                    <td class="text-sm" style="max-width:340px">
+                        <span class="inline-block truncate" style="max-width:340px" title="{{ it.description }}">
                             {{ it.description or '—' }}
                         </span>
                     </td>
-                    <td class="text-end px-3">
-                        <a href="/admin/audit/{{ it.id }}" class="btn-soft" title="View detail">
+                    <td class="text-right px-3">
+                        <a href="/admin/audit/{{ it.id }}" class="rk-btn-ghost" title="View detail">
                             <i class="bi bi-eye"></i>
                         </a>
                     </td>
@@ -131,8 +131,8 @@
                 {% endfor %}
                 {% else %}
                 <tr>
-                    <td colspan="7" class="text-center text-muted py-5">
-                        <i class="bi bi-search fs-3 d-block mb-2"></i>
+                    <td colspan="7" class="text-center text-slate-500 py-5">
+                        <i class="bi bi-search fs-3 block mb-2"></i>
                         No audit entries match your filters.
                     </td>
                 </tr>
@@ -144,8 +144,8 @@
 
 <!-- ── Pagination ─────────────────────────────────────────────────── -->
 {% if total_pages > 1 %}
-<nav class="mt-3 d-flex justify-content-between align-items-center">
-    <span class="text-muted small">Page {{ page }} of {{ total_pages }}</span>
+<nav class="mt-3 flex justify-between items-center">
+    <span class="text-slate-500 text-sm">Page {{ page }} of {{ total_pages }}</span>
     <ul class="pagination pagination-sm mb-0">
         <li class="page-item {{ 'disabled' if page <= 1 else '' }}">
             <a class="page-link" href="/admin/audit?{{ base_query }}{% if base_query %}&{% endif %}page={{ page - 1 }}">Previous</a>
