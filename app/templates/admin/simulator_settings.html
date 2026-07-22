@@ -1,0 +1,176 @@
+{% extends "admin/base.html" %}
+{% set active_nav = 'simulator' %}
+{% block title %}Planning Thresholds — RisKonek{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-start flex-wrap gap-2">
+    <div>
+        <h1><i class="bi bi-sliders me-2"></i>Planning Thresholds</h1>
+        <p>The simulator computes gaps against these values.</p>
+    </div>
+    <a href="/admin/simulator/setup" class="btn btn-soft">
+        <i class="bi bi-arrow-left"></i> Back to Simulator
+    </a>
+</div>
+
+{% if success %}
+<div class="alert alert-success py-2"><i class="bi bi-check-circle-fill me-1"></i>{{ success }}</div>
+{% endif %}
+{% if error %}
+<div class="alert alert-danger py-2"><i class="bi bi-exclamation-triangle-fill me-1"></i>{{ error }}</div>
+{% endif %}
+
+<form method="post" action="/admin/simulator/settings">
+    <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+
+    {# ── Cited Standards (floored) ─────────────────────────────────────── #}
+    <div class="dash-card mb-3">
+        <div class="card-title-row">
+            <h6><i class="bi bi-award me-1"></i>Cited Standards</h6>
+        </div>
+        <p class="text-muted" style="font-size: 12px;">
+            Published-standard minimums. Editable upward only — never below the floor.
+        </p>
+        {% for f in sections.floored %}
+        <div class="row align-items-center mb-3">
+            <div class="col-md-5">
+                <label class="fw-semibold" for="{{ f.key }}">{{ f.label }}</label>
+                {% if f.source_label %}
+                <span class="badge bg-light text-dark border ms-1">{{ f.source_label }}</span>
+                {% endif %}
+                <div class="form-text">
+                    Minimum {{ f.floor | round(2) }} {{ f.unit }}
+                    {% if f.source_label %}({{ f.source_label }}){% endif %} — you may plan above this.
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="input-group">
+                    <input type="number" step="any" min="{{ f.floor }}" class="form-control"
+                           id="{{ f.key }}" name="{{ f.key }}" value="{{ f.value }}">
+                    <span class="input-group-text">{{ f.unit }}</span>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <button type="submit" name="reset_key" value="{{ f.key }}" class="btn btn-soft btn-sm"
+                        title="Restore the default value">
+                    <i class="bi bi-arrow-counterclockwise"></i> Reset ({{ f.default | round(2) }})
+                </button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    {# ── Local Planning Targets (local) ────────────────────────────────── #}
+    <div class="dash-card mb-3">
+        <div class="card-title-row">
+            <h6><i class="bi bi-geo me-1"></i>Local Planning Targets</h6>
+        </div>
+        <p class="text-muted" style="font-size: 12px;">
+            No available national or international per-capita standard exists. Any positive value is accepted (exposure
+            fractions are capped at 0.60 by the engine).
+        </p>
+        <p class="text-muted" style="font-size: 12px;">
+            <i class="bi bi-info-circle me-1"></i><strong>Exposure fraction</strong> —
+            the share of a barangay's population assumed to be affected in a
+            scenario, selected by that barangay's risk level.
+        </p>
+        {% for f in sections.local %}
+        {% set is_exposure = f.key.startswith('EXPOSURE_FRACTION_') %}
+        {% set noun = 'kit' if f.key == 'MEDICINE_KITS_PER_AFFECTED'
+                       else ('vehicle' if f.key == 'VEHICLES_PER_AFFECTED' else '') %}
+        <div class="row align-items-center mb-3">
+            <div class="col-md-5">
+                <label class="fw-semibold" for="{{ f.key }}">{{ f.label }}</label>
+                {% if is_exposure %}
+                <div class="form-text fw-semibold" id="readout_{{ f.key }}"></div>
+                {% else %}
+                <div class="form-text">One {{ noun }} is planned per this many affected people.</div>
+                {% endif %}
+            </div>
+            <div class="col-md-4">
+                {% if is_exposure %}
+                    {# Exact number box (the form field) submits the stored 0–1
+                       fraction unchanged, with a live "= NN%" readout. #}
+                    <input type="number" step="0.01" min="0" max="0.60" class="form-control"
+                           id="{{ f.key }}" name="{{ f.key }}" value="{{ f.value }}"
+                           data-role="exposure" data-readout="readout_{{ f.key }}">
+                {% else %}
+                    {# Human unit: user edits N in "1 <noun> per N affected people".
+                       Stored value = 1/N, converted server-side at save time. N is
+                       initialised from the current stored value = round(1/value). #}
+                    <div class="input-group">
+                        <span class="input-group-text">1 {{ noun }} per</span>
+                        <input type="number" step="1" min="1" class="form-control"
+                               id="{{ f.key }}" name="{{ f.key }}"
+                               value="{{ (1 / f.value) | round(0, 'common') | int }}">
+                        <span class="input-group-text">people</span>
+                    </div>
+                {% endif %}
+            </div>
+            <div class="col-md-3">
+                <button type="submit" name="reset_key" value="{{ f.key }}" class="btn btn-soft btn-sm"
+                        title="Restore the default value">
+                    <i class="bi bi-arrow-counterclockwise"></i>
+                    {% if is_exposure %}
+                        Reset ({{ (f.default * 100) | round | int }}%)
+                    {% else %}
+                        Reset (1 per {{ (1 / f.default) | round(0, 'common') | int }})
+                    {% endif %}
+                </button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    {# ── Locked Constants (locked, read-only) ──────────────────────────── #}
+    <div class="dash-card mb-3">
+        <div class="card-title-row">
+            <h6><i class="bi bi-lock-fill me-1"></i>Locked Constants</h6>
+        </div>
+        <p class="text-muted" style="font-size: 12px;">
+            Read-Only. DSWD Family Food Pack contents are defined by the DSWD's "Family Food Pack Specifications" (DSWD Memorandum Circular No. 1, Series of 2020).
+        </p>
+        {% for f in sections.locked %}
+        <div class="row align-items-center mb-2">
+            <div class="col-md-5">
+                <span class="fw-semibold">{{ f.label }}</span>
+                {% if f.source_label %}
+                <span class="badge bg-light text-dark border ms-1">{{ f.source_label }}</span>
+                {% endif %}
+            </div>
+            <div class="col-md-4">
+                <input type="number" class="form-control" value="{{ f.value }}" disabled readonly>
+            </div>
+            <div class="col-md-3 text-muted" style="font-size: 12px;">{{ f.unit }}</div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <button type="submit" class="btn btn-rk">
+        <i class="bi bi-save me-1"></i>Save Changes
+    </button>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script nonce="{{ request.state.csp_nonce }}">
+// Exposure-fraction readout: shows "= NN% of population assumed affected" and
+// updates live as the number box is edited. Display-only — the box still submits
+// the stored 0–1 fraction unchanged. No stored value, unit, or engine math changes.
+(function () {
+    function updateReadout(box) {
+        var readout = document.getElementById(box.dataset.readout);
+        if (!readout) return;
+        var v = parseFloat(box.value);
+        readout.textContent = isNaN(v)
+            ? ''
+            : '= ' + Math.round(v * 100) + '% of population assumed affected';
+    }
+
+    document.querySelectorAll('input[data-role="exposure"]').forEach(function (box) {
+        updateReadout(box);
+        box.addEventListener('input', function () { updateReadout(box); });
+    });
+})();
+</script>
+{% endblock %}

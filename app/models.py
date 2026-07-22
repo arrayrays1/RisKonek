@@ -554,6 +554,38 @@ class AuditLog(Base):
     user = relationship("User", back_populates="audit_logs")
 
 
+# ==========================
+# TABLE 12: Planning Thresholds (simulator, admin-editable overrides)
+# ==========================
+
+class PlanningThreshold(Base):
+    """Admin-editable overrides for the simulator's planning ratios.
+
+    app/simulation/config.py remains the source of DEFAULTS and provenance
+    comments; this table only holds overrides. A fresh DB (no rows) behaves
+    identically to the defaults. New table — created by create_all() on startup,
+    so no migration is needed.
+
+    tier semantics (do not collapse):
+      * locked  — DESCRIBES what a DSWD pack physically contains; changing it
+                  means "a different pack", not "plan more generously". Not editable.
+      * floored — a published-standard MINIMUM; editable upward, never below
+                  floor_value (e.g. Sphere's 15 L/person/day).
+      * local   — no per-capita standard exists; the CDRRMO owns it. No floor.
+    """
+    __tablename__ = "planning_thresholds"
+
+    id = Column(Integer, primary_key=True, index=True)
+    key = Column(String(60), nullable=False, unique=True, index=True)
+    value = Column(Float, nullable=False)
+    tier = Column(String(10), nullable=False)          # "locked" | "floored" | "local"
+    floor_value = Column(Float, nullable=True)          # only meaningful for tier="floored"
+    unit = Column(String(30))
+    source_label = Column(String(100), nullable=True)   # None when no standard exists
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    updated_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+
+
 
 
 # *******************************

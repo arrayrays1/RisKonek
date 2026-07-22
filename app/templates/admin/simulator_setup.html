@@ -1,0 +1,96 @@
+{% extends "admin/base.html" %}
+{% set active_nav = 'simulator' %}
+{% block title %}Disaster Simulator — RisKonek{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-start flex-wrap gap-2">
+    <div>
+        <h1><i class="bi bi-lightning-fill me-2"></i>Disaster Simulator</h1>
+        <p>Model a hypothetical disaster scenario to support planning and
+           resource decisions before an event occurs.</p>
+    </div>
+    <a href="/admin/simulator/settings" class="btn btn-soft">
+        <i class="bi bi-sliders"></i> Planning Thresholds
+    </a>
+</div>
+
+{# ── About / advisory notice ─────────────────────────────────────────── #}
+<div class="alert-banner">
+    <i class="bi bi-info-circle-fill"></i>
+    <span>
+        <strong>About this module.</strong>
+        The Disaster Simulator provides decision support for disaster planning.
+        All outputs are <strong>advisory estimates only</strong> and must be
+        reviewed and validated by qualified CDRRMO personnel before use in any
+        operational plan.
+    </span>
+</div>
+
+<div class="row">
+    <div class="col-lg-8 col-xl-6">
+        <div class="dash-card">
+            <div class="card-title-row">
+                <h6><i class="bi bi-sliders me-1"></i>Scenario Setup</h6>
+            </div>
+
+            <form method="post" action="/admin/simulator/run">
+                <input type="hidden" name="csrf_token"
+                       value="{{ request.session.get('csrf_token', '') }}">
+
+                {# 1. Disaster Type #}
+                <div class="mb-3">
+                    <label for="disaster_type" class="form-label fw-semibold">
+                        Disaster Type
+                    </label>
+                    <select class="form-select" id="disaster_type"
+                            name="disaster_type" required>
+                        <option value="" disabled selected>Select a disaster type…</option>
+                        {% for dt in disaster_types %}
+                        <option value="{{ dt.value }}">
+                            {{ dt.value.replace('_', ' ').title() }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                {# 2. Affected Barangay — single select, one barangay per run #}
+                <div class="mb-3">
+                    <label for="barangay_id" class="form-label fw-semibold">
+                        Affected Barangay
+                    </label>
+                    <select class="form-select" id="barangay_id"
+                            name="barangay_id" required>
+                        <option value="" disabled selected>Select a barangay…</option>
+                        {% for b in barangays %}
+                        <option value="{{ b.id }}">{{ b.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <div class="form-text">One barangay per simulation.</div>
+                </div>
+
+                {# 3. Estimated Duration — drives water/food sizing #}
+                <div class="mb-4">
+                    <label for="duration" class="form-label fw-semibold">
+                        Estimated Duration
+                    </label>
+                    <select class="form-select" id="duration" name="duration" required>
+                        {% for opt in duration_options %}
+                        <option value="{{ opt.value }}"
+                            {{ 'selected' if opt.value == default_duration else '' }}>
+                            {{ opt.label }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <div class="form-text">
+                        Used to estimate water and food requirements.
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-rk">
+                    <i class="bi bi-graph-up-arrow me-1"></i>Generate Analysis
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
