@@ -108,11 +108,11 @@
                    placeholder="e.g. Due for oil change, minor hull repair">
         </div>
         <div class="col-span-12">
-            <button type="submit" class="rk-btn-primary rk-rk-btn-sm">
+            <button type="submit" class="rk-btn-primary rk-btn-sm">
                 <i class="bi bi-save"></i> {{ 'Save Changes' if editing else 'Add Equipment' }}
             </button>
             {% if editing %}
-            <a href="/bdrrmo/equipment" class="rk-btn-secondary rk-rk-btn-sm">Cancel</a>
+            <a href="/bdrrmo/equipment" class="rk-btn-secondary rk-btn-sm">Cancel</a>
             {% endif %}
             <span class="text-slate-500 text-sm ml-2">
                 Track vehicles individually (quantity 1 + plate/serial); gear may use a bulk quantity.
@@ -139,7 +139,7 @@
 <!-- ── Equipment list ─────────────────────────────────────────── -->
 <div class="rk-card p-0">
     <div class="overflow-x-auto">
-        <table class="rk-rk-table align-middle mb-0">
+        <table class="rk-table align-middle mb-0">
             <thead style="background:#f9fafb">
                 <tr style="font-size:12px;color:var(--rk-muted);text-transform:uppercase;letter-spacing:0.04em">
                     <th class="px-3 py-3">Name</th>
@@ -161,19 +161,19 @@
                     <td>
                         {{ e.equipment_type.value.replace('_', ' ').title() }}
                         {% if e.equipment_type.value in vehicle_types %}
-                        <span class="rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate-slate ml-1" style="font-size:10px">Vehicle</span>
+                        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate ml-1" style="font-size:10px">Vehicle</span>
                         {% endif %}
                     </td>
                     <td class="text-right">{{ e.quantity if e.quantity is not none else 1 }}</td>
                     <td class="text-slate-500">{{ e.plate_or_serial or '—' }}</td>
                     <td>
-                        <span class="rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate-slate {{ status_classes[sval] }}">{{ status_labels[sval] }}</span>
+                        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate {{ status_classes[sval] }}">{{ status_labels[sval] }}</span>
                     </td>
                     <td class="px-3 text-right">
                         {% if show_archived %}
                         <form method="POST" action="/bdrrmo/equipment/{{ e.id }}/archive" class="inline">
             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
-                            <button type="submit" class="rk-btn-secondary rk-rk-btn-sm">
+                            <button type="submit" class="rk-btn-secondary rk-btn-sm">
                                 <i class="bi bi-arrow-counterclockwise"></i> Restore
                             </button>
                         </form>
@@ -189,14 +189,14 @@
                                 </select>
                             </div>
                         </form>
-                        <a href="/bdrrmo/equipment?edit={{ e.id }}" class="rk-btn-secondary rk-rk-btn-sm" title="Edit">
+                        <a href="/bdrrmo/equipment?edit={{ e.id }}" class="rk-btn-secondary rk-btn-sm" title="Edit">
                             <i class="bi bi-pencil"></i>
                         </a>
                         <form method="POST" action="/bdrrmo/equipment/{{ e.id }}/archive"
                               class="inline"
                               data-confirm='Archive {{ e.name }}? It will be hidden from the active list but kept on record.'>
             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
-                            <button type="submit" class="rk-btn-secondary rk-rk-btn-sm" title="Archive">
+                            <button type="submit" class="rk-btn-secondary rk-btn-sm" title="Archive">
                                 <i class="bi bi-archive"></i>
                             </button>
                         </form>

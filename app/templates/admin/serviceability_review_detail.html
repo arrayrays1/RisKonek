@@ -27,33 +27,33 @@
         <div class="rk-card">
             <div class="grid grid-cols-12 gap-3 mb-2">
                 <div class="col-span-6">
-                    <div class="rk-rk-stat-label">Equipment</div>
+                    <div class="rk-stat-label">Equipment</div>
                     <div class="font-semibold">{{ r.equipment.name if r.equipment else '—' }}</div>
                 </div>
                 <div class="col-span-3">
-                    <div class="rk-rk-stat-label">Finding</div>
+                    <div class="rk-stat-label">Finding</div>
                     <div class="font-semibold">{{ finding_label }}</div>
                 </div>
                 <div class="col-span-3">
-                    <div class="rk-rk-stat-label">Urgency</div>
+                    <div class="rk-stat-label">Urgency</div>
                     {% set u = r.urgency.value if r.urgency else 'moderate' %}
                     <div>
                     {% if u == 'critical' %}
-                        <span class="rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate-slate" style="background:#fde8e8;color:#c0392b;border:1px solid #f4c2bd">
+                        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate" style="background:#fde8e8;color:#c0392b;border:1px solid #f4c2bd">
                             <i class="bi bi-exclamation-triangle-fill"></i> Critical</span>
                     {% elif u == 'high' %}
-                        <span class="rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate-slate" style="background:#fdebd0;color:#b9770e;border:1px solid #f5cba7">
+                        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate" style="background:#fdebd0;color:#b9770e;border:1px solid #f5cba7">
                             <i class="bi bi-exclamation-circle-fill"></i> High</span>
                     {% elif u == 'moderate' %}
-                        <span class="rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate-amber">Moderate</span>
+                        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-amber">Moderate</span>
                     {% else %}
-                        <span class="rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate-slate" style="background:#eef0f2;color:#6c757d;border:1px solid #dee2e6">Low</span>
+                        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate" style="background:#eef0f2;color:#6c757d;border:1px solid #dee2e6">Low</span>
                     {% endif %}
                     </div>
                 </div>
             </div>
             <hr>
-            <div class="rk-rk-stat-label">Findings / Issue Description</div>
+            <div class="rk-stat-label">Findings / Issue Description</div>
             <p class="mb-0" style="white-space:pre-wrap">{{ r.issue_description or '—' }}</p>
         </div>
 
@@ -101,7 +101,7 @@
                 This report is still a draft with CFAU and cannot be reviewed until it is submitted.
             </p>
             {% if r.admin_remarks %}
-            <div class="rk-rk-stat-label">Existing Remarks</div>
+            <div class="rk-stat-label">Existing Remarks</div>
             <p class="mb-0" style="white-space:pre-wrap">{{ r.admin_remarks }}</p>
             {% endif %}
             {% endif %}
@@ -112,20 +112,20 @@
                 <i class="bi bi-arrow-left-right" style="color:var(--rk-green);font-size:16px"></i>
                 <h6>Live Equipment Status</h6>
                 {% if finding_applied %}
-                <span class="rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate-green ml-2">
+                <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-green ml-2">
                     <i class="bi bi-check2"></i> Applied to Live Status
                 </span>
                 {% else %}
-                <span class="rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate-slate ml-2">Not Yet Applied</span>
+                <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate ml-2">Not Yet Applied</span>
                 {% endif %}
             </div>
             <div class="grid grid-cols-12 gap-3 mb-2">
                 <div class="col-span-6">
-                    <div class="rk-rk-stat-label">Live fleet status</div>
+                    <div class="rk-stat-label">Live fleet status</div>
                     <div class="font-semibold">{{ live_status_label }}</div>
                 </div>
                 <div class="col-span-6">
-                    <div class="rk-rk-stat-label">This report's finding</div>
+                    <div class="rk-stat-label">This report's finding</div>
                     <div class="font-semibold">{{ finding_label }}</div>
                 </div>
             </div>
@@ -141,7 +141,7 @@
             </p>
             <form method="POST" action="/admin/serviceability/{{ r.id }}/apply-finding"
                   onsubmit="event.preventDefault(); rkConfirm('Set the live equipment status to {{ mapped_live_label }}?', this)">
-                <button type="submit" class="rk-btn-secondary rk-rk-btn-sm">
+                <button type="submit" class="rk-btn-secondary rk-btn-sm">
                     <i class="bi bi-arrow-right-circle"></i> Apply Finding to Live Equipment
                 </button>
             </form>

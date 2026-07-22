@@ -6,15 +6,15 @@
 
 {% macro workflow_pill(v, label) -%}
     {% if v == 'draft' %}
-        <span class="rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate-slate">{{ label }}</span>
+        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate">{{ label }}</span>
     {% elif v == 'submitted' %}
-        <span class="rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate-amber">{{ label }}</span>
+        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-amber">{{ label }}</span>
     {% elif v == 'reviewed' %}
-        <span class="rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate-blue">{{ label }}</span>
+        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-blue">{{ label }}</span>
     {% elif v == 'resolved' %}
-        <span class="rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate-green">{{ label }}</span>
+        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-green">{{ label }}</span>
     {% else %}
-        <span class="rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate-slate">{{ label }}</span>
+        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate">{{ label }}</span>
     {% endif %}
 {%- endmacro %}
 
@@ -47,18 +47,18 @@
 
 <!-- ── Summary cards ──────────────────────────────────────────── -->
 <div class="grid grid-cols-12 gap-3 mb-3">
-    <div class="col-span-3"><div class="rk-rk-stat-card">
-        <div class="rk-rk-stat-label">Total</div><div class="rk-rk-stat-value">{{ summary.total }}</div>
+    <div class="col-span-3"><div class="rk-stat-card">
+        <div class="rk-stat-label">Total</div><div class="rk-stat-value">{{ summary.total }}</div>
     </div></div>
-    <div class="col-span-3"><div class="rk-rk-stat-card">
-        <div class="rk-rk-stat-label">Drafts</div><div class="rk-rk-stat-value">{{ summary.draft }}</div>
+    <div class="col-span-3"><div class="rk-stat-card">
+        <div class="rk-stat-label">Drafts</div><div class="rk-stat-value">{{ summary.draft }}</div>
     </div></div>
-    <div class="col-span-3"><div class="rk-rk-stat-card">
-        <div class="rk-rk-stat-label">Submitted</div><div class="rk-rk-stat-value">{{ summary.submitted }}</div>
+    <div class="col-span-3"><div class="rk-stat-card">
+        <div class="rk-stat-label">Submitted</div><div class="rk-stat-value">{{ summary.submitted }}</div>
     </div></div>
-    <div class="col-span-3"><div class="rk-rk-stat-card">
-        <div class="rk-rk-stat-label">Reviewed / Resolved</div>
-        <div class="rk-rk-stat-value">{{ summary.reviewed + summary.resolved }}</div>
+    <div class="col-span-3"><div class="rk-stat-card">
+        <div class="rk-stat-label">Reviewed / Resolved</div>
+        <div class="rk-stat-value">{{ summary.reviewed + summary.resolved }}</div>
     </div></div>
 </div>
 
@@ -75,7 +75,7 @@
             </select>
         </div>
         <div class="col-span-2 d-grid">
-            <a href="/cfau/serviceability" class="rk-btn-secondary rk-rk-btn-sm"><i class="bi bi-x-circle"></i> Reset</a>
+            <a href="/cfau/serviceability" class="rk-btn-secondary rk-btn-sm"><i class="bi bi-x-circle"></i> Reset</a>
         </div>
     </form>
 </div>
@@ -83,7 +83,7 @@
 <!-- ── Table ──────────────────────────────────────────────────── -->
 <div class="rk-card p-0">
     <div class="overflow-x-auto">
-        <table class="rk-rk-table align-middle mb-0">
+        <table class="rk-table align-middle mb-0">
             <thead style="background:#f9fafb">
                 <tr style="font-size:12px;color:var(--rk-muted);text-transform:uppercase;letter-spacing:0.04em">
                     <th class="px-3 py-3">Title</th>
@@ -107,16 +107,16 @@
                     {% if is_admin_view %}<td class="text-slate-500">{{ r.reporter }}</td>{% endif %}
                     <td class="text-slate-500">{{ r.reported_at | pht }}</td>
                     <td class="text-right px-3">
-                        <a href="/cfau/serviceability/{{ r.id }}" class="rk-btn-secondary rk-rk-btn-sm">
+                        <a href="/cfau/serviceability/{{ r.id }}" class="rk-btn-secondary rk-btn-sm">
                             <i class="bi bi-eye"></i> View
                         </a>
                         {% if r.report_status == 'draft' %}
-                        <a href="/cfau/serviceability/{{ r.id }}/edit" class="rk-btn-secondary rk-rk-btn-sm">
+                        <a href="/cfau/serviceability/{{ r.id }}/edit" class="rk-btn-secondary rk-btn-sm">
                             <i class="bi bi-pencil"></i>
                         </a>
                         <form method="POST" action="/cfau/serviceability/{{ r.id }}/submit" class="inline"
                               onsubmit="event.preventDefault(); rkConfirm('Submit this report for review? You will no longer be able to edit it.', this)">
-                            <button type="submit" class="rk-btn-primary rk-rk-btn-sm"><i class="bi bi-send"></i> Submit</button>
+                            <button type="submit" class="rk-btn-primary rk-btn-sm"><i class="bi bi-send"></i> Submit</button>
                         </form>
                         {% endif %}
                     </td>

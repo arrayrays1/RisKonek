@@ -30,7 +30,7 @@
 <div class="rk-card mb-3">
     <div class="kv flex flex-col gap-2">
         <div><span class="k">Action performed</span>
-            <span class="v"><span class="rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate-slate">{{ log.action }}</span></span></div>
+            <span class="v"><span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate">{{ log.action }}</span></span></div>
         <div><span class="k">Category / Module</span><span class="v">{{ category }}</span></div>
         <div><span class="k">Affected table</span><span class="v">{{ log.target_table or '—' }}</span></div>
         <div><span class="k">Affected record ID</span><span class="v">{{ log.target_id if log.target_id is not none else '—' }}</span></div>
@@ -54,17 +54,17 @@
     </div>
     <p class="text-sm mb-2">
         <strong>{{ related_upload.file_name }}</strong>
-        <span class="rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate-slate">{{ related_upload.file_type.value | upper }}</span>
+        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate">{{ related_upload.file_type.value | upper }}</span>
         — lifecycle: {{ related_upload.lifecycle_status.value }}
         {% if related_upload.extracted_data and related_upload.extracted_data.get('linked_incident_ids') %}
         <br>Linked Incident IDs: {{ related_upload.extracted_data.get('linked_incident_ids') | join(', ') }}
         {% endif %}
     </p>
     <div class="flex gap-2">
-        <a href="/admin/uploads/{{ related_upload.id }}/review" class="rk-btn-secondary rk-rk-btn-sm">
+        <a href="/admin/uploads/{{ related_upload.id }}/review" class="rk-btn-secondary rk-btn-sm">
             <i class="bi bi-eye"></i> Open Upload
         </a>
-        <a href="/admin/uploads/{{ related_upload.id }}/history" class="rk-btn-secondary rk-rk-btn-sm">
+        <a href="/admin/uploads/{{ related_upload.id }}/history" class="rk-btn-secondary rk-btn-sm">
             <i class="bi bi-clock-history"></i> Full Upload History
         </a>
     </div>

@@ -35,34 +35,34 @@
 <!-- ── Latest snapshot ────────────────────────────────────────── -->
 <div class="grid grid-cols-12 gap-3 mb-4">
     <div class="col-span-3">
-        <div class="rk-rk-stat-card">
-            <div class="rk-rk-stat-label">Total Population</div>
-            <div class="rk-rk-stat-value">{{ "{:,}".format(latest.total_population) if latest else "—" }}</div>
+        <div class="rk-stat-card">
+            <div class="rk-stat-label">Total Population</div>
+            <div class="rk-stat-value">{{ "{:,}".format(latest.total_population) if latest else "—" }}</div>
             <div class="text-sm mt-1 text-slate-500">
                 {% if latest %}{{ "{:,}".format(latest.total_households) }} households{% else %}No record yet{% endif %}
             </div>
         </div>
     </div>
     <div class="col-span-3">
-        <div class="rk-rk-stat-card">
-            <div class="rk-rk-stat-label">Vulnerable %</div>
-            <div class="rk-rk-stat-value">{{ vulnerable_pct }}%</div>
+        <div class="rk-stat-card">
+            <div class="rk-stat-label">Vulnerable %</div>
+            <div class="rk-stat-value">{{ vulnerable_pct }}%</div>
             <div class="text-sm mt-1 text-slate-500">Elderly, PWDs, Children</div>
         </div>
     </div>
     <div class="col-span-3">
-        <div class="rk-rk-stat-card">
-            <div class="rk-rk-stat-label">Elderly / PWD</div>
-            <div class="rk-rk-stat-value" style="font-size:20px">
+        <div class="rk-stat-card">
+            <div class="rk-stat-label">Elderly / PWD</div>
+            <div class="rk-stat-value" style="font-size:20px">
                 {% if latest %}{{ "{:,}".format(latest.elderly_count) }} / {{ "{:,}".format(latest.pwd_count) }}{% else %}—{% endif %}
             </div>
             <div class="text-sm mt-1 text-slate-500">Latest record</div>
         </div>
     </div>
     <div class="col-span-3">
-        <div class="rk-rk-stat-card">
-            <div class="rk-rk-stat-label">Last Recorded</div>
-            <div class="rk-rk-stat-value" style="font-size:16px">
+        <div class="rk-stat-card">
+            <div class="rk-stat-label">Last Recorded</div>
+            <div class="rk-stat-value" style="font-size:16px">
                 {{ latest.recorded_at | pht if latest else "—" }}
             </div>
         </div>
@@ -98,7 +98,7 @@
             <input type="number" name="children_count" min="0" value="{{ latest.children_count if latest else '' }}" class="rk-input text-xs py-1.5" required>
         </div>
         <div class="col-span-12">
-            <button type="submit" class="rk-btn-primary rk-rk-btn-sm">
+            <button type="submit" class="rk-btn-primary rk-btn-sm">
                 <i class="bi bi-save"></i> Save Population Record
             </button>
             <span class="text-slate-500 text-sm ml-2">
@@ -113,7 +113,7 @@
 <div class="rk-card p-0">
     <div class="p-3 border-bottom"><h6 class="mb-0">Population History</h6></div>
     <div class="overflow-x-auto">
-        <table class="rk-rk-table align-middle mb-0">
+        <table class="rk-table align-middle mb-0">
             <thead style="background:#f9fafb">
                 <tr style="font-size:12px;color:var(--rk-muted);text-transform:uppercase;letter-spacing:0.04em">
                     <th class="px-3 py-3">Recorded</th>

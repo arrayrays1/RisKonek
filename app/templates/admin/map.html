@@ -325,11 +325,11 @@ function popupHtml(f) {
 
     const badges = [];
     if (f.is_city_level)
-        badges.push('<span class="popup-rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate city">City-level</span>');
+        badges.push('<span class="popup-rk-badge rk-badge-slate rk-badge rk-badge-slate-slate city">City-level</span>');
     if (f.is_approximate_location)
-        badges.push('<span class="popup-rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate approx">Approximate location</span>');
+        badges.push('<span class="popup-rk-badge rk-badge-slate rk-badge rk-badge-slate-slate approx">Approximate location</span>');
     if (f.status)
-        badges.push(`<span class="popup-rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate">${esc(f.status)}</span>`);
+        badges.push(`<span class="popup-rk-badge rk-badge-slate rk-badge rk-badge-slate-slate">${esc(f.status)}</span>`);
 
     function row(label, value) {
         if (value === null || value === undefined || value === '') return '';
@@ -340,7 +340,7 @@ function popupHtml(f) {
         <div class="popup-name">${esc(f.name)}</div>
         <div class="popup-sub">${esc(f.barangay) || ''} · ${esc(f.facility_type_label) || ''}</div>
         ${badges.length ? `<div class="popup-badges">${badges.join('')}</div>` : ''}
-        <table class="popup-rk-rk-table">
+        <table class="popup-rk-table">
             ${row('Floor area',          f.floor_area_sqm ? f.floor_area_sqm + ' sqm' : null)}
             ${row('Capacity (families)', f.capacity_families)}
             ${row('Capacity (indiv.)',   f.capacity_individuals)}

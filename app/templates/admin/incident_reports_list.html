@@ -6,13 +6,13 @@
 
 {% macro workflow_pill(v, label) -%}
     {% if v == 'submitted' %}
-        <span class="rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate-amber">{{ label }}</span>
+        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-amber">{{ label }}</span>
     {% elif v == 'reviewed' %}
-        <span class="rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate-blue">{{ label }}</span>
+        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-blue">{{ label }}</span>
     {% elif v == 'resolved' %}
-        <span class="rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate-green">{{ label }}</span>
+        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-green">{{ label }}</span>
     {% else %}
-        <span class="rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate-slate">{{ label }}</span>
+        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate">{{ label }}</span>
     {% endif %}
 {%- endmacro %}
 
@@ -23,14 +23,14 @@
 </div>
 
 <div class="grid grid-cols-12 gap-3 mb-3">
-    <div class="col-span-4"><div class="rk-rk-stat-card">
-        <div class="rk-rk-stat-label">Total Reports</div><div class="rk-rk-stat-value">{{ summary.total }}</div>
+    <div class="col-span-4"><div class="rk-stat-card">
+        <div class="rk-stat-label">Total Reports</div><div class="rk-stat-value">{{ summary.total }}</div>
     </div></div>
-    <div class="col-span-4"><div class="rk-rk-stat-card">
-        <div class="rk-rk-stat-label">Submitted</div><div class="rk-rk-stat-value">{{ summary.submitted }}</div>
+    <div class="col-span-4"><div class="rk-stat-card">
+        <div class="rk-stat-label">Submitted</div><div class="rk-stat-value">{{ summary.submitted }}</div>
     </div></div>
-    <div class="col-span-4"><div class="rk-rk-stat-card">
-        <div class="rk-rk-stat-label">Drafts</div><div class="rk-rk-stat-value">{{ summary.draft }}</div>
+    <div class="col-span-4"><div class="rk-stat-card">
+        <div class="rk-stat-label">Drafts</div><div class="rk-stat-value">{{ summary.draft }}</div>
     </div></div>
 </div>
 
@@ -82,7 +82,7 @@
             </select>
         </div>
         <div class="col-span-1 d-grid">
-            <a href="/admin/incident-reports" class="rk-btn-secondary rk-rk-btn-sm" title="Reset filters">
+            <a href="/admin/incident-reports" class="rk-btn-secondary rk-btn-sm" title="Reset filters">
                 <i class="bi bi-x-circle"></i>
             </a>
         </div>
@@ -91,7 +91,7 @@
 
 <div class="rk-card p-0">
     <div class="overflow-x-auto">
-        <table class="rk-rk-table align-middle mb-0">
+        <table class="rk-table align-middle mb-0">
             <thead style="background:#f9fafb">
                 <tr style="font-size:12px;color:var(--rk-muted);text-transform:uppercase;letter-spacing:0.04em">
                     <th class="px-3 py-3">Report</th>
@@ -118,14 +118,14 @@
                     <td class="text-slate-500">{{ r.reporter }}</td>
                     <td>
                         {% if r.origin == 'uploaded' %}
-                        <span class="rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate-blue"><i class="bi bi-cloud-arrow-up mr-1"></i>Uploaded</span>
+                        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-blue"><i class="bi bi-cloud-arrow-up mr-1"></i>Uploaded</span>
                         {% else %}
-                        <span class="rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate-slate"><i class="bi bi-pencil mr-1"></i>Manual</span>
+                        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate"><i class="bi bi-pencil mr-1"></i>Manual</span>
                         {% endif %}
                     </td>
                     <td>{{ workflow_pill(r.report_status, r.report_status_label) }}</td>
                     <td class="text-right px-3">
-                        <a href="/admin/incident-reports/{{ r.id }}" class="rk-btn-secondary rk-rk-btn-sm">
+                        <a href="/admin/incident-reports/{{ r.id }}" class="rk-btn-secondary rk-btn-sm">
                             <i class="bi bi-eye"></i> View
                         </a>
                     </td>

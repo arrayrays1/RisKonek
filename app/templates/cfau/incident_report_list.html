@@ -6,9 +6,9 @@
 
 {% macro workflow_pill(v, label) -%}
     {% if v == 'submitted' %}
-        <span class="rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate-green">{{ label }}</span>
+        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-green">{{ label }}</span>
     {% else %}
-        <span class="rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate-slate">{{ label }}</span>
+        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate">{{ label }}</span>
     {% endif %}
 {%- endmacro %}
 
@@ -66,7 +66,7 @@
             </select>
         </div>
         <div class="col-span-2 d-grid">
-            <a href="/cfau/incident-reports" class="rk-btn-secondary rk-rk-btn-sm"><i class="bi bi-x-circle"></i> Reset</a>
+            <a href="/cfau/incident-reports" class="rk-btn-secondary rk-btn-sm"><i class="bi bi-x-circle"></i> Reset</a>
         </div>
     </form>
 </div>
@@ -74,7 +74,7 @@
 <!-- ── Table ──────────────────────────────────────────────────── -->
 <div class="rk-card p-0">
     <div class="overflow-x-auto">
-        <table class="rk-rk-table align-middle mb-0">
+        <table class="rk-table align-middle mb-0">
             <thead style="background:#f9fafb">
                 <tr style="font-size:12px;color:var(--rk-muted);text-transform:uppercase;letter-spacing:0.04em">
                     <th class="px-3 py-3">Disaster Type</th>
@@ -96,16 +96,16 @@
                     <td>{{ workflow_pill(r.report_status, r.report_status_label) }}</td>
                     {% if is_admin_view %}<td class="text-slate-500">{{ r.reporter }}</td>{% endif %}
                     <td class="text-right px-3">
-                        <a href="/cfau/incident-reports/{{ r.id }}" class="rk-btn-secondary rk-rk-btn-sm">
+                        <a href="/cfau/incident-reports/{{ r.id }}" class="rk-btn-secondary rk-btn-sm">
                             <i class="bi bi-eye"></i> View
                         </a>
                         {% if r.report_status == 'draft' %}
-                        <a href="/cfau/incident-reports/{{ r.id }}/edit" class="rk-btn-secondary rk-rk-btn-sm">
+                        <a href="/cfau/incident-reports/{{ r.id }}/edit" class="rk-btn-secondary rk-btn-sm">
                             <i class="bi bi-pencil"></i>
                         </a>
                         <form method="POST" action="/cfau/incident-reports/{{ r.id }}/submit" class="inline"
                               onsubmit="event.preventDefault(); rkConfirm('Submit this report? You will no longer be able to edit it.', this)">
-                            <button type="submit" class="rk-btn-primary rk-rk-btn-sm"><i class="bi bi-send"></i> Submit</button>
+                            <button type="submit" class="rk-btn-primary rk-btn-sm"><i class="bi bi-send"></i> Submit</button>
                         </form>
                         {% endif %}
                     </td>

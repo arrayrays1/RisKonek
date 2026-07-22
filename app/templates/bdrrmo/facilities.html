@@ -99,11 +99,11 @@
                    value="{{ editing.address or '' if editing else '' }}">
         </div>
         <div class="col-span-12">
-            <button type="submit" class="rk-btn-primary rk-rk-btn-sm">
+            <button type="submit" class="rk-btn-primary rk-btn-sm">
                 <i class="bi bi-save"></i> {{ 'Save Changes' if editing else 'Add Facility' }}
             </button>
             {% if editing %}
-            <a href="/bdrrmo/facilities" class="rk-btn-secondary rk-rk-btn-sm">Cancel</a>
+            <a href="/bdrrmo/facilities" class="rk-btn-secondary rk-btn-sm">Cancel</a>
             {% endif %}
             <span class="text-slate-500 text-sm ml-2">
                 Duplicate names or near-identical coordinates in your barangay are blocked.
@@ -130,7 +130,7 @@
 <!-- ── Facility list ──────────────────────────────────────────── -->
 <div class="rk-card p-0">
     <div class="overflow-x-auto">
-        <table class="rk-rk-table align-middle mb-0">
+        <table class="rk-table align-middle mb-0">
             <thead style="background:#f9fafb">
                 <tr style="font-size:12px;color:var(--rk-muted);text-transform:uppercase;letter-spacing:0.04em">
                     <th class="px-3 py-3">Facility Name</th>
@@ -151,13 +151,13 @@
                     <td>{{ f.facility_type.value.replace('_', ' ').title() }}</td>
                     <td class="text-slate-500">{{ "%.5f"|format(f.latitude) }}, {{ "%.5f"|format(f.longitude) }}</td>
                     <td>
-                        <span class="rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate-slate {{ status_classes[sval] }}">{{ status_labels[sval] }}</span>
+                        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate {{ status_classes[sval] }}">{{ status_labels[sval] }}</span>
                     </td>
                     <td class="px-3 text-right">
                         {% if show_archived %}
                         <form method="POST" action="/bdrrmo/facilities/{{ f.id }}/archive" class="inline">
             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
-                            <button type="submit" class="rk-btn-secondary rk-rk-btn-sm">
+                            <button type="submit" class="rk-btn-secondary rk-btn-sm">
                                 <i class="bi bi-arrow-counterclockwise"></i> Restore
                             </button>
                         </form>
@@ -174,13 +174,13 @@
                                 </select>
                             </div>
                         </form>
-                        <a href="/bdrrmo/facilities?edit={{ f.id }}" class="rk-btn-secondary rk-rk-btn-sm" title="Edit">
+                        <a href="/bdrrmo/facilities?edit={{ f.id }}" class="rk-btn-secondary rk-btn-sm" title="Edit">
                             <i class="bi bi-pencil"></i>
                         </a>
                         <form method="POST" action="/bdrrmo/facilities/{{ f.id }}/archive"
                               class="inline"
                               onsubmit="event.preventDefault(); rkConfirm('Archive {{ f.name }}? It will be hidden from the active list but kept on record.', this)">
-                            <button type="submit" class="rk-btn-secondary rk-rk-btn-sm" title="Archive">
+                            <button type="submit" class="rk-btn-secondary rk-btn-sm" title="Archive">
                                 <i class="bi bi-archive"></i>
                             </button>
                         </form>

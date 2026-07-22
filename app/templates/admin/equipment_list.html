@@ -6,15 +6,15 @@
 
 {% macro status_pill(v, label) -%}
     {% if v in ('available', 'serviceable') %}
-        <span class="rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate-green">{{ label }}</span>
+        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-green">{{ label }}</span>
     {% elif v == 'deployed' %}
-        <span class="rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate-blue">{{ label }}</span>
+        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-blue">{{ label }}</span>
     {% elif v == 'under_repair' %}
-        <span class="rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate-amber">{{ label }}</span>
+        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-amber">{{ label }}</span>
     {% elif v in ('unserviceable', 'not_serviceable') %}
-        <span class="rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate-red">{{ label }}</span>
+        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-red">{{ label }}</span>
     {% else %}
-        <span class="rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate-slate">{{ label }}</span>
+        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate">{{ label }}</span>
     {% endif %}
 {%- endmacro %}
 
@@ -47,45 +47,45 @@
 <!-- ── Summary cards ──────────────────────────────────────────── -->
 <div class="grid grid-cols-12 gap-3 mb-3">
     <div class="col-span-3">
-        <div class="rk-rk-stat-card flex justify-between items-center">
+        <div class="rk-stat-card flex justify-between items-center">
             <div>
-                <div class="rk-rk-stat-label">Active Units</div>
-                <div class="rk-rk-stat-value">{{ summary.total }}</div>
+                <div class="rk-stat-label">Active Units</div>
+                <div class="rk-stat-value">{{ summary.total }}</div>
             </div>
-            <div class="rk-rk-stat-icon" style="background:#eafaf1;color:var(--rk-green)">
+            <div class="rk-stat-icon" style="background:#eafaf1;color:var(--rk-green)">
                 <i class="bi bi-truck"></i>
             </div>
         </div>
     </div>
     <div class="col-span-3">
-        <div class="rk-rk-stat-card flex justify-between items-center">
+        <div class="rk-stat-card flex justify-between items-center">
             <div>
-                <div class="rk-rk-stat-label">Available</div>
-                <div class="rk-rk-stat-value">{{ summary.available }}</div>
+                <div class="rk-stat-label">Available</div>
+                <div class="rk-stat-value">{{ summary.available }}</div>
             </div>
-            <div class="rk-rk-stat-icon" style="background:#eafaf1;color:var(--rk-green)">
+            <div class="rk-stat-icon" style="background:#eafaf1;color:var(--rk-green)">
                 <i class="bi bi-check2-circle"></i>
             </div>
         </div>
     </div>
     <div class="col-span-3">
-        <div class="rk-rk-stat-card flex justify-between items-center">
+        <div class="rk-stat-card flex justify-between items-center">
             <div>
-                <div class="rk-rk-stat-label">Deployed</div>
-                <div class="rk-rk-stat-value">{{ summary.deployed }}</div>
+                <div class="rk-stat-label">Deployed</div>
+                <div class="rk-stat-value">{{ summary.deployed }}</div>
             </div>
-            <div class="rk-rk-stat-icon" style="background:#e6f2fa;color:#226e9b">
+            <div class="rk-stat-icon" style="background:#e6f2fa;color:#226e9b">
                 <i class="bi bi-broadcast-pin"></i>
             </div>
         </div>
     </div>
     <div class="col-span-3">
-        <div class="rk-rk-stat-card flex justify-between items-center">
+        <div class="rk-stat-card flex justify-between items-center">
             <div>
-                <div class="rk-rk-stat-label">Under Repair / Unserviceable</div>
-                <div class="rk-rk-stat-value">{{ summary.under_repair + summary.unserviceable }}</div>
+                <div class="rk-stat-label">Under Repair / Unserviceable</div>
+                <div class="rk-stat-value">{{ summary.under_repair + summary.unserviceable }}</div>
             </div>
-            <div class="rk-rk-stat-icon" style="background:#fde8e8;color:#c0392b">
+            <div class="rk-stat-icon" style="background:#fde8e8;color:#c0392b">
                 <i class="bi bi-tools"></i>
             </div>
         </div>
@@ -126,7 +126,7 @@
             </select>
         </div>
         <div class="col-span-1 d-grid">
-            <a href="/admin/equipment" class="rk-btn-secondary rk-rk-btn-sm" title="Reset filters">
+            <a href="/admin/equipment" class="rk-btn-secondary rk-btn-sm" title="Reset filters">
                 <i class="bi bi-x-circle"></i>
             </a>
         </div>
@@ -136,7 +136,7 @@
 <!-- ── Table ──────────────────────────────────────────────────── -->
 <div class="rk-card p-0">
     <div class="overflow-x-auto">
-        <table class="rk-rk-table align-middle mb-0">
+        <table class="rk-table align-middle mb-0">
             <thead style="background:#f9fafb">
                 <tr style="font-size:12px;color:var(--rk-muted);text-transform:uppercase;letter-spacing:0.04em">
                     <th class="px-3 py-3">Equipment</th>
@@ -159,24 +159,24 @@
                     <td class="text-slate-500">{{ e.last_inspected.strftime('%Y-%m-%d') if e.last_inspected else '—' }}</td>
                     <td class="text-right px-3">
                         {% if not e.is_archived %}
-                        <button type="button" class="rk-btn-secondary rk-rk-btn-sm"
+                        <button type="button" class="rk-btn-secondary rk-btn-sm"
                                 data-bs-toggle="modal" data-bs-target="#statusModal-{{ e.id }}">
                             <i class="bi bi-arrow-repeat"></i> Status
                         </button>
                         <a href="/admin/equipment/{{ e.id }}/edit"
-                           class="rk-btn-secondary rk-rk-btn-sm">
+                           class="rk-btn-secondary rk-btn-sm">
                             <i class="bi bi-pencil"></i>
                         </a>
                         <form method="POST" action="/admin/equipment/{{ e.id }}/archive" class="inline"
                               onsubmit="event.preventDefault(); rkConfirm('Archive {{ e.name }}?', this)">
-                            <button type="submit" class="-outline-warning rk-rk-btn-sm">
+                            <button type="submit" class="-outline-warning rk-btn-sm">
                                 <i class="bi bi-archive"></i>
                             </button>
                         </form>
                         {% else %}
                         <form method="POST" action="/admin/equipment/{{ e.id }}/archive" class="inline">
             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
-                            <button type="submit" class="-outline-success rk-rk-btn-sm">
+                            <button type="submit" class="-outline-success rk-btn-sm">
                                 <i class="bi bi-arrow-counterclockwise"></i> Restore
                             </button>
                         </form>
@@ -226,8 +226,8 @@
         </div>
       </div>
       <div class="modal-footer">
-        <button type="button" class="rk-btn-secondary rk-rk-btn-sm" data-bs-dismiss="modal">Cancel</button>
-        <button type="submit" class="rk-btn-primary rk-rk-btn-sm">Apply</button>
+        <button type="button" class="rk-btn-secondary rk-btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" class="rk-btn-primary rk-btn-sm">Apply</button>
       </div>
     </form>
   </div>
