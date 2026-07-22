@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ request.session.get('csrf_token', '') }}">
     <title>{% block title %}Admin — RisKonek{% endblock %}</title>
+    <link rel="icon" type="image/png" href="/static/img/favicon.png">
     <script nonce="{{ request.state.csp_nonce }}">
     // Apply the saved sidebar state BEFORE any CSS paints so the
     // collapsed/expanded layout is correct on first frame (no flash).
