@@ -15,7 +15,7 @@
         'Vehicle & Equipment': 'background:#e2e8f0;color:#334155',
         'System Actions': 'background:#f3f4f6;color:#6b7280'
     } %}
-    <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate" style="{{ m.get(cat, 'background:#f3f4f6;color:#6b7280') }}">{{ cat }}</span>
+    <span class="rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate-slate" style="{{ m.get(cat, 'background:#f3f4f6;color:#6b7280') }}">{{ cat }}</span>
 {%- endmacro %}
 
 {% block content %}
@@ -31,7 +31,7 @@
 
 {% if focus_user %}
 <div class="rk-alert rk-alert-blue flex justify-between items-center">
-    <span><i class="bi bi-person-rk-badge rk-badge-slate mr-1"></i>
+    <span><i class="bi bi-person-rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate mr-1"></i>
         Showing the audit trail for <strong>{{ focus_user.username }}</strong>.</span>
     <a href="/admin/audit" class="rk-btn-ghost">View all users</a>
 </div>
@@ -91,7 +91,7 @@
 <!-- ── Results ────────────────────────────────────────────────────── -->
 <div class="rk-card p-0">
     <div class="overflow-x-auto">
-        <table class="rk-table mb-0 align-middle">
+        <table class="rk-rk-table mb-0 align-middle">
             <thead style="background:#f9fafb">
                 <tr style="font-size:12px;color:var(--rk-muted);text-transform:uppercase;letter-spacing:0.04em">
                     <th class="px-3 py-3">Time</th>
@@ -113,7 +113,7 @@
                     <td class="px-3 text-nowrap">{{ it.timestamp | pht }}</td>
                     <td>{{ it.username }}</td>
                     <td>{{ category_badge(it.category) }}</td>
-                    <td><span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate">{{ it.action }}</span></td>
+                    <td><span class="rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate-slate">{{ it.action }}</span></td>
                     <td class="text-sm text-slate-500">
                         {{ it.target_table or '—' }}{% if it.target_id %} #{{ it.target_id }}{% endif %}
                     </td>

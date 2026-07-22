@@ -36,42 +36,42 @@
 <!-- ── Headline cards ─────────────────────────────────────────── -->
 <div class="grid grid-cols-12 gap-3 mb-4">
     <div class="col-span-3">
-        <div class="rk-stat-card">
+        <div class="rk-rk-stat-card">
             <div class="flex justify-between items-start">
-                <div class="rk-stat-label">Total Population</div>
-                <div class="rk-stat-icon" style="background:#e8f4fd;color:#2980b9"><i class="bi bi-people-fill"></i></div>
+                <div class="rk-rk-stat-label">Total Population</div>
+                <div class="rk-rk-stat-icon" style="background:#e8f4fd;color:#2980b9"><i class="bi bi-people-fill"></i></div>
             </div>
-            <div class="rk-stat-value">{{ "{:,}".format(total_population) }}</div>
+            <div class="rk-rk-stat-value">{{ "{:,}".format(total_population) }}</div>
             <div class="text-sm mt-1 text-slate-500">{{ "{:,}".format(households) }} households</div>
         </div>
     </div>
     <div class="col-span-3">
-        <div class="rk-stat-card">
+        <div class="rk-rk-stat-card">
             <div class="flex justify-between items-start">
-                <div class="rk-stat-label">Vulnerable %</div>
-                <div class="rk-stat-icon" style="background:#fef3e2;color:#d35400"><i class="bi bi-exclamation-triangle-fill"></i></div>
+                <div class="rk-rk-stat-label">Vulnerable %</div>
+                <div class="rk-rk-stat-icon" style="background:#fef3e2;color:#d35400"><i class="bi bi-exclamation-triangle-fill"></i></div>
             </div>
-            <div class="rk-stat-value">{{ vulnerable_pct }}%</div>
+            <div class="rk-rk-stat-value">{{ vulnerable_pct }}%</div>
             <div class="text-sm mt-1 text-slate-500">Elderly, PWDs, Children</div>
         </div>
     </div>
     <div class="col-span-3">
-        <div class="rk-stat-card">
+        <div class="rk-rk-stat-card">
             <div class="flex justify-between items-start">
-                <div class="rk-stat-label">Flood Risk Trend</div>
-                <div class="rk-stat-icon" style="background:#fde8e8;color:#c0392b"><i class="bi bi-graph-up-arrow"></i></div>
+                <div class="rk-rk-stat-label">Flood Risk Trend</div>
+                <div class="rk-rk-stat-icon" style="background:#fde8e8;color:#c0392b"><i class="bi bi-graph-up-arrow"></i></div>
             </div>
-            <div class="rk-stat-value {{ 'trend-up' if flood_trend == 'Increasing' else 'trend-stable' }}">{{ flood_trend }}</div>
+            <div class="rk-rk-stat-value {{ 'trend-up' if flood_trend == 'Increasing' else 'trend-stable' }}">{{ flood_trend }}</div>
             <div class="text-sm mt-1 text-slate-500">Last 12 months vs prior</div>
         </div>
     </div>
     <div class="col-span-3">
-        <div class="rk-stat-card">
+        <div class="rk-rk-stat-card">
             <div class="flex justify-between items-start">
-                <div class="rk-stat-label">Fire Risk Trend</div>
-                <div class="rk-stat-icon" style="background:#fef9e7;color:#b7950b"><i class="bi bi-fire"></i></div>
+                <div class="rk-rk-stat-label">Fire Risk Trend</div>
+                <div class="rk-rk-stat-icon" style="background:#fef9e7;color:#b7950b"><i class="bi bi-fire"></i></div>
             </div>
-            <div class="rk-stat-value {{ 'trend-up' if fire_trend == 'Increasing' else 'trend-stable' }}">{{ fire_trend }}</div>
+            <div class="rk-rk-stat-value {{ 'trend-up' if fire_trend == 'Increasing' else 'trend-stable' }}">{{ fire_trend }}</div>
             <div class="text-sm mt-1 text-slate-500">Last 12 months vs prior</div>
         </div>
     </div>
@@ -121,7 +121,7 @@
     </div>
     {% if hazard_types %}
         {% for h in hazard_types %}
-        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate mr-1" style="font-size:12px">{{ h.title() }}</span>
+        <span class="rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate-slate mr-1" style="font-size:12px">{{ h.title() }}</span>
         {% endfor %}
     {% else %}
         <span class="text-slate-500" style="font-size:13px">No hazards recorded.</span>

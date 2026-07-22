@@ -89,14 +89,14 @@
 <div class="grid grid-cols-12 gap-3 mb-4">
 
     <div class="col-span-3">
-        <div class="rk-stat-card">
+        <div class="rk-rk-stat-card">
             <div class="flex justify-between items-start">
-                <div class="rk-stat-label">Overall System Status</div>
-                <div class="rk-stat-icon" style="background:#d1fae5;color:#047857">
+                <div class="rk-rk-stat-label">Overall System Status</div>
+                <div class="rk-rk-stat-icon" style="background:#d1fae5;color:#047857">
                     <i class="bi bi-shield-check"></i>
                 </div>
             </div>
-            <div class="rk-stat-value" style="color:#047857">Operational</div>
+            <div class="rk-rk-stat-value" style="color:#047857">Operational</div>
             <div class="text-sm mt-1 text-emerald-700">
                 {{ total_barangays }} barangays monitored
             </div>
@@ -104,14 +104,14 @@
     </div>
 
     <div class="col-span-3">
-        <div class="rk-stat-card">
+        <div class="rk-rk-stat-card">
             <div class="flex justify-between items-start">
-                <div class="rk-stat-label">Overall Readiness Score</div>
-                <div class="rk-stat-icon" style="background:#e8f4fd;color:#2980b9">
+                <div class="rk-rk-stat-label">Overall Readiness Score</div>
+                <div class="rk-rk-stat-icon" style="background:#e8f4fd;color:#2980b9">
                     <i class="bi bi-graph-up-arrow"></i>
                 </div>
             </div>
-            <div class="rk-stat-value">{{ readiness_score }}%</div>
+            <div class="rk-rk-stat-value">{{ readiness_score }}%</div>
             <div class="text-sm mt-1 text-slate-500">
                 {{ serviceable_count }}/{{ total_equip }} equipment serviceable
             </div>
@@ -119,14 +119,14 @@
     </div>
 
     <div class="col-span-3">
-        <div class="rk-stat-card">
+        <div class="rk-rk-stat-card">
             <div class="flex justify-between items-start">
-                <div class="rk-stat-label">Data Relevance Score</div>
-                <div class="rk-stat-icon" style="background:#f3e8fd;color:#8e44ad">
+                <div class="rk-rk-stat-label">Data Relevance Score</div>
+                <div class="rk-rk-stat-icon" style="background:#f3e8fd;color:#8e44ad">
                     <i class="bi bi-database-check"></i>
                 </div>
             </div>
-            <div class="rk-stat-value">{{ data_relevance }}%</div>
+            <div class="rk-rk-stat-value">{{ data_relevance }}%</div>
             <div class="text-sm mt-1 text-slate-500">
                 Barangays updated within 6 months
             </div>
@@ -134,14 +134,14 @@
     </div>
 
     <div class="col-span-3">
-        <div class="rk-stat-card">
+        <div class="rk-rk-stat-card">
             <div class="flex justify-between items-start">
-                <div class="rk-stat-label">Active Alerts Count</div>
-                <div class="rk-stat-icon" style="background:#fde8e8;color:#c0392b">
+                <div class="rk-rk-stat-label">Active Alerts Count</div>
+                <div class="rk-rk-stat-icon" style="background:#fde8e8;color:#c0392b">
                     <i class="bi bi-bell-fill"></i>
                 </div>
             </div>
-            <div class="rk-stat-value" style="color:{{ '#c0392b' if active_alerts > 0 else '#047857' }}">
+            <div class="rk-rk-stat-value" style="color:{{ '#c0392b' if active_alerts > 0 else '#047857' }}">
                 {{ active_alerts }}
             </div>
             <div class="text-sm mt-1 text-slate-500">
@@ -306,7 +306,7 @@
                 <h6>Preparedness Index Overview</h6>
             </div>
 
-            <table class="rk-table prep-rk-table">
+            <table class="rk-rk-table prep-rk-rk-table">
                 <thead>
                     <tr>
                         <th>Barangay</th>

@@ -33,7 +33,7 @@
 
 <div class="rk-card p-0">
     <div class="overflow-x-auto">
-        <table class="rk-table mb-0 align-middle">
+        <table class="rk-rk-table mb-0 align-middle">
             <thead style="background:#f9fafb">
                 <tr style="font-size:12px;color:var(--rk-muted);text-transform:uppercase;letter-spacing:0.04em">
                     <th class="px-3 py-3">Username</th>
@@ -52,31 +52,31 @@
                     <td>{{ u.email or '—' }}</td>
                     <td>
                         {% if u.role.value == 'admin' %}
-                            <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-red">CDRRMO Admin</span>
+                            <span class="rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate-red">CDRRMO Admin</span>
                         {% elif u.role.value == 'cfau_oic' %}
-                            <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-amber">CFAU / Operations Personnel</span>
+                            <span class="rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate-amber">CFAU / Operations Personnel</span>
                         {% elif u.role.value == 'bdrrmo' %}
-                            <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-green">BDRRMO / Barangay Focal</span>
+                            <span class="rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate-green">BDRRMO / Barangay Focal</span>
                         {% elif u.role.value == 'cdrrmo_staff' %}
-                            <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-blue">CDRRMO Logistics Staff</span>
+                            <span class="rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate-blue">CDRRMO Logistics Staff</span>
                         {% endif %}
                     </td>
                     <td>{{ u.barangay.name if u.barangay else '—' }}</td>
                     <td>{{ u.contact_number or '—' }}</td>
                     <td>
                         {% if u.is_active %}
-                            <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-green">Active</span>
+                            <span class="rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate-green">Active</span>
                         {% else %}
-                            <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-amber">Inactive</span>
+                            <span class="rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate-amber">Inactive</span>
                         {% endif %}
                     </td>
                     <td class="text-right px-3">
                         <a href="/admin/users/{{ u.id }}/edit"
-                           class="rk-btn-secondary rk-btn-sm mr-1">
+                           class="rk-btn-secondary rk-rk-btn-sm mr-1">
                             <i class="bi bi-pencil"></i> Edit
                         </a>
                         <a href="/admin/audit?user_id={{ u.id }}"
-                           class="rk-btn-secondary rk-btn-sm mr-1" title="View this user's audit trail">
+                           class="rk-btn-secondary rk-rk-btn-sm mr-1" title="View this user's audit trail">
                             <i class="bi bi-clock-history"></i> Audit
                         </a>
                         {% if u.id != user.id %}
@@ -84,7 +84,7 @@
                               style="display:inline"
                               onsubmit="event.preventDefault(); rkConfirm('Are you sure?', this)">
                             <button type="submit"
-                                class="rk-btn-sm {{ '-outline-danger' if u.is_active else '-outline-success' }}">
+                                class="rk-rk-btn-sm {{ '-outline-danger' if u.is_active else '-outline-success' }}">
                                 {% if u.is_active %}
                                     <i class="bi bi-slash-circle"></i> Deactivate
                                 {% else %}

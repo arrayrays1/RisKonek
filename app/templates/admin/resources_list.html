@@ -6,13 +6,13 @@
 
 {% macro alert_pill(a) -%}
     {% if a == 'expired' %}
-        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-red">Expired</span>
+        <span class="rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate-red">Expired</span>
     {% elif a == 'near_expiry' %}
-        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-amber">Near Expiry</span>
+        <span class="rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate-amber">Near Expiry</span>
     {% elif a == 'low_stock' %}
-        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-amber">Low Stock</span>
+        <span class="rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate-amber">Low Stock</span>
     {% else %}
-        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-green">OK</span>
+        <span class="rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate-green">OK</span>
     {% endif %}
 {%- endmacro %}
 
@@ -45,45 +45,45 @@
 <!-- ── Summary cards ──────────────────────────────────────────── -->
 <div class="grid grid-cols-12 gap-3 mb-3">
     <div class="col-span-3">
-        <div class="rk-stat-card flex justify-between items-center">
+        <div class="rk-rk-stat-card flex justify-between items-center">
             <div>
-                <div class="rk-stat-label">Total Active Items</div>
-                <div class="rk-stat-value">{{ summary.total }}</div>
+                <div class="rk-rk-stat-label">Total Active Items</div>
+                <div class="rk-rk-stat-value">{{ summary.total }}</div>
             </div>
-            <div class="rk-stat-icon" style="background:#d1fae5;color:var(--rk-green)">
+            <div class="rk-rk-stat-icon" style="background:#d1fae5;color:var(--rk-green)">
                 <i class="bi bi-box-seam"></i>
             </div>
         </div>
     </div>
     <div class="col-span-3">
-        <div class="rk-stat-card flex justify-between items-center">
+        <div class="rk-rk-stat-card flex justify-between items-center">
             <div>
-                <div class="rk-stat-label">Low Stock</div>
-                <div class="rk-stat-value">{{ summary.low_stock }}</div>
+                <div class="rk-rk-stat-label">Low Stock</div>
+                <div class="rk-rk-stat-value">{{ summary.low_stock }}</div>
             </div>
-            <div class="rk-stat-icon" style="background:#fef9e7;color:#b7950b">
+            <div class="rk-rk-stat-icon" style="background:#fef9e7;color:#b7950b">
                 <i class="bi bi-exclamation-triangle"></i>
             </div>
         </div>
     </div>
     <div class="col-span-3">
-        <div class="rk-stat-card flex justify-between items-center">
+        <div class="rk-rk-stat-card flex justify-between items-center">
             <div>
-                <div class="rk-stat-label">Near Expiry (≤ 30d)</div>
-                <div class="rk-stat-value">{{ summary.near_expiry }}</div>
+                <div class="rk-rk-stat-label">Near Expiry (≤ 30d)</div>
+                <div class="rk-rk-stat-value">{{ summary.near_expiry }}</div>
             </div>
-            <div class="rk-stat-icon" style="background:#fef9e7;color:#b7950b">
+            <div class="rk-rk-stat-icon" style="background:#fef9e7;color:#b7950b">
                 <i class="bi bi-clock-history"></i>
             </div>
         </div>
     </div>
     <div class="col-span-3">
-        <div class="rk-stat-card flex justify-between items-center">
+        <div class="rk-rk-stat-card flex justify-between items-center">
             <div>
-                <div class="rk-stat-label">Expired</div>
-                <div class="rk-stat-value">{{ summary.expired }}</div>
+                <div class="rk-rk-stat-label">Expired</div>
+                <div class="rk-rk-stat-value">{{ summary.expired }}</div>
             </div>
-            <div class="rk-stat-icon" style="background:#fde8e8;color:#c0392b">
+            <div class="rk-rk-stat-icon" style="background:#fde8e8;color:#c0392b">
                 <i class="bi bi-x-octagon"></i>
             </div>
         </div>
@@ -136,7 +136,7 @@
             </select>
         </div>
         <div class="col-span-1 d-grid">
-            <a href="/admin/resources" class="rk-btn-secondary rk-btn-sm" title="Reset filters">
+            <a href="/admin/resources" class="rk-btn-secondary rk-rk-btn-sm" title="Reset filters">
                 <i class="bi bi-x-circle"></i>
             </a>
         </div>
@@ -146,7 +146,7 @@
 <!-- ── Table ──────────────────────────────────────────────────── -->
 <div class="rk-card p-0">
     <div class="overflow-x-auto">
-        <table class="rk-table align-middle mb-0">
+        <table class="rk-rk-table align-middle mb-0">
             <thead style="background:#f9fafb">
                 <tr style="font-size:12px;color:var(--rk-muted);text-transform:uppercase;letter-spacing:0.04em">
                     <th class="px-3 py-3">Item</th>
@@ -252,8 +252,8 @@
         </div>
       </div>
       <div class="modal-footer">
-        <button type="button" class="rk-btn-secondary rk-btn-sm" data-bs-dismiss="modal">Cancel</button>
-        <button type="submit" class="rk-btn-primary rk-btn-sm">Apply</button>
+        <button type="button" class="rk-btn-secondary rk-rk-btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" class="rk-btn-primary rk-rk-btn-sm">Apply</button>
       </div>
     </form>
   </div>

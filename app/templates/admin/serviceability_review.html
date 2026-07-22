@@ -6,29 +6,29 @@
 
 {% macro workflow_pill(v, label) -%}
     {% if v == 'draft' %}
-        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate">{{ label }}</span>
+        <span class="rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate-slate">{{ label }}</span>
     {% elif v == 'submitted' %}
-        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-amber">{{ label }}</span>
+        <span class="rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate-amber">{{ label }}</span>
     {% elif v == 'reviewed' %}
-        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-blue">{{ label }}</span>
+        <span class="rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate-blue">{{ label }}</span>
     {% elif v == 'resolved' %}
-        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-green">{{ label }}</span>
+        <span class="rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate-green">{{ label }}</span>
     {% else %}
-        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate">{{ label }}</span>
+        <span class="rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate-slate">{{ label }}</span>
     {% endif %}
 {%- endmacro %}
 
 {% macro urgency_badge(v, label) -%}
     {% if v == 'critical' %}
-        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate" style="background:#fde8e8;color:#c0392b;border:1px solid #f4c2bd">
+        <span class="rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate-slate" style="background:#fde8e8;color:#c0392b;border:1px solid #f4c2bd">
             <i class="bi bi-exclamation-triangle-fill"></i> {{ label }}</span>
     {% elif v == 'high' %}
-        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate" style="background:#fdebd0;color:#b9770e;border:1px solid #f5cba7">
+        <span class="rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate-slate" style="background:#fdebd0;color:#b9770e;border:1px solid #f5cba7">
             <i class="bi bi-exclamation-circle-fill"></i> {{ label }}</span>
     {% elif v == 'moderate' %}
-        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-amber">{{ label }}</span>
+        <span class="rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate-amber">{{ label }}</span>
     {% else %}
-        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate" style="background:#eef0f2;color:#6c757d;border:1px solid #dee2e6">{{ label }}</span>
+        <span class="rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate-slate" style="background:#eef0f2;color:#6c757d;border:1px solid #dee2e6">{{ label }}</span>
     {% endif %}
 {%- endmacro %}
 
@@ -63,21 +63,21 @@
 {% endif %}
 
 <div class="grid grid-cols-12 gap-3 mb-3">
-    <div class="col-span-3"><div class="rk-stat-card flex justify-between items-center">
+    <div class="col-span-3"><div class="rk-rk-stat-card flex justify-between items-center">
         <div>
-            <div class="rk-stat-label">Needs Urgent Attention</div>
-            <div class="rk-stat-value {{ 'text-red-600' if summary.priority else '' }}">{{ summary.priority }}</div>
+            <div class="rk-rk-stat-label">Needs Urgent Attention</div>
+            <div class="rk-rk-stat-value {{ 'text-red-600' if summary.priority else '' }}">{{ summary.priority }}</div>
         </div>
-        <div class="rk-stat-icon" style="background:#fde8e8;color:#c0392b"><i class="bi bi-exclamation-triangle"></i></div>
+        <div class="rk-rk-stat-icon" style="background:#fde8e8;color:#c0392b"><i class="bi bi-exclamation-triangle"></i></div>
     </div></div>
-    <div class="col-span-3"><div class="rk-stat-card">
-        <div class="rk-stat-label">Awaiting Review</div><div class="rk-stat-value">{{ summary.submitted }}</div>
+    <div class="col-span-3"><div class="rk-rk-stat-card">
+        <div class="rk-rk-stat-label">Awaiting Review</div><div class="rk-rk-stat-value">{{ summary.submitted }}</div>
     </div></div>
-    <div class="col-span-3"><div class="rk-stat-card">
-        <div class="rk-stat-label">Reviewed</div><div class="rk-stat-value">{{ summary.reviewed }}</div>
+    <div class="col-span-3"><div class="rk-rk-stat-card">
+        <div class="rk-rk-stat-label">Reviewed</div><div class="rk-rk-stat-value">{{ summary.reviewed }}</div>
     </div></div>
-    <div class="col-span-3"><div class="rk-stat-card">
-        <div class="rk-stat-label">Resolved</div><div class="rk-stat-value">{{ summary.resolved }}</div>
+    <div class="col-span-3"><div class="rk-rk-stat-card">
+        <div class="rk-rk-stat-label">Resolved</div><div class="rk-rk-stat-value">{{ summary.resolved }}</div>
     </div></div>
 </div>
 
@@ -102,14 +102,14 @@
             </select>
         </div>
         <div class="col-span-2 d-grid">
-            <a href="/admin/serviceability" class="rk-btn-secondary rk-btn-sm"><i class="bi bi-x-circle"></i> Reset</a>
+            <a href="/admin/serviceability" class="rk-btn-secondary rk-rk-btn-sm"><i class="bi bi-x-circle"></i> Reset</a>
         </div>
     </form>
 </div>
 
 <div class="rk-card p-0">
     <div class="overflow-x-auto">
-        <table class="rk-table align-middle mb-0">
+        <table class="rk-rk-table align-middle mb-0">
             <thead style="background:#f9fafb">
                 <tr style="font-size:12px;color:var(--rk-muted);text-transform:uppercase;letter-spacing:0.04em">
                     <th class="px-3 py-3">Urgency</th>
@@ -134,7 +134,7 @@
                     <td class="text-slate-500">{{ r.reporter }}</td>
                     <td>{{ workflow_pill(r.report_status, r.report_status_label) }}</td>
                     <td class="text-right px-3">
-                        <a href="/admin/serviceability/{{ r.id }}" class="rk-btn-secondary rk-btn-sm">
+                        <a href="/admin/serviceability/{{ r.id }}" class="rk-btn-secondary rk-rk-btn-sm">
                             <i class="bi bi-eye"></i> Review
                         </a>
                     </td>

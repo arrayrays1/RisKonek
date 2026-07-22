@@ -10,7 +10,7 @@
            verify the details below and save to record this incident for
            {% if barangay %}Barangay <strong>{{ barangay.name }}</strong>{% else %}your barangay{% endif %}.</p>
     </div>
-    <a href="/bdrrmo/incidents" class="rk-btn-secondary rk-btn-sm">
+    <a href="/bdrrmo/incidents" class="rk-btn-secondary rk-rk-btn-sm">
         <i class="bi bi-arrow-left"></i> Back
     </a>
 </div>
@@ -41,7 +41,7 @@
         <div class="col-span-3">
             <div class="text-sm" style="color:var(--rk-muted)">File name</div>
             <div class="font-semibold" style="font-size:13px;">{{ report.file_name }}</div>
-            <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate" style="background:#f1f5f9;color:#475569;font-size:11px;">
+            <span class="rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate rk-rk-badge rk-badge-slate rk-rk-badge rk-badge-slate-slate-slate" style="background:#f1f5f9;color:#475569;font-size:11px;">
                 {{ report.file_type.value | upper }}
             </span>
         </div>
@@ -57,7 +57,7 @@
         </div>
         <div class="col-span-3 flex items-end">
             <a href="/bdrrmo/incidents/upload/{{ report.id }}/file"
-               class="rk-btn-secondary rk-btn-sm w-full">
+               class="rk-btn-secondary rk-rk-btn-sm w-full">
                 <i class="bi bi-download"></i> View Original File
             </a>
         </div>
@@ -93,7 +93,7 @@
     </div>
     {% if columns_preview and rows_preview %}
         <div class="overflow-x-auto mt-2" style="max-height:320px;overflow:auto;border-radius:8px;border:1px solid #e5e7eb;">
-            <table class="rk-table mb-0" style="font-size:12px;">
+            <table class="rk-rk-table mb-0" style="font-size:12px;">
                 <thead style="background:#f9fafb;position:sticky;top:0;">
                     <tr>{% for c in columns_preview %}<th class="text-slate-500 font-semibold">{{ c }}</th>{% endfor %}</tr>
                 </thead>
@@ -233,7 +233,7 @@
                     </div>
                     {% endfor %}
                 </div>
-                <button type="button" class="rk-btn-secondary rk-btn-sm" id="rkAddEquipmentBtn">
+                <button type="button" class="rk-btn-secondary rk-rk-btn-sm" id="rkAddEquipmentBtn">
                     <i class="bi bi-plus"></i> Add another
                 </button>
                 <div class="rk-field-hint mt-1">Leave blank if none. Empty rows are ignored on save.</div>
