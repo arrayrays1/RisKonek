@@ -2,49 +2,6 @@
 {% set active_nav = 'simulator' %}
 {% block title %}Simulation Results — RisKonek{% endblock %}
 
-{# ── Presentation maps (top-level so both content and scripts blocks see them) ── #}
-{% set display_order = ['water', 'food', 'blankets', 'evac_capacity', 'medicine', 'vehicles'] %}
-{% set class_label = {
-    'water': 'Water',
-    'food': 'Food Packs',
-    'blankets': 'Blankets / NFI Kits',
-    'evac_capacity': 'Evacuation Capacity',
-    'medicine': 'Medicine Kits',
-    'vehicles': 'Response Vehicles'
-} %}
-{# engine status -> UI vocabulary (label + Bootstrap/base classes) #}
-{% set status_ui = {
-    'Adequate': {'label': 'Sufficient', 'pill': 'status-operational', 'bar': 'bg-success', 'alert': 'alert-success'},
-    'Partial':  {'label': 'At Risk',    'pill': 'status-maintenance', 'bar': 'bg-warning', 'alert': 'alert-warning'},
-    'Critical': {'label': 'Critical',   'pill': 'status-unavailable', 'bar': 'bg-danger',  'alert': 'alert-danger'}
-} %}
-{% set band_ui = {
-    'Adequate': {'label': 'Low Risk',      'text': 'text-success', 'bar': 'bg-success'},
-    'Partial':  {'label': 'Moderate Risk', 'text': 'text-warning', 'bar': 'bg-warning'},
-    'Critical': {'label': 'High Risk',      'text': 'text-danger',  'bar': 'bg-danger'}
-} %}
-{% set band = band_ui.get(result.overall_readiness, band_ui['Critical']) %}
-
-{# Sub-score groups — worst coverage per group drives its bar + status.
-   NOT a single 0–100 composite; each is its own readiness band. #}
-{% set groups = [
-    {'label': 'Evacuation Readiness', 'icon': 'bi-house-heart-fill', 'classes': ['evac_capacity']},
-    {'label': 'Resource Readiness',   'icon': 'bi-box-seam-fill',    'classes': ['water', 'food', 'blankets', 'medicine']},
-    {'label': 'Response Readiness',   'icon': 'bi-truck',            'classes': ['vehicles']}
-] %}
-
-{# Chart.js series (built once here, consumed in the scripts block) #}
-{% set chart_labels = [] %}
-{% set chart_need = [] %}
-{% set chart_avail = [] %}
-{% for c in display_order %}
-    {% if c in result.gaps %}
-        {% set _ = chart_labels.append(class_label[c]) %}
-        {% set _ = chart_need.append(result.gaps[c].need) %}
-        {% set _ = chart_avail.append(result.gaps[c].available) %}
-    {% endif %}
-{% endfor %}
-
 {% block content %}
 <div class="page-header d-flex justify-content-between align-items-start flex-wrap gap-2">
     <div>
@@ -52,252 +9,60 @@
         <p>Advisory planning estimate — review and validate with CDRRMO personnel
            before any operational use.</p>
     </div>
-    <a href="/admin/simulator/setup" class="btn btn-soft">
-        <i class="bi bi-arrow-repeat"></i> New Simulation
-    </a>
-</div>
-
-<!-- ── Overall readiness band + sub-score bars ─────────────────────────── -->
-<div class="dash-card mb-3">
-    <div class="row align-items-center">
-        <div class="col-md-4 text-center border-end">
-            <div class="stat-label">Overall Readiness</div>
-            <div class="{{ band.text }}" style="font-size: 30px; font-weight: 800;">
-                {{ band.label }}
-            </div>
-            <div class="text-muted" style="font-size: 12px;">
-                Worst-status band across all resource classes
-            </div>
-        </div>
-        <div class="col-md-8">
-            {% for g in groups %}
-                {% set covs = [] %}
-                {% for c in g.classes %}
-                    {% if c in result.gaps %}{% set _ = covs.append(result.gaps[c].coverage) %}{% endif %}
-                {% endfor %}
-                {% set gcov = (covs | min) if covs else 1.0 %}
-                {% set gpct = (gcov * 100) | round(0, 'floor') | int %}
-                {% set gpct = 100 if gpct > 100 else gpct %}
-                {% set gstatus = 'Adequate' if gcov >= 1.0 else ('Partial' if gcov >= 0.5 else 'Critical') %}
-                {% set gui = status_ui[gstatus] %}
-                <div class="mb-2">
-                    <div class="d-flex justify-content-between" style="font-size: 13px;">
-                        <span><i class="bi {{ g.icon }} me-1"></i>{{ g.label }}</span>
-                        <span class="fw-semibold">{{ gui.label }}</span>
-                    </div>
-                    <div class="progress" style="height: 10px;">
-                        <div class="progress-bar {{ gui.bar }}" role="progressbar"
-                             style="width: {{ gpct }}%;"
-                             aria-valuenow="{{ gpct }}" aria-valuemin="0" aria-valuemax="100"></div>
-                    </div>
-                </div>
-            {% endfor %}
-        </div>
+    <div class="d-flex gap-2">
+        {% if saved_scenario_id %}
+        <a href="/admin/simulator/scenarios/{{ saved_scenario_id }}" class="btn btn-soft">
+            <i class="bi bi-bookmark-check-fill"></i> View Saved Scenario
+        </a>
+        {% else %}
+        <button type="button" class="btn btn-rk"
+                data-bs-toggle="modal" data-bs-target="#saveScenarioModal">
+            <i class="bi bi-save"></i> Save Scenario
+        </button>
+        {% endif %}
+        <a href="/admin/simulator/setup" class="btn btn-soft">
+            <i class="bi bi-arrow-repeat"></i> New Simulation
+        </a>
     </div>
 </div>
 
-<!-- ── Scenario config strip ───────────────────────────────────────────── -->
-<div class="dash-card mb-3">
-    <div class="row text-center">
-        <div class="col-md-4">
-            <div class="stat-label">Barangay</div>
-            <div class="fw-semibold">{{ result.inputs.barangay_name }}</div>
-        </div>
-        <div class="col-md-4">
-            <div class="stat-label">Disaster Type</div>
-            <div class="fw-semibold text-capitalize">{{ result.inputs.disaster_type }}</div>
-        </div>
-        <div class="col-md-4">
-            <div class="stat-label">Planning Horizon</div>
-            <div class="fw-semibold">{{ result.duration_label }} ({{ result.inputs.horizon_days }} days)</div>
-        </div>
-    </div>
-    {% if not result.hazard_recorded %}
-    <div class="alert-banner mt-3 mb-0">
-        <i class="bi bi-exclamation-triangle-fill"></i>
-        <span>{{ result.hazard_note }}</span>
-    </div>
-    {% endif %}
-</div>
+{% include "admin/_simulator_result.html" %}
 
-<div class="row">
-    <!-- ── Affected population card ─────────────────────────────────────── -->
-    <div class="col-lg-4 mb-3">
-        <div class="dash-card h-100">
-            <div class="card-title-row">
-                <h6><i class="bi bi-people-fill me-1"></i>Estimated Affected Population</h6>
-            </div>
-            <div class="stat-value" style="font-size: 32px;">
-                {{ "{:,}".format(result.estimated_affected) }}
-            </div>
-            <div class="text-muted" style="font-size: 12px;">
-                of {{ "{:,}".format(result.inputs.total_population) }} residents
-            </div>
-            <hr>
-            {% set vpct = (result.estimated_vulnerable / result.estimated_affected * 100) if result.estimated_affected else 0 %}
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <div class="stat-label">Vulnerable (PWD + elderly + children)</div>
-                    <div class="fw-semibold">{{ "{:,}".format(result.estimated_vulnerable) }}</div>
-                </div>
-                <span class="risk-badge risk-moderate">{{ vpct | round(1) }}% of affected</span>
-            </div>
-        </div>
-    </div>
-
-    <!-- ── Planning status summary (alert rows per class) ───────────────── -->
-    <div class="col-lg-8 mb-3">
-        <div class="dash-card h-100">
-            <div class="card-title-row">
-                <h6><i class="bi bi-ui-checks me-1"></i>Planning Status Summary</h6>
-            </div>
-            {% for c in display_order %}
-                {% if c in result.gaps %}
-                    {% set g = result.gaps[c] %}
-                    {% set sui = status_ui[result.status_by_class[c]] %}
-                    <div class="alert {{ sui.alert }} d-flex justify-content-between align-items-center py-2 mb-2">
-                        <span><strong>{{ class_label[c] }}</strong>
-                            {% if g.gap > 0 %}
-                                — short by {{ "{:,}".format(g.gap) }} {{ g.unit }}
-                            {% else %}
-                                — fully covered
-                            {% endif %}
-                        </span>
-                        <span class="status-pill {{ sui.pill }}">{{ sui.label }}</span>
-                    </div>
-                {% endif %}
-            {% endfor %}
-        </div>
-    </div>
-</div>
-
-<!-- ── Resource analysis table ─────────────────────────────────────────── -->
-<div class="dash-card mb-3">
-    <div class="card-title-row">
-        <h6><i class="bi bi-table me-1"></i>Resource Analysis</h6>
-    </div>
-    <div class="table-responsive">
-        <table class="table align-middle">
-            <thead>
-                <tr>
-                    <th>Resource Class</th>
-                    <th class="text-end">Required</th>
-                    <th class="text-end">Available</th>
-                    <th class="text-end">Gap / Surplus</th>
-                    <th>Basis</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for c in display_order %}
-                    {% if c in result.gaps %}
-                        {% set g = result.gaps[c] %}
-                        {% set sui = status_ui[result.status_by_class[c]] %}
-                        <tr>
-                            <td>{{ class_label[c] }}<span class="text-muted"> ({{ g.unit }})</span></td>
-                            <td class="text-end">{{ "{:,}".format(g.need) }}</td>
-                            <td class="text-end">{{ "{:,}".format(g.available) }}</td>
-                            <td class="text-end">
-                                {% if g.gap > 0 %}
-                                    <span class="text-danger fw-semibold">−{{ "{:,}".format(g.gap) }}</span>
-                                {% else %}
-                                    <span class="text-success fw-semibold">+{{ "{:,}".format(g.available - g.need) }}</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if g.basis == 'standard' %}
-                                    <span class="badge bg-light text-dark border" title="Traceable to Sphere / DSWD">Standard</span>
-                                {% else %}
-                                    <span class="badge bg-light text-secondary border" title="CDRRMO planning assumption, adjustable">Assumption</span>
-                                {% endif %}
-                            </td>
-                            <td><span class="status-pill {{ sui.pill }}">{{ sui.label }}</span></td>
-                        </tr>
-                    {% endif %}
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-    <p class="text-muted mb-0" style="font-size: 12px;">
-        <i class="bi bi-info-circle me-1"></i><strong>Standard</strong> figures follow
-        Sphere / DSWD guidance; <strong>Assumption</strong> figures are adjustable CDRRMO
-        planning targets, not standard-based requirements.
-    </p>
-</div>
-
-<!-- ── Operational risks ───────────────────────────────────────────────── -->
-{% if result.operational_risks %}
-<div class="dash-card mb-3">
-    <div class="card-title-row">
-        <h6><i class="bi bi-shield-exclamation me-1"></i>Operational Risks</h6>
-    </div>
-    <ul class="mb-0">
-        {% for r in result.operational_risks %}
-        <li>{{ r }}</li>
-        {% endfor %}
-    </ul>
+{% if not saved_scenario_id %}
+<!-- ── Save Scenario modal ─────────────────────────────────────────────── -->
+<div class="modal fade" id="saveScenarioModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <form method="POST" action="/admin/simulator/save" class="modal-content">
+      <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+      <input type="hidden" name="run_id" value="{{ run_id }}">
+      <div class="modal-header">
+        <h6 class="modal-title"><i class="bi bi-save me-1"></i>Save Scenario</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-muted">
+            This saves a <strong>frozen snapshot</strong> of the current results —
+            the figures and thresholds as they are right now. Later data or
+            threshold changes will not affect it.
+        </p>
+        <label for="scenario_name" class="form-label small fw-semibold">Scenario name</label>
+        <input type="text" id="scenario_name" name="name" class="form-control"
+               maxlength="150" required autocomplete="off"
+               value="{{ default_scenario_name }}">
+        <div class="form-text">Auto-filled from the scenario details — edit if you like.</div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" class="btn btn-rk btn-sm">
+            <i class="bi bi-save me-1"></i>Save Scenario
+        </button>
+      </div>
+    </form>
+  </div>
 </div>
 {% endif %}
-
-<!-- ── Need vs Available chart ─────────────────────────────────────────── -->
-<div class="dash-card mb-3">
-    <div class="card-title-row">
-        <h6><i class="bi bi-bar-chart-fill me-1"></i>Need vs. Available</h6>
-    </div>
-    <canvas id="needChart" height="110"></canvas>
-</div>
-
-<!-- ── AI briefing (optional; below the numeric tables) ─────────────────── -->
-<div class="dash-card mb-3">
-    <div class="card-title-row">
-        <h6><i class="bi bi-robot me-1"></i>AI Planning Briefing</h6>
-        <span class="risk-badge risk-moderate ms-auto">
-            AI-generated · advisory · validate with current conditions and expert judgment
-        </span>
-    </div>
-    {% if ai_briefing %}
-        {# ai_briefing is markdown already converted to a SANITIZED HTML fragment
-           in ai_layer.to_safe_html() (nh3 allowlist). Safe to mark |safe. #}
-        <div class="ai-briefing" style="font-size: 14px; line-height: 1.6;">{{ ai_briefing | safe }}</div>
-    {% else %}
-        <div class="alert-banner mb-0">
-            <i class="bi bi-info-circle-fill"></i>
-            <span>{{ ai_note or "The AI summary is unavailable. The numeric report above is complete and unaffected." }}</span>
-        </div>
-    {% endif %}
-</div>
 {% endblock %}
 
 {% block scripts %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"
-        integrity="sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4" crossorigin="anonymous"></script>
-<script nonce="{{ request.state.csp_nonce }}">
-// All init JS lives here (CSP: nonce required; no inline on* handlers).
-(function () {
-    const labels = {{ chart_labels | tojson }};
-    const needData = {{ chart_need | tojson }};
-    const availData = {{ chart_avail | tojson }};
-    const canvas = document.getElementById('needChart');
-    if (!canvas) return;
-
-    new Chart(canvas, {
-        type: 'bar',
-        data: {
-            labels: labels,
-            datasets: [
-                { label: 'Required', data: needData, backgroundColor: '#f59e0b', borderRadius: 5 },
-                { label: 'Available', data: availData, backgroundColor: '#10b981', borderRadius: 5 }
-            ]
-        },
-        options: {
-            responsive: true,
-            plugins: { legend: { position: 'top' } },
-            scales: {
-                y: { beginAtZero: true, grid: { color: '#f5f5f5' } },
-                x: { grid: { display: false } }
-            }
-        }
-    });
-})();
-</script>
+{% include "admin/_simulator_scripts.html" %}
 {% endblock %}
