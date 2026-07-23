@@ -586,6 +586,39 @@ class PlanningThreshold(Base):
     updated_by = Column(Integer, ForeignKey("users.id"), nullable=True)
 
 
+# ==========================
+# TABLE 13: Saved Scenarios (simulator — frozen snapshots)
+# ==========================
+
+class SavedScenario(Base):
+    """A FROZEN snapshot of one simulator run, saved by an admin.
+
+    result_json and thresholds_json capture what was computed and the
+    threshold values in force AT RUN TIME. The view route renders straight
+    from these columns — it never recomputes and never calls Groq — so a
+    later threshold edit or resource change never alters a saved record.
+    barangay_name is denormalized so the record stays readable if the
+    barangay is later renamed or deleted. New table: created by create_all()
+    on startup, so no migration is needed.
+    """
+    __tablename__ = "saved_scenarios"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(150), nullable=False)            # admin-supplied label
+    barangay_id = Column(Integer, ForeignKey("barangays.id"), nullable=True)
+    barangay_name = Column(String(100), nullable=False)   # denormalized — survives renames
+    disaster_type = Column(String(30), nullable=False)
+    duration = Column(String(30), nullable=False)         # duration key, e.g. "3_days"
+    horizon_days = Column(Integer, nullable=False)
+    result_json = Column(Text, nullable=False)            # full engine result dict
+    ai_briefing = Column(Text, nullable=True)             # saved AI prose (sanitized HTML)
+    thresholds_json = Column(Text, nullable=False)        # thresholds used for THIS run
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+
+    # relationships (no cascade — a deleted barangay/user must not destroy history)
+    barangay = relationship("Barangay")
+    created_by_user = relationship("User")
 
 
 # *******************************

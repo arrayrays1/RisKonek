@@ -1,0 +1,246 @@
+{# ── Shared simulator results body ─────────────────────────────────────────
+   Rendered by both the live results page (admin/simulator_results.html) and a
+   saved-scenario snapshot (admin/scenario_detail.html). Consumes `result`,
+   `ai_briefing`, and `ai_note` from the parent context. The page-specific
+   header/action row lives in each wrapper, NOT here. #}
+
+{# ── Presentation maps ── #}
+{% set display_order = ['water', 'food', 'blankets', 'evac_capacity', 'medicine', 'vehicles'] %}
+{% set class_label = {
+    'water': 'Water',
+    'food': 'Food Packs',
+    'blankets': 'Blankets / NFI Kits',
+    'evac_capacity': 'Evacuation Capacity',
+    'medicine': 'Medicine Kits',
+    'vehicles': 'Response Vehicles'
+} %}
+{# engine status -> UI vocabulary (label + Bootstrap/base classes) #}
+{% set status_ui = {
+    'Adequate': {'label': 'Sufficient', 'pill': 'status-operational', 'bar': 'bg-success', 'alert': 'alert-success'},
+    'Partial':  {'label': 'At Risk',    'pill': 'status-maintenance', 'bar': 'bg-warning', 'alert': 'alert-warning'},
+    'Critical': {'label': 'Critical',   'pill': 'status-unavailable', 'bar': 'bg-danger',  'alert': 'alert-danger'}
+} %}
+{% set band_ui = {
+    'Adequate': {'label': 'Low Risk',      'text': 'text-success', 'bar': 'bg-success'},
+    'Partial':  {'label': 'Moderate Risk', 'text': 'text-warning', 'bar': 'bg-warning'},
+    'Critical': {'label': 'High Risk',      'text': 'text-danger',  'bar': 'bg-danger'}
+} %}
+{% set band = band_ui.get(result.overall_readiness, band_ui['Critical']) %}
+
+{# Sub-score groups — worst coverage per group drives its bar + status.
+   NOT a single 0–100 composite; each is its own readiness band. #}
+{% set groups = [
+    {'label': 'Evacuation Readiness', 'icon': 'bi-house-heart-fill', 'classes': ['evac_capacity']},
+    {'label': 'Resource Readiness',   'icon': 'bi-box-seam-fill',    'classes': ['water', 'food', 'blankets', 'medicine']},
+    {'label': 'Response Readiness',   'icon': 'bi-truck',            'classes': ['vehicles']}
+] %}
+
+<!-- ── Overall readiness band + sub-score bars ─────────────────────────── -->
+<div class="dash-card mb-3">
+    <div class="row align-items-center">
+        <div class="col-md-4 text-center border-end">
+            <div class="stat-label">Overall Readiness</div>
+            <div class="{{ band.text }}" style="font-size: 30px; font-weight: 800;">
+                {{ band.label }}
+            </div>
+            <div class="text-muted" style="font-size: 12px;">
+                Worst-status band across all resource classes
+            </div>
+        </div>
+        <div class="col-md-8">
+            {% for g in groups %}
+                {% set covs = [] %}
+                {% for c in g.classes %}
+                    {% if c in result.gaps %}{% set _ = covs.append(result.gaps[c].coverage) %}{% endif %}
+                {% endfor %}
+                {% set gcov = (covs | min) if covs else 1.0 %}
+                {% set gpct = (gcov * 100) | round(0, 'floor') | int %}
+                {% set gpct = 100 if gpct > 100 else gpct %}
+                {% set gstatus = 'Adequate' if gcov >= 1.0 else ('Partial' if gcov >= 0.5 else 'Critical') %}
+                {% set gui = status_ui[gstatus] %}
+                <div class="mb-2">
+                    <div class="d-flex justify-content-between" style="font-size: 13px;">
+                        <span><i class="bi {{ g.icon }} me-1"></i>{{ g.label }}</span>
+                        <span class="fw-semibold">{{ gui.label }}</span>
+                    </div>
+                    <div class="progress" style="height: 10px;">
+                        <div class="progress-bar {{ gui.bar }}" role="progressbar"
+                             style="width: {{ gpct }}%;"
+                             aria-valuenow="{{ gpct }}" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- ── Scenario config strip ───────────────────────────────────────────── -->
+<div class="dash-card mb-3">
+    <div class="row text-center">
+        <div class="col-md-4">
+            <div class="stat-label">Barangay</div>
+            <div class="fw-semibold">{{ result.inputs.barangay_name }}</div>
+        </div>
+        <div class="col-md-4">
+            <div class="stat-label">Disaster Type</div>
+            <div class="fw-semibold text-capitalize">{{ result.inputs.disaster_type }}</div>
+        </div>
+        <div class="col-md-4">
+            <div class="stat-label">Planning Horizon</div>
+            <div class="fw-semibold">{{ result.duration_label }} ({{ result.inputs.horizon_days }} days)</div>
+        </div>
+    </div>
+    {% if not result.hazard_recorded %}
+    <div class="alert-banner mt-3 mb-0">
+        <i class="bi bi-exclamation-triangle-fill"></i>
+        <span>{{ result.hazard_note }}</span>
+    </div>
+    {% endif %}
+</div>
+
+<div class="row">
+    <!-- ── Affected population card ─────────────────────────────────────── -->
+    <div class="col-lg-4 mb-3">
+        <div class="dash-card h-100">
+            <div class="card-title-row">
+                <h6><i class="bi bi-people-fill me-1"></i>Estimated Affected Population</h6>
+            </div>
+            <div class="stat-value" style="font-size: 32px;">
+                {{ "{:,}".format(result.estimated_affected) }}
+            </div>
+            <div class="text-muted" style="font-size: 12px;">
+                of {{ "{:,}".format(result.inputs.total_population) }} residents
+            </div>
+            <hr>
+            {% set vpct = (result.estimated_vulnerable / result.estimated_affected * 100) if result.estimated_affected else 0 %}
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="stat-label">Vulnerable (PWD + elderly + children)</div>
+                    <div class="fw-semibold">{{ "{:,}".format(result.estimated_vulnerable) }}</div>
+                </div>
+                <span class="risk-badge risk-moderate">{{ vpct | round(1) }}% of affected</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Planning status summary (alert rows per class) ───────────────── -->
+    <div class="col-lg-8 mb-3">
+        <div class="dash-card h-100">
+            <div class="card-title-row">
+                <h6><i class="bi bi-ui-checks me-1"></i>Planning Status Summary</h6>
+            </div>
+            {% for c in display_order %}
+                {% if c in result.gaps %}
+                    {% set g = result.gaps[c] %}
+                    {% set sui = status_ui[result.status_by_class[c]] %}
+                    <div class="alert {{ sui.alert }} d-flex justify-content-between align-items-center py-2 mb-2">
+                        <span><strong>{{ class_label[c] }}</strong>
+                            {% if g.gap > 0 %}
+                                — short by {{ "{:,}".format(g.gap) }} {{ g.unit }}
+                            {% else %}
+                                — fully covered
+                            {% endif %}
+                        </span>
+                        <span class="status-pill {{ sui.pill }}">{{ sui.label }}</span>
+                    </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- ── Resource analysis table ─────────────────────────────────────────── -->
+<div class="dash-card mb-3">
+    <div class="card-title-row">
+        <h6><i class="bi bi-table me-1"></i>Resource Analysis</h6>
+    </div>
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th>Resource Class</th>
+                    <th class="text-end">Required</th>
+                    <th class="text-end">Available</th>
+                    <th class="text-end">Gap / Surplus</th>
+                    <th>Basis</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in display_order %}
+                    {% if c in result.gaps %}
+                        {% set g = result.gaps[c] %}
+                        {% set sui = status_ui[result.status_by_class[c]] %}
+                        <tr>
+                            <td>{{ class_label[c] }}<span class="text-muted"> ({{ g.unit }})</span></td>
+                            <td class="text-end">{{ "{:,}".format(g.need) }}</td>
+                            <td class="text-end">{{ "{:,}".format(g.available) }}</td>
+                            <td class="text-end">
+                                {% if g.gap > 0 %}
+                                    <span class="text-danger fw-semibold">−{{ "{:,}".format(g.gap) }}</span>
+                                {% else %}
+                                    <span class="text-success fw-semibold">+{{ "{:,}".format(g.available - g.need) }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if g.basis == 'standard' %}
+                                    <span class="badge bg-light text-dark border" title="Traceable to Sphere / DSWD">Standard</span>
+                                {% else %}
+                                    <span class="badge bg-light text-secondary border" title="CDRRMO planning assumption, adjustable">Assumption</span>
+                                {% endif %}
+                            </td>
+                            <td><span class="status-pill {{ sui.pill }}">{{ sui.label }}</span></td>
+                        </tr>
+                    {% endif %}
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <p class="text-muted mb-0" style="font-size: 12px;">
+        <i class="bi bi-info-circle me-1"></i><strong>Standard</strong> figures follow
+        Sphere / DSWD guidance; <strong>Assumption</strong> figures are adjustable CDRRMO
+        planning targets, not standard-based requirements.
+    </p>
+</div>
+
+<!-- ── Operational risks ───────────────────────────────────────────────── -->
+{% if result.operational_risks %}
+<div class="dash-card mb-3">
+    <div class="card-title-row">
+        <h6><i class="bi bi-shield-exclamation me-1"></i>Operational Risks</h6>
+    </div>
+    <ul class="mb-0">
+        {% for r in result.operational_risks %}
+        <li>{{ r }}</li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+
+<!-- ── Need vs Available chart ─────────────────────────────────────────── -->
+<div class="dash-card mb-3">
+    <div class="card-title-row">
+        <h6><i class="bi bi-bar-chart-fill me-1"></i>Need vs. Available</h6>
+    </div>
+    <canvas id="needChart" height="110"></canvas>
+</div>
+
+<!-- ── AI briefing (optional; below the numeric tables) ─────────────────── -->
+<div class="dash-card mb-3">
+    <div class="card-title-row">
+        <h6><i class="bi bi-robot me-1"></i>AI Planning Briefing</h6>
+        <span class="risk-badge risk-moderate ms-auto">
+            AI-generated · advisory · validate with current conditions and expert judgment
+        </span>
+    </div>
+    {% if ai_briefing %}
+        {# ai_briefing is markdown already converted to a SANITIZED HTML fragment
+           in ai_layer.to_safe_html() (nh3 allowlist). Safe to mark |safe. #}
+        <div class="ai-briefing" style="font-size: 14px; line-height: 1.6;">{{ ai_briefing | safe }}</div>
+    {% else %}
+        <div class="alert-banner mb-0">
+            <i class="bi bi-info-circle-fill"></i>
+            <span>{{ ai_note or "The AI summary is unavailable. The numeric report above is complete and unaffected." }}</span>
+        </div>
+    {% endif %}
+</div>

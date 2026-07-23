@@ -1,0 +1,54 @@
+{# ── Shared simulator results chart ────────────────────────────────────────
+   Included from the {% block scripts %} of both the live results page and a
+   saved-scenario snapshot. Builds the Need-vs-Available series from
+   `result.gaps` (in the parent context) so both pages stay identical. #}
+{% set class_label = {
+    'water': 'Water',
+    'food': 'Food Packs',
+    'blankets': 'Blankets / NFI Kits',
+    'evac_capacity': 'Evacuation Capacity',
+    'medicine': 'Medicine Kits',
+    'vehicles': 'Response Vehicles'
+} %}
+{% set display_order = ['water', 'food', 'blankets', 'evac_capacity', 'medicine', 'vehicles'] %}
+{% set chart_labels = [] %}
+{% set chart_need = [] %}
+{% set chart_avail = [] %}
+{% for c in display_order %}
+    {% if c in result.gaps %}
+        {% set _ = chart_labels.append(class_label[c]) %}
+        {% set _ = chart_need.append(result.gaps[c].need) %}
+        {% set _ = chart_avail.append(result.gaps[c].available) %}
+    {% endif %}
+{% endfor %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"
+        integrity="sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4" crossorigin="anonymous"></script>
+<script nonce="{{ request.state.csp_nonce }}">
+// All init JS lives here (CSP: nonce required; no inline on* handlers).
+(function () {
+    const labels = {{ chart_labels | tojson }};
+    const needData = {{ chart_need | tojson }};
+    const availData = {{ chart_avail | tojson }};
+    const canvas = document.getElementById('needChart');
+    if (!canvas) return;
+
+    new Chart(canvas, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                { label: 'Required', data: needData, backgroundColor: '#f59e0b', borderRadius: 5 },
+                { label: 'Available', data: availData, backgroundColor: '#10b981', borderRadius: 5 }
+            ]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { position: 'top' } },
+            scales: {
+                y: { beginAtZero: true, grid: { color: '#f5f5f5' } },
+                x: { grid: { display: false } }
+            }
+        }
+    });
+})();
+</script>

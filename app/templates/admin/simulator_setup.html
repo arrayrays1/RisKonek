@@ -9,10 +9,30 @@
         <p>Model a hypothetical disaster scenario to support planning and
            resource decisions before an event occurs.</p>
     </div>
-    <a href="/admin/simulator/settings" class="btn btn-soft">
-        <i class="bi bi-sliders"></i> Planning Thresholds
-    </a>
+    <div class="d-flex gap-2">
+        <a href="#saved-scenarios" class="btn btn-soft">
+            <i class="bi bi-bookmark-check"></i> Saved Scenarios
+        </a>
+        <a href="/admin/simulator/settings" class="btn btn-soft">
+            <i class="bi bi-sliders"></i> Planning Thresholds
+        </a>
+    </div>
 </div>
+
+{% if request.query_params.get('success') %}
+<div class="alert alert-success alert-dismissible fade show">
+    <i class="bi bi-check-circle-fill me-1"></i>
+    {{ request.query_params.get('success') }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+{% if request.query_params.get('error') %}
+<div class="alert alert-danger alert-dismissible fade show">
+    <i class="bi bi-exclamation-triangle-fill me-1"></i>
+    {{ request.query_params.get('error') }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
 
 {# ── About / advisory notice ─────────────────────────────────────────── #}
 <div class="alert-banner">
@@ -26,8 +46,9 @@
     </span>
 </div>
 
-<div class="row">
-    <div class="col-lg-8 col-xl-6">
+<div class="row g-4">
+    <!-- ── LEFT (narrower): Scenario Setup ──────────────────────────────── -->
+    <div class="col-lg-5">
         <div class="dash-card">
             <div class="card-title-row">
                 <h6><i class="bi bi-sliders me-1"></i>Scenario Setup</h6>
@@ -92,5 +113,267 @@
             </form>
         </div>
     </div>
+
+    <!-- ── RIGHT (wider): Weather strip + Priority Barangays ────────────── -->
+    {# Flex column so the Priority card grows to fill the remaining height and
+       its bottom aligns with the Scenario Setup card on the left. The global
+       .dash-card{height:100%} is overridden inline so the weather strip stays
+       compact instead of stretching. #}
+    <div class="col-lg-7 d-flex flex-column">
+        {# ── Weather Outlook — compact 7-day horizontal strip ───────────── #}
+        <div class="dash-card mb-4" style="height:auto;">
+            {% if weather and weather.days %}
+                <div class="d-flex flex-nowrap gap-2 overflow-auto">
+                    {% for d in weather.days %}
+                    {% set icol = '#3b82f6' if ('rain' in d.icon or 'drizzle' in d.icon or 'lightning' in d.icon)
+                                  else ('#f59e0b' if 'sun' in d.icon else '#64748b') %}
+                    <div class="text-center flex-fill py-2 px-1 rounded"
+                         style="min-width:60px; background:#f8fafc;" title="{{ d.label }}">
+                        <div class="fw-semibold" style="font-size:12px;">{{ d.day }}</div>
+                        <div class="my-1"><i class="bi {{ d.icon }}" style="font-size:20px; color:{{ icol }};"></i></div>
+                        <div style="font-size:12px; white-space:nowrap;">
+                            <span class="fw-semibold">{{ d.tmax }}°</span>
+                            <span class="text-muted">{{ d.tmin }}°</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                <p class="text-muted mb-0 mt-2" style="font-size:11px;">
+                    Forecast data from Open-Meteo. For official warnings, refer to PAGASA.
+                </p>
+            {% else %}
+                <div class="alert-banner mb-0">
+                    <i class="bi bi-cloud-slash-fill"></i>
+                    <span>Weather data unavailable. This does not affect the simulator —
+                          try refreshing later.</span>
+                </div>
+            {% endif %}
+        </div>
+
+        {# ── Priority Barangays (config-list; study risk score) ─────────── #}
+        {# Shown ONE at a time with prev/next navigation so the card stays
+           compact — no long list, no awkward empty space. flex-grow-1 lets it
+           fill the remaining column height so its bottom aligns with the left. #}
+        <div class="dash-card flex-grow-1" style="height:auto;">
+            <div class="card-title-row">
+                <h6 class="mb-0"><i class="bi bi-exclamation-triangle-fill me-1 text-danger"></i>Priority Barangays (Frequently Affected)</h6>
+                {% if priority_rows | length > 1 %}
+                <div class="ms-auto d-flex align-items-center gap-1">
+                    <button type="button" class="btn-soft" data-pb-nav data-dir="prev" aria-label="Previous barangay">
+                        <i class="bi bi-chevron-left"></i>
+                    </button>
+                    <span class="text-muted" style="font-size:12px; white-space:nowrap;">
+                        <span id="pb-current">1</span> / {{ priority_rows | length }}
+                    </span>
+                    <button type="button" class="btn-soft" data-pb-nav data-dir="next" aria-label="Next barangay">
+                        <i class="bi bi-chevron-right"></i>
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+            <p class="text-muted" style="font-size:12px;">
+                <i class="bi bi-info-circle me-1"></i>This score is system-generated
+                for planning support only and is not an official hazard or risk
+                classification.
+            </p>
+            {% if priority_rows %}
+            <div id="priority-carousel">
+                {% for p in priority_rows %}
+                <div class="pb-item" data-index="{{ loop.index0 }}"{% if not loop.first %} style="display:none;"{% endif %}>
+                    <div class="d-flex align-items-start gap-2">
+                        <span style="display:inline-flex; align-items:center; justify-content:center;
+                                     width:22px; height:22px; border-radius:50%; flex:0 0 auto;
+                                     background:var(--rk-green,#0f7b3d); color:#fff;
+                                     font-size:12px; font-weight:700;">{{ loop.index }}</span>
+                        <div class="flex-grow-1">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="fw-semibold">{{ p.name }}</span>
+                                <span class="risk-badge risk-{{ p.level }}">{{ p.level.title() }}</span>
+                            </div>
+                            <div class="text-muted" style="font-size:12px;">
+                                Hazards: {{ p.hazards }} · Population: {{ "{:,}".format(p.population) }}
+                            </div>
+                            <div class="progress mt-2" style="height:6px;">
+                                <div class="progress-bar {{ p.bar_class }}" role="progressbar"
+                                     style="width: {{ p.score }}%;"
+                                     aria-valuenow="{{ p.score }}" aria-valuemin="0" aria-valuemax="100"></div>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center mt-1">
+                                <a href="/admin/barangays/{{ p.id }}" style="font-size:12px;">
+                                    View Barangay Profile →
+                                </a>
+                                <span class="text-muted" style="font-size:12px;">Score: {{ p.score }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-muted mb-0" style="font-size:13px;">
+                No priority barangays configured.
+            </p>
+            {% endif %}
+        </div>
+    </div>
 </div>
+
+{# ── Saved scenarios history — full width across the bottom ────────────── #}
+{% set readiness_badge = {
+    'Adequate': {'label': 'Low Risk',      'class': 'status-operational'},
+    'Partial':  {'label': 'Moderate Risk', 'class': 'status-maintenance'},
+    'Critical': {'label': 'High Risk',      'class': 'status-unavailable'}
+} %}
+<div class="dash-card mt-4" id="saved-scenarios">
+    <div class="card-title-row">
+        <h6><i class="bi bi-bookmark-check me-1"></i>Saved Scenarios</h6>
+        <div class="ms-auto d-flex align-items-center gap-2">
+            {% if total_saved %}
+            <span class="text-muted" style="font-size:12px;">
+                {{ saved_rows | length }} of {{ total_saved }} shown
+            </span>
+            {% endif %}
+            {% if saved_rows %}
+            <button type="button" id="cmp-btn" class="btn btn-rk btn-sm" disabled
+                    title="Select exactly two scenarios to compare">
+                <i class="bi bi-bar-chart-steps"></i> Compare
+            </button>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if saved_rows %}
+    <p class="text-muted mb-2" style="font-size:12px;">
+        Tick two scenarios, then choose <strong>Compare</strong> to view them side by side.
+    </p>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead>
+                <tr style="font-size:12px;color:var(--rk-muted);text-transform:uppercase;letter-spacing:0.04em">
+                    <th style="width:34px;"></th>
+                    <th>Name</th>
+                    <th>Barangay</th>
+                    <th>Disaster Type</th>
+                    <th>Duration</th>
+                    <th>Readiness</th>
+                    <th>Saved By</th>
+                    <th>Saved On</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in saved_rows %}
+                {% set rb = readiness_badge.get(s.readiness, readiness_badge['Critical']) %}
+                <tr style="font-size:13px">
+                    <td>
+                        <input type="checkbox" class="form-check-input cmp-check"
+                               value="{{ s.id }}" aria-label="Select {{ s.name }} to compare">
+                    </td>
+                    <td class="fw-semibold">{{ s.name }}</td>
+                    <td>{{ s.barangay_name }}</td>
+                    <td class="text-capitalize">{{ s.disaster_type }}</td>
+                    <td>{{ s.duration_label }}</td>
+                    <td><span class="status-pill {{ rb.class }}">{{ rb.label }}</span></td>
+                    <td class="text-muted">{{ s.saved_by }}</td>
+                    <td class="text-muted">{{ s.created_at | pht }}</td>
+                    <td class="text-end">
+                        <a href="/admin/simulator/scenarios/{{ s.id }}" class="btn-soft" title="View">
+                            <i class="bi bi-eye"></i> View
+                        </a>
+                        <form method="POST" action="/admin/simulator/scenarios/{{ s.id }}/delete"
+                              class="d-inline"
+                              data-confirm="Delete saved scenario '{{ s.name }}'? This cannot be undone.">
+                            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+                            <button type="submit" class="btn-soft" style="color:#c0392b" title="Delete">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if total_saved > saved_rows | length and not show_all %}
+    <div class="text-center mt-3">
+        <a href="/admin/simulator/setup?all=1#saved-scenarios" class="btn btn-outline-secondary btn-sm">
+            View all {{ total_saved }} saved scenarios
+        </a>
+    </div>
+    {% elif show_all and total_saved > 10 %}
+    <div class="text-center mt-3">
+        <a href="/admin/simulator/setup#saved-scenarios" class="btn btn-outline-secondary btn-sm">
+            Show recent only
+        </a>
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="text-center text-muted py-4">
+        <i class="bi bi-inbox" style="font-size:24px;"></i>
+        <p class="mb-0 mt-2">
+            No saved scenarios yet — run an analysis and click
+            <strong>Save Scenario</strong> to keep it here.
+        </p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script nonce="{{ request.state.csp_nonce }}">
+// Priority Barangays carousel — show one entry at a time, prev/next cycles.
+// CSP-safe: nonce'd, delegated listener, no inline on* handlers.
+(function () {
+    var carousel = document.getElementById('priority-carousel');
+    if (!carousel) return;
+    var items = Array.prototype.slice.call(carousel.querySelectorAll('.pb-item'));
+    if (items.length <= 1) return;
+
+    var counter = document.getElementById('pb-current');
+    var current = 0;
+
+    function show(i) {
+        current = (i + items.length) % items.length;   // wrap around
+        items.forEach(function (el, idx) {
+            el.style.display = idx === current ? '' : 'none';
+        });
+        if (counter) counter.textContent = current + 1;
+    }
+
+    document.addEventListener('click', function (e) {
+        var btn = e.target.closest ? e.target.closest('[data-pb-nav]') : null;
+        if (!btn) return;
+        show(current + (btn.getAttribute('data-dir') === 'next' ? 1 : -1));
+    });
+})();
+
+// Compare — enable the button only when exactly TWO scenarios are ticked.
+(function () {
+    var btn = document.getElementById('cmp-btn');
+    if (!btn) return;
+
+    function checked() {
+        return Array.prototype.slice
+            .call(document.querySelectorAll('.cmp-check'))
+            .filter(function (c) { return c.checked; });
+    }
+
+    document.addEventListener('change', function (e) {
+        if (!e.target.classList || !e.target.classList.contains('cmp-check')) return;
+        var sel = checked();
+        // Stop a third selection so it stays a two-way compare.
+        if (sel.length > 2) { e.target.checked = false; sel = checked(); }
+        btn.disabled = sel.length !== 2;
+    });
+
+    btn.addEventListener('click', function () {
+        var sel = checked();
+        if (sel.length !== 2) return;
+        window.location.href = '/admin/simulator/scenarios/compare?a='
+            + encodeURIComponent(sel[0].value) + '&b=' + encodeURIComponent(sel[1].value);
+    });
+})();
+</script>
 {% endblock %}

@@ -1,0 +1,51 @@
+{% extends "admin/base.html" %}
+{% set active_nav = 'simulator' %}
+{% block title %}{{ scenario.name }} — Saved Scenario — RisKonek{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-start flex-wrap gap-2">
+    <div>
+        <h1><i class="bi bi-bookmark-check-fill me-2"></i>{{ scenario.name }}</h1>
+        <p>Saved disaster-simulation scenario.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="/admin/simulator/setup" class="btn btn-soft">
+            <i class="bi bi-arrow-left"></i> Back to Simulator
+        </a>
+        <a href="/admin/simulator/scenarios/{{ scenario.id }}/pdf" class="btn btn-soft">
+            <i class="bi bi-file-earmark-pdf"></i> Export PDF
+        </a>
+        <form method="POST" action="/admin/simulator/scenarios/{{ scenario.id }}/delete"
+              class="d-inline"
+              data-confirm="Delete saved scenario '{{ scenario.name }}'? This cannot be undone.">
+            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+            <button type="submit" class="btn btn-outline-danger">
+                <i class="bi bi-trash"></i> Delete
+            </button>
+        </form>
+    </div>
+</div>
+
+{% if request.query_params.get('success') %}
+<div class="alert alert-success alert-dismissible fade show">
+    <i class="bi bi-check-circle-fill me-1"></i>
+    {{ request.query_params.get('success') }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+<!-- ── Snapshot banner ─────────────────────────────────────────────────── -->
+<div class="alert alert-secondary d-flex align-items-start gap-2">
+    <i class="bi bi-clock-history" style="font-size:16px"></i>
+    <span>
+        <strong>Saved scenario — snapshot from {{ scenario.created_at | pht }}.</strong>
+        Figures reflect data and thresholds at the time it was run. Saved by {{ saved_by }}.
+    </span>
+</div>
+
+{% include "admin/_simulator_result.html" %}
+{% endblock %}
+
+{% block scripts %}
+{% include "admin/_simulator_scripts.html" %}
+{% endblock %}

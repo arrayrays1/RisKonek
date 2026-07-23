@@ -1,5 +1,4 @@
-"""Optional AI explanation layer for the Disaster Simulator (Groq / Llama).
-
+"""
 The numbers produced by engine.py are the product; this layer is an OPTIONAL
 plain-language briefing on top of them. It must never break a simulation:
 callers wrap explain_simulation() in try/except and render the numeric report

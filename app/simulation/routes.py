@@ -1,9 +1,12 @@
+import json
+import re
 import uuid
 from collections import OrderedDict
+from datetime import datetime, timezone, timedelta
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Request, Depends, Form
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, Response
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -13,17 +16,36 @@ from app.database import get_db
 from app.models import (
     Barangay, DisasterType, Population, Resource, ResourceCategory,
     Equipment, EquipmentType, EquipmentStatus, Facility, FacilityStatus,
-    Incident, PlanningThreshold, log_action,
+    Incident, PlanningThreshold, SavedScenario, log_action,
 )
 from app.auth import require_role
 from app.simulation import engine
 from app.simulation import ai_layer
 from app.simulation import thresholds as thresholds_svc
+from app.simulation import weather as weather_svc
+from app.simulation import config as C
 from app.simulation.schemas import ScenarioInput
+from app.simulation import pdf_export
+from app.analytics.simulator import compute_risk_score
 from typing import Optional
 
 router = APIRouter(prefix="/admin/simulator")
 templates = Jinja2Templates(directory="app/templates")
+
+# Timestamps are stored UTC; display in Philippine Standard Time (UTC+8),
+# mirroring the `pht` filter registered in app/routes/admin.py.
+_PHT = timezone(timedelta(hours=8))
+
+
+def _to_pht(dt):
+    if dt is None:
+        return ""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(_PHT).strftime('%B %d, %Y at %I:%M %p')
+
+
+templates.env.filters['pht'] = _to_pht
 
 # ── Short-lived server-side store for the Post/Redirect/Get flow ──────────
 # The result dict + sanitized AI briefing are too large to safely round-trip in
@@ -54,6 +76,8 @@ DURATION_OPTIONS = [
 ]
 # Fast key -> horizon days lookup reused by the /run handler.
 DURATION_DAYS = {opt["value"]: opt["days"] for opt in DURATION_OPTIONS}
+# Fast key -> human label lookup reused by the saved-scenario views.
+DURATION_LABELS = {opt["value"]: opt["label"] for opt in DURATION_OPTIONS}
 
 # Which Facility.supports_* boolean gates evacuation capacity for each disaster
 # type. earthquake / other have no dedicated support flag, so they fall back to
@@ -103,6 +127,64 @@ def simulator_setup(request: Request, db: Session = Depends(get_db)):
 
     barangays = db.query(Barangay).order_by(Barangay.name).all()
 
+    # ── Saved-scenario history (newest first) shown below the setup form ───
+    # Compact by default: 10 most recent, with a "View all" toggle so the form
+    # stays visible at the top.
+    show_all = request.query_params.get("all") == "1"
+    saved_q = db.query(SavedScenario).order_by(SavedScenario.created_at.desc())
+    total_saved = saved_q.count()
+    rows = saved_q.all() if show_all else saved_q.limit(10).all()
+    saved_rows = [
+        {
+            "id": s.id,
+            "name": s.name,
+            "barangay_name": s.barangay_name,
+            "disaster_type": s.disaster_type,
+            "duration_label": DURATION_LABELS.get(s.duration, s.duration),
+            "readiness": json.loads(s.result_json).get("overall_readiness"),
+            "saved_by": s.created_by_user.username if s.created_by_user else "—",
+            "created_at": s.created_at,
+        }
+        for s in rows
+    ]
+
+    # ── Right column: weather outlook (server-side, fail-safe) + priority list ─
+    weather = weather_svc.get_outlook()   # dict or None (never raises)
+
+    # Priority barangays: compute the study risk score for each configured name,
+    # then rank highest-first. Score/level reuse the existing analytics formula
+    # (app/analytics/simulator.py) — the same numbers shown on the profile page.
+    risk_bar_class = {
+        "critical": "bg-danger", "high": "bg-warning",
+        "moderate": "bg-info", "low": "bg-success",
+    }
+    priority_rows = []
+    for brgy in (
+        db.query(Barangay).filter(Barangay.name.in_(C.PRIORITY_BARANGAYS)).all()
+    ):
+        pop = (
+            db.query(Population)
+            .filter(Population.barangay_id == brgy.id)
+            .order_by(Population.recorded_at.desc())
+            .first()
+        )
+        rr = compute_risk_score(brgy, brgy.incidents, pop)
+        level = rr["level"].value
+        hazards = [
+            h.strip().title()
+            for h in (brgy.hazard_types or "").split(",") if h.strip()
+        ]
+        priority_rows.append({
+            "id": brgy.id,
+            "name": brgy.name,
+            "hazards": ", ".join(hazards) if hazards else "—",
+            "population": pop.total_population if pop else 0,
+            "score": rr["score"],
+            "level": level,
+            "bar_class": risk_bar_class.get(level, "bg-secondary"),
+        })
+    priority_rows.sort(key=lambda r: r["score"], reverse=True)
+
     return templates.TemplateResponse(
         request=request,
         name="admin/simulator_setup.html",
@@ -113,6 +195,11 @@ def simulator_setup(request: Request, db: Session = Depends(get_db)):
             "disaster_types": list(DisasterType),
             "duration_options": DURATION_OPTIONS,
             "default_duration": "3_days",
+            "saved_rows": saved_rows,
+            "total_saved": total_saved,
+            "show_all": show_all,
+            "weather": weather,
+            "priority_rows": priority_rows,
         },
     )
 
@@ -296,8 +383,16 @@ def simulator_run(
     # Stash the computed result + briefing and redirect (303) to the GET view.
     # This makes refresh re-fetch the stored run instead of re-POSTing, so no
     # second simulation, no second Groq call, and no duplicate audit row.
-    run_id = _store_run({"result": result, "ai_briefing": ai_briefing,
-                         "ai_note": ai_note, "user_id": user["id"]})
+    run_id = _store_run({
+        "result": result, "ai_briefing": ai_briefing, "ai_note": ai_note,
+        "user_id": user["id"],
+        # Extra snapshot facts the /save route freezes into a SavedScenario.
+        "barangay_id": barangay.id,
+        "duration": scenario.duration,
+        "thresholds": scenario_facts["thresholds"],
+        # When this run was generated (UTC) — used to autofill the save name.
+        "generated_at": datetime.utcnow(),
+    })
     return RedirectResponse(url=f"/admin/simulator/results/{run_id}", status_code=303)
 
 
@@ -314,6 +409,14 @@ def simulator_results(request: Request, run_id: str, db: Session = Depends(get_d
     if run is None or run.get("user_id") != user["id"]:
         return RedirectResponse(url="/admin/simulator/setup", status_code=303)
 
+    # Suggested save name: barangay — duration — disaster type — generated date/time.
+    # Editable in the modal; the planner can override before saving.
+    ir = run["result"]["inputs"]
+    default_scenario_name = (
+        f"{ir['barangay_name']} — {DURATION_LABELS.get(run.get('duration'), '')} — "
+        f"{str(ir['disaster_type']).title()} — {_to_pht(run.get('generated_at'))}"
+    )
+
     return templates.TemplateResponse(
         request=request,
         name="admin/simulator_results.html",
@@ -323,7 +426,317 @@ def simulator_results(request: Request, run_id: str, db: Session = Depends(get_d
             "result": run["result"],
             "ai_briefing": run["ai_briefing"],
             "ai_note": run["ai_note"],
+            "run_id": run_id,
+            "default_scenario_name": default_scenario_name,
+            # Set once this run has been saved, so the button flips to a link
+            # and a second POST can't create a duplicate SavedScenario.
+            "saved_scenario_id": run.get("saved_scenario_id"),
         },
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SAVED SCENARIOS (frozen snapshots — save / view / delete)
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+@router.post("/save")
+def simulator_save(
+    request: Request,
+    db: Session = Depends(get_db),
+    run_id: str = Form(...),
+    name: str = Form(...),
+):
+    """Freeze a stored run into a SavedScenario. Reads the run store (never
+    recomputes), persists the computed result + the thresholds used, audits it,
+    and redirects to the saved-scenario view."""
+    user = require_role(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
+
+    run = _RUN_STORE.get(run_id)
+    if run is None or run.get("user_id") != user["id"]:
+        return RedirectResponse(url="/admin/simulator/setup", status_code=303)
+
+    # Already saved (double-submit / refresh) → go to the existing record.
+    existing_id = run.get("saved_scenario_id")
+    if existing_id:
+        return RedirectResponse(
+            url=f"/admin/simulator/scenarios/{existing_id}?"
+                + urlencode({"success": "This run was already saved."}),
+            status_code=303,
+        )
+
+    result = run["result"]
+    inputs = result["inputs"]
+    label = (name or "").strip() or (
+        f"{str(inputs['disaster_type']).title()} — {inputs['barangay_name']}"
+    )
+
+    scenario = SavedScenario(
+        name=label[:150],
+        barangay_id=run.get("barangay_id"),
+        barangay_name=inputs["barangay_name"],
+        disaster_type=inputs["disaster_type"],
+        duration=run.get("duration"),
+        horizon_days=inputs["horizon_days"],
+        result_json=json.dumps(result),
+        ai_briefing=run.get("ai_briefing"),
+        thresholds_json=json.dumps(run.get("thresholds") or {}),
+        created_by=user["id"],
+    )
+    db.add(scenario)
+    db.commit()
+    db.refresh(scenario)
+
+    # Mark the run so a repeat POST for the same run_id can't duplicate it.
+    run["saved_scenario_id"] = scenario.id
+
+    log_action(
+        db, user["id"], "saved", "saved_scenarios", scenario.id,
+        f"Saved scenario '{label}': {scenario.disaster_type} in "
+        f"{scenario.barangay_name} (readiness={result['overall_readiness']})",
+    )
+
+    return RedirectResponse(
+        url=f"/admin/simulator/scenarios/{scenario.id}?"
+            + urlencode({"success": "Scenario saved."}),
+        status_code=303,
+    )
+
+
+# ── Threshold-diff helpers (compare view) ────────────────────────────────
+
+
+def _flatten_thresholds(d, prefix=""):
+    """Flatten the nested thresholds dict to dotted keys for a flat diff."""
+    out = {}
+    for k, v in (d or {}).items():
+        key = f"{prefix}{k}"
+        if isinstance(v, dict):
+            out.update(_flatten_thresholds(v, prefix=key + "."))
+        else:
+            out[key] = v
+    return out
+
+
+def _humanize_threshold(k: str) -> str:
+    if "." in k:
+        base, sub = k.split(".", 1)
+        return base.replace("_", " ").title() + f" ({sub})"
+    return k.replace("_", " ").title()
+
+
+def _threshold_diff(a_json, b_json):
+    """Return the list of thresholds whose stored values differ between two
+    snapshots. Empty list => identical planning assumptions."""
+    try:
+        a = _flatten_thresholds(json.loads(a_json or "{}"))
+        b = _flatten_thresholds(json.loads(b_json or "{}"))
+    except (ValueError, TypeError):
+        return []
+    diffs = []
+    for k in sorted(set(a) | set(b)):
+        if a.get(k) != b.get(k):
+            diffs.append({"label": _humanize_threshold(k), "a": a.get(k), "b": b.get(k)})
+    return diffs
+
+
+@router.get("/scenarios/compare", response_class=HTMLResponse)
+def saved_scenario_compare(
+    request: Request,
+    db: Session = Depends(get_db),
+    a: Optional[str] = None,
+    b: Optional[str] = None,
+):
+    """Side-by-side comparison built ONLY from two stored result_json snapshots.
+    No recomputation, no Groq call. Declared before /scenarios/{scenario_id} so
+    the literal 'compare' path isn't captured by the int id route."""
+    user = require_role(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
+
+    def _coerce(x):
+        try:
+            return int(x)
+        except (TypeError, ValueError):
+            return None
+
+    ida, idb = _coerce(a), _coerce(b)
+    if ida is None or idb is None:
+        return RedirectResponse(
+            url="/admin/simulator/setup?"
+                + urlencode({"error": "Select two scenarios to compare."}),
+            status_code=303,
+        )
+    if ida == idb:
+        return RedirectResponse(
+            url="/admin/simulator/setup?"
+                + urlencode({"error": "Select two different scenarios to compare."}),
+            status_code=303,
+        )
+
+    sa = db.query(SavedScenario).filter(SavedScenario.id == ida).first()
+    sb = db.query(SavedScenario).filter(SavedScenario.id == idb).first()
+    if sa is None or sb is None:
+        return RedirectResponse(
+            url="/admin/simulator/setup?"
+                + urlencode({"error": "One or both scenarios were not found."}),
+            status_code=303,
+        )
+
+    ra = json.loads(sa.result_json)
+    rb = json.loads(sb.result_json)
+    gaps_a, gaps_b = ra.get("gaps", {}), rb.get("gaps", {})
+    status_a, status_b = ra.get("status_by_class", {}), rb.get("status_by_class", {})
+
+    # Per-class rows with a delta. A lower gap (shortfall) in B = improvement.
+    compare_rows = []
+    for c in pdf_export.DISPLAY_ORDER:
+        if c in gaps_a and c in gaps_b:
+            ga, gb = gaps_a[c], gaps_b[c]
+            delta_gap = gb.get("gap", 0) - ga.get("gap", 0)
+            direction = ("improved" if delta_gap < 0
+                         else "worsened" if delta_gap > 0 else "same")
+            compare_rows.append({
+                "label": pdf_export.CLASS_LABEL.get(c, c),
+                "unit": ga.get("unit", ""),
+                "a": ga, "b": gb,
+                "status_a": status_a.get(c), "status_b": status_b.get(c),
+                "delta_gap": delta_gap, "abs_delta": abs(delta_gap),
+                "direction": direction,
+            })
+
+    def _meta(s, r):
+        return {
+            "id": s.id, "name": s.name,
+            "barangay": r["inputs"]["barangay_name"],
+            "disaster_type": r["inputs"]["disaster_type"],
+            "duration_label": r.get("duration_label", s.duration),
+            "saved_by": s.created_by_user.username if s.created_by_user else "—",
+            "created_at": s.created_at,
+            "readiness": r.get("overall_readiness"),
+        }
+
+    return templates.TemplateResponse(
+        request=request,
+        name="admin/scenario_compare.html",
+        context={
+            "title": "Compare Scenarios — RisKonek",
+            "user": user,
+            "a": _meta(sa, ra), "b": _meta(sb, rb),
+            "compare_rows": compare_rows,
+            "threshold_diffs": _threshold_diff(sa.thresholds_json, sb.thresholds_json),
+        },
+    )
+
+
+@router.get("/scenarios/{scenario_id}", response_class=HTMLResponse)
+def saved_scenario_detail(
+    request: Request, scenario_id: int, db: Session = Depends(get_db)
+):
+    """Render one saved scenario from its stored snapshot. This path NEVER
+    recomputes and NEVER calls Groq — result + AI briefing come straight from
+    the row, so it always reflects the data and thresholds at run time."""
+    user = require_role(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
+
+    row = db.query(SavedScenario).filter(SavedScenario.id == scenario_id).first()
+    if row is None:
+        return RedirectResponse(
+            url="/admin/simulator/setup?"
+                + urlencode({"error": "Saved scenario not found."}),
+            status_code=303,
+        )
+
+    result = json.loads(row.result_json)
+    saved_by = row.created_by_user.username if row.created_by_user else "—"
+
+    return templates.TemplateResponse(
+        request=request,
+        name="admin/scenario_detail.html",
+        context={
+            "title": f"{row.name} — Saved Scenario — RisKonek",
+            "user": user,
+            "scenario": row,
+            "saved_by": saved_by,
+            "result": result,
+            "ai_briefing": row.ai_briefing,
+            "ai_note": None,
+        },
+    )
+
+
+@router.get("/scenarios/{scenario_id}/pdf")
+def saved_scenario_pdf(
+    request: Request, scenario_id: int, db: Session = Depends(get_db)
+):
+    """Download the stored snapshot as a PDF. Built purely from result_json +
+    the saved AI briefing — no recomputation, no Groq call. Audited."""
+    user = require_role(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
+
+    row = db.query(SavedScenario).filter(SavedScenario.id == scenario_id).first()
+    if row is None:
+        return RedirectResponse(
+            url="/admin/simulator/setup?"
+                + urlencode({"error": "Saved scenario not found."}),
+            status_code=303,
+        )
+
+    result = json.loads(row.result_json)
+    saved_by = row.created_by_user.username if row.created_by_user else "—"
+    created_at_str = _to_pht(row.created_at)
+    pdf_bytes = pdf_export.build_scenario_pdf(row, result, created_at_str, saved_by)
+
+    slug = re.sub(r"[^a-z0-9]+", "-", (row.barangay_name or "scenario").lower()).strip("-")
+    date_slug = row.created_at.strftime("%Y%m%d") if row.created_at else "snapshot"
+    filename = f"riskonek-scenario-{slug or 'scenario'}-{date_slug}.pdf"
+
+    log_action(
+        db, user["id"], "exported", "saved_scenarios", row.id,
+        f"Exported PDF for saved scenario '{row.name}'",
+    )
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.post("/scenarios/{scenario_id}/delete")
+def saved_scenario_delete(
+    request: Request, scenario_id: int, db: Session = Depends(get_db)
+):
+    """Delete a saved scenario (admin only), audited."""
+    user = require_role(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
+
+    row = db.query(SavedScenario).filter(SavedScenario.id == scenario_id).first()
+    if row is None:
+        return RedirectResponse(
+            url="/admin/simulator/setup?"
+                + urlencode({"error": "Saved scenario not found."}),
+            status_code=303,
+        )
+
+    name = row.name
+    db.delete(row)
+    db.commit()
+
+    log_action(
+        db, user["id"], "deleted", "saved_scenarios", scenario_id,
+        f"Deleted saved scenario '{name}'",
+    )
+
+    return RedirectResponse(
+        url="/admin/simulator/setup?"
+            + urlencode({"success": "Saved scenario deleted."}),
+        status_code=303,
     )
 
 

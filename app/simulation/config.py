@@ -92,3 +92,22 @@ READINESS_THRESHOLDS = {
     "adequate": 1.0,   # ratio >= 1.0  -> Adequate
     "partial": 0.5,    # 0.5 <= ratio < 1.0 -> Partial; below 0.5 -> Critical
 }
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# PRIORITY BARANGAYS  (study scope — display only)
+# ══════════════════════════════════════════════════════════════════════════
+# The barangays this capstone study prioritizes. Config-list (not a DB flag) so
+# no schema change is needed — names are matched against Barangay.name at query
+# time, and any name not present in the DB is simply skipped. The simulator
+# itself still supports ALL barangays; this list only drives the "Priority
+# Barangays" card on the setup page. EDIT THIS LIST to match the actual study
+# scope — the current set is a flood-prone / high-population default.
+PRIORITY_BARANGAYS = [
+    "San Antonio",
+    "Landayan",
+    "Cuyab",
+    "San Vicente",
+    "Bagong Silang",
+    "Riverside",
+]
