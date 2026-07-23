@@ -52,22 +52,22 @@
                     <td>{{ u.email or '—' }}</td>
                     <td>
                         {% if u.role.value == 'admin' %}
-                            <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-red">CDRRMO Admin</span>
+                            <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-red">CDRRMO Admin</span>
                         {% elif u.role.value == 'cfau_oic' %}
-                            <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-amber">CFAU / Operations Personnel</span>
+                            <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-amber">CFAU / Operations Personnel</span>
                         {% elif u.role.value == 'bdrrmo' %}
-                            <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-green">BDRRMO / Barangay Focal</span>
+                            <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-green">BDRRMO / Barangay Focal</span>
                         {% elif u.role.value == 'cdrrmo_staff' %}
-                            <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-blue">CDRRMO Logistics Staff</span>
+                            <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-blue">CDRRMO Logistics Staff</span>
                         {% endif %}
                     </td>
                     <td>{{ u.barangay.name if u.barangay else '—' }}</td>
                     <td>{{ u.contact_number or '—' }}</td>
                     <td>
                         {% if u.is_active %}
-                            <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-green">Active</span>
+                            <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-green">Active</span>
                         {% else %}
-                            <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-amber">Inactive</span>
+                            <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-amber">Inactive</span>
                         {% endif %}
                     </td>
                     <td class="text-right px-3">

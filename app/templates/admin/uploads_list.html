@@ -7,13 +7,13 @@
 {% macro lifecycle_badge(r) -%}
     {% set ls = r.lifecycle_status.value %}
     {% if ls == 'draft' %}
-        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-amber">Draft</span>
+        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-amber">Draft</span>
     {% elif ls == 'confirmed' %}
-        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-green">Confirmed</span>
+        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-green">Confirmed</span>
     {% elif ls == 'archived' %}
-        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate"><i class="bi bi-archive mr-1"></i>Archived</span>
+        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-slate"><i class="bi bi-archive mr-1"></i>Archived</span>
     {% elif ls == 'discarded' %}
-        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-red">Discarded</span>
+        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-red">Discarded</span>
     {% endif %}
 {%- endmacro %}
 
@@ -57,7 +57,7 @@
     <div class="px-3 pt-3 pb-2 flex items-center gap-2">
         <i class="bi bi-pencil-square text-amber-600"></i>
         <h6 class="mb-0">Drafts &mdash; awaiting review</h6>
-        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate bg-warning-subtle text-slate-900 border">{{ drafts | length }}</span>
+        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate bg-warning-subtle text-slate-900 border">{{ drafts | length }}</span>
         <span class="text-slate-500 text-sm ml-1">Unconfirmed uploads. Nothing is saved to the database until you confirm.</span>
     </div>
     <div class="overflow-x-auto">
@@ -79,7 +79,7 @@
                         <div class="font-semibold">{{ r.file_name }}</div>
                         <div class="text-slate-500 text-sm">ID #{{ r.id }}</div>
                     </td>
-                    <td><span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate">{{ r.file_type.value | upper }}</span></td>
+                    <td><span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-slate">{{ r.file_type.value | upper }}</span></td>
                     <td>{{ r.uploaded_by_user.username if r.uploaded_by_user else '—' }}</td>
                     <td>{{ r.uploaded_at | pht }}</td>
                     <td>{{ lifecycle_badge(r) }}</td>
@@ -113,7 +113,7 @@
         <div class="flex items-center gap-2">
             <i class="bi bi-collection"></i>
             <h6 class="mb-0">Confirmed Uploads</h6>
-            <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate">{{ active_reports | length }}</span>
+            <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-slate">{{ active_reports | length }}</span>
         </div>
         {% if hidden_count or show_archived %}
         <div>
@@ -148,7 +148,7 @@
                         <div class="font-semibold">{{ r.file_name }}</div>
                         <div class="text-slate-500 text-sm">ID #{{ r.id }}</div>
                     </td>
-                    <td><span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate">{{ r.file_type.value | upper }}</span></td>
+                    <td><span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-slate">{{ r.file_type.value | upper }}</span></td>
                     <td>{{ r.uploaded_by_user.username if r.uploaded_by_user else '—' }}</td>
                     <td>{{ r.uploaded_at | pht }}</td>
                     <td>{{ lifecycle_badge(r) }}</td>
@@ -193,7 +193,7 @@
                         <div class="font-semibold">{{ r.file_name }}</div>
                         <div class="text-slate-500 text-sm">ID #{{ r.id }}</div>
                     </td>
-                    <td><span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate">{{ r.file_type.value | upper }}</span></td>
+                    <td><span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-slate">{{ r.file_type.value | upper }}</span></td>
                     <td>{{ r.uploaded_by_user.username if r.uploaded_by_user else '—' }}</td>
                     <td>{{ r.uploaded_at | pht }}</td>
                     <td>{{ lifecycle_badge(r) }}</td>

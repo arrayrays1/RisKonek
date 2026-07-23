@@ -39,15 +39,15 @@
                     {% set u = r.urgency.value if r.urgency else 'moderate' %}
                     <div>
                     {% if u == 'critical' %}
-                        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate" style="background:#fde8e8;color:#c0392b;border:1px solid #f4c2bd">
+                        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-slate" style="background:#fde8e8;color:#c0392b;border:1px solid #f4c2bd">
                             <i class="bi bi-exclamation-triangle-fill"></i> Critical</span>
                     {% elif u == 'high' %}
-                        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate" style="background:#fdebd0;color:#b9770e;border:1px solid #f5cba7">
+                        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-slate" style="background:#fdebd0;color:#b9770e;border:1px solid #f5cba7">
                             <i class="bi bi-exclamation-circle-fill"></i> High</span>
                     {% elif u == 'moderate' %}
-                        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-amber">Moderate</span>
+                        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-amber">Moderate</span>
                     {% else %}
-                        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate" style="background:#eef0f2;color:#6c757d;border:1px solid #dee2e6">Low</span>
+                        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-slate" style="background:#eef0f2;color:#6c757d;border:1px solid #dee2e6">Low</span>
                     {% endif %}
                     </div>
                 </div>
@@ -112,11 +112,11 @@
                 <i class="bi bi-arrow-left-right" style="color:var(--rk-green);font-size:16px"></i>
                 <h6>Live Equipment Status</h6>
                 {% if finding_applied %}
-                <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-green ml-2">
+                <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-green ml-2">
                     <i class="bi bi-check2"></i> Applied to Live Status
                 </span>
                 {% else %}
-                <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate ml-2">Not Yet Applied</span>
+                <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-slate ml-2">Not Yet Applied</span>
                 {% endif %}
             </div>
             <div class="grid grid-cols-12 gap-3 mb-2">

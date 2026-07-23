@@ -37,7 +37,7 @@
         <div class="col-span-3">
             <div class="text-slate-500 text-sm">File</div>
             <div class="font-semibold">{{ report.file_name }}</div>
-            <div class="text-sm"><span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate">{{ report.file_type.value | upper }}</span></div>
+            <div class="text-sm"><span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-slate">{{ report.file_type.value | upper }}</span></div>
         </div>
         <div class="col-span-3">
             <div class="text-slate-500 text-sm">Uploaded</div>
@@ -49,13 +49,13 @@
             <div>
                 {% set ls = report.lifecycle_status.value %}
                 {% if ls == 'draft' %}
-                    <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-amber">Draft</span>
+                    <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-amber">Draft</span>
                 {% elif ls == 'confirmed' %}
-                    <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-green">Confirmed</span>
+                    <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-green">Confirmed</span>
                 {% elif ls == 'archived' %}
-                    <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate"><i class="bi bi-archive mr-1"></i>Archived</span>
+                    <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-slate"><i class="bi bi-archive mr-1"></i>Archived</span>
                 {% elif ls == 'discarded' %}
-                    <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-red">Discarded</span>
+                    <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-red">Discarded</span>
                 {% endif %}
             </div>
         </div>

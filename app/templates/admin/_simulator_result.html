@@ -36,18 +36,18 @@
 ] %}
 
 <!-- ── Overall readiness band + sub-score bars ─────────────────────────── -->
-<div class="dash-card mb-3">
-    <div class="row align-items-center">
-        <div class="col-md-4 text-center border-end">
-            <div class="stat-label">Overall Readiness</div>
+<div class="rk-card mb-3">
+    <div class="grid grid-cols-12 gap-4 items-center">
+        <div class="col-span-4 text-center border-end">
+            <div class="rk-stat-label">Overall Readiness</div>
             <div class="{{ band.text }}" style="font-size: 30px; font-weight: 800;">
                 {{ band.label }}
             </div>
-            <div class="text-muted" style="font-size: 12px;">
+            <div class="text-slate-500" style="font-size: 12px;">
                 Worst-status band across all resource classes
             </div>
         </div>
-        <div class="col-md-8">
+        <div class="col-span-8">
             {% for g in groups %}
                 {% set covs = [] %}
                 {% for c in g.classes %}
@@ -59,9 +59,9 @@
                 {% set gstatus = 'Adequate' if gcov >= 1.0 else ('Partial' if gcov >= 0.5 else 'Critical') %}
                 {% set gui = status_ui[gstatus] %}
                 <div class="mb-2">
-                    <div class="d-flex justify-content-between" style="font-size: 13px;">
-                        <span><i class="bi {{ g.icon }} me-1"></i>{{ g.label }}</span>
-                        <span class="fw-semibold">{{ gui.label }}</span>
+                    <div class="flex justify-between" style="font-size: 13px;">
+                        <span><i class="bi {{ g.icon }} mr-1"></i>{{ g.label }}</span>
+                        <span class="font-semibold">{{ gui.label }}</span>
                     </div>
                     <div class="progress" style="height: 10px;">
                         <div class="progress-bar {{ gui.bar }}" role="progressbar"
@@ -75,19 +75,19 @@
 </div>
 
 <!-- ── Scenario config strip ───────────────────────────────────────────── -->
-<div class="dash-card mb-3">
-    <div class="row text-center">
-        <div class="col-md-4">
-            <div class="stat-label">Barangay</div>
-            <div class="fw-semibold">{{ result.inputs.barangay_name }}</div>
+<div class="rk-card mb-3">
+    <div class="grid grid-cols-12 gap-4 text-center">
+        <div class="col-span-4">
+            <div class="rk-stat-label">Barangay</div>
+            <div class="font-semibold">{{ result.inputs.barangay_name }}</div>
         </div>
-        <div class="col-md-4">
-            <div class="stat-label">Disaster Type</div>
-            <div class="fw-semibold text-capitalize">{{ result.inputs.disaster_type }}</div>
+        <div class="col-span-4">
+            <div class="rk-stat-label">Disaster Type</div>
+            <div class="font-semibold text-capitalize">{{ result.inputs.disaster_type }}</div>
         </div>
-        <div class="col-md-4">
-            <div class="stat-label">Planning Horizon</div>
-            <div class="fw-semibold">{{ result.duration_label }} ({{ result.inputs.horizon_days }} days)</div>
+        <div class="col-span-4">
+            <div class="rk-stat-label">Planning Horizon</div>
+            <div class="font-semibold">{{ result.duration_label }} ({{ result.inputs.horizon_days }} days)</div>
         </div>
     </div>
     {% if not result.hazard_recorded %}
@@ -98,42 +98,42 @@
     {% endif %}
 </div>
 
-<div class="row">
+<div class="grid grid-cols-12 gap-4">
     <!-- ── Affected population card ─────────────────────────────────────── -->
-    <div class="col-lg-4 mb-3">
-        <div class="dash-card h-100">
-            <div class="card-title-row">
-                <h6><i class="bi bi-people-fill me-1"></i>Estimated Affected Population</h6>
+    <div class="col-span-4 mb-3">
+        <div class="rk-card h-100">
+            <div class="card-title-grid grid-cols-12 gap-4">
+                <h6><i class="bi bi-people-fill mr-1"></i>Estimated Affected Population</h6>
             </div>
-            <div class="stat-value" style="font-size: 32px;">
+            <div class="rk-stat-value" style="font-size: 32px;">
                 {{ "{:,}".format(result.estimated_affected) }}
             </div>
-            <div class="text-muted" style="font-size: 12px;">
+            <div class="text-slate-500" style="font-size: 12px;">
                 of {{ "{:,}".format(result.inputs.total_population) }} residents
             </div>
             <hr>
             {% set vpct = (result.estimated_vulnerable / result.estimated_affected * 100) if result.estimated_affected else 0 %}
-            <div class="d-flex justify-content-between align-items-center">
+            <div class="flex justify-between items-center">
                 <div>
-                    <div class="stat-label">Vulnerable (PWD + elderly + children)</div>
-                    <div class="fw-semibold">{{ "{:,}".format(result.estimated_vulnerable) }}</div>
+                    <div class="rk-stat-label">Vulnerable (PWD + elderly + children)</div>
+                    <div class="font-semibold">{{ "{:,}".format(result.estimated_vulnerable) }}</div>
                 </div>
-                <span class="risk-badge risk-moderate">{{ vpct | round(1) }}% of affected</span>
+                <span class="risk-rk-badge rk-badge-slate risk-moderate">{{ vpct | round(1) }}% of affected</span>
             </div>
         </div>
     </div>
 
     <!-- ── Planning status summary (alert rows per class) ───────────────── -->
-    <div class="col-lg-8 mb-3">
-        <div class="dash-card h-100">
-            <div class="card-title-row">
-                <h6><i class="bi bi-ui-checks me-1"></i>Planning Status Summary</h6>
+    <div class="col-span-8 mb-3">
+        <div class="rk-card h-100">
+            <div class="card-title-grid grid-cols-12 gap-4">
+                <h6><i class="bi bi-ui-checks mr-1"></i>Planning Status Summary</h6>
             </div>
             {% for c in display_order %}
                 {% if c in result.gaps %}
                     {% set g = result.gaps[c] %}
                     {% set sui = status_ui[result.status_by_class[c]] %}
-                    <div class="alert {{ sui.alert }} d-flex justify-content-between align-items-center py-2 mb-2">
+                    <div class="alert {{ sui.alert }} flex justify-between items-center py-2 mb-2">
                         <span><strong>{{ class_label[c] }}</strong>
                             {% if g.gap > 0 %}
                                 — short by {{ "{:,}".format(g.gap) }} {{ g.unit }}
@@ -141,7 +141,7 @@
                                 — fully covered
                             {% endif %}
                         </span>
-                        <span class="status-pill {{ sui.pill }}">{{ sui.label }}</span>
+                        <span class="rk-badge rk-badge-slate {{ sui.pill }}">{{ sui.label }}</span>
                     </div>
                 {% endif %}
             {% endfor %}
@@ -150,18 +150,18 @@
 </div>
 
 <!-- ── Resource analysis table ─────────────────────────────────────────── -->
-<div class="dash-card mb-3">
-    <div class="card-title-row">
-        <h6><i class="bi bi-table me-1"></i>Resource Analysis</h6>
+<div class="rk-card mb-3">
+    <div class="card-title-grid grid-cols-12 gap-4">
+        <h6><i class="bi bi-rk-table mr-1"></i>Resource Analysis</h6>
     </div>
-    <div class="table-responsive">
-        <table class="table align-middle">
+    <div class="overflow-x-auto">
+        <table class="rk-table align-middle">
             <thead>
                 <tr>
                     <th>Resource Class</th>
-                    <th class="text-end">Required</th>
-                    <th class="text-end">Available</th>
-                    <th class="text-end">Gap / Surplus</th>
+                    <th class="text-right">Required</th>
+                    <th class="text-right">Available</th>
+                    <th class="text-right">Gap / Surplus</th>
                     <th>Basis</th>
                     <th>Status</th>
                 </tr>
@@ -172,32 +172,32 @@
                         {% set g = result.gaps[c] %}
                         {% set sui = status_ui[result.status_by_class[c]] %}
                         <tr>
-                            <td>{{ class_label[c] }}<span class="text-muted"> ({{ g.unit }})</span></td>
-                            <td class="text-end">{{ "{:,}".format(g.need) }}</td>
-                            <td class="text-end">{{ "{:,}".format(g.available) }}</td>
-                            <td class="text-end">
+                            <td>{{ class_label[c] }}<span class="text-slate-500"> ({{ g.unit }})</span></td>
+                            <td class="text-right">{{ "{:,}".format(g.need) }}</td>
+                            <td class="text-right">{{ "{:,}".format(g.available) }}</td>
+                            <td class="text-right">
                                 {% if g.gap > 0 %}
-                                    <span class="text-danger fw-semibold">−{{ "{:,}".format(g.gap) }}</span>
+                                    <span class="text-red-600 font-semibold">−{{ "{:,}".format(g.gap) }}</span>
                                 {% else %}
-                                    <span class="text-success fw-semibold">+{{ "{:,}".format(g.available - g.need) }}</span>
+                                    <span class="text-emerald-600 font-semibold">+{{ "{:,}".format(g.available - g.need) }}</span>
                                 {% endif %}
                             </td>
                             <td>
                                 {% if g.basis == 'standard' %}
-                                    <span class="badge bg-light text-dark border" title="Traceable to Sphere / DSWD">Standard</span>
+                                    <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate border" title="Traceable to Sphere / DSWD">Standard</span>
                                 {% else %}
-                                    <span class="badge bg-light text-secondary border" title="CDRRMO planning assumption, adjustable">Assumption</span>
+                                    <span class="rk-badge rk-badge-slate bg-slate-50 text-secondary border" title="CDRRMO planning assumption, adjustable">Assumption</span>
                                 {% endif %}
                             </td>
-                            <td><span class="status-pill {{ sui.pill }}">{{ sui.label }}</span></td>
+                            <td><span class="rk-badge rk-badge-slate {{ sui.pill }}">{{ sui.label }}</span></td>
                         </tr>
                     {% endif %}
                 {% endfor %}
             </tbody>
         </table>
     </div>
-    <p class="text-muted mb-0" style="font-size: 12px;">
-        <i class="bi bi-info-circle me-1"></i><strong>Standard</strong> figures follow
+    <p class="text-slate-500 mb-0" style="font-size: 12px;">
+        <i class="bi bi-info-circle mr-1"></i><strong>Standard</strong> figures follow
         Sphere / DSWD guidance; <strong>Assumption</strong> figures are adjustable CDRRMO
         planning targets, not standard-based requirements.
     </p>
@@ -205,9 +205,9 @@
 
 <!-- ── Operational risks ───────────────────────────────────────────────── -->
 {% if result.operational_risks %}
-<div class="dash-card mb-3">
-    <div class="card-title-row">
-        <h6><i class="bi bi-shield-exclamation me-1"></i>Operational Risks</h6>
+<div class="rk-card mb-3">
+    <div class="card-title-grid grid-cols-12 gap-4">
+        <h6><i class="bi bi-shield-exclamation mr-1"></i>Operational Risks</h6>
     </div>
     <ul class="mb-0">
         {% for r in result.operational_risks %}
@@ -218,18 +218,18 @@
 {% endif %}
 
 <!-- ── Need vs Available chart ─────────────────────────────────────────── -->
-<div class="dash-card mb-3">
-    <div class="card-title-row">
-        <h6><i class="bi bi-bar-chart-fill me-1"></i>Need vs. Available</h6>
+<div class="rk-card mb-3">
+    <div class="card-title-grid grid-cols-12 gap-4">
+        <h6><i class="bi bi-bar-chart-fill mr-1"></i>Need vs. Available</h6>
     </div>
     <canvas id="needChart" height="110"></canvas>
 </div>
 
 <!-- ── AI briefing (optional; below the numeric tables) ─────────────────── -->
-<div class="dash-card mb-3">
-    <div class="card-title-row">
-        <h6><i class="bi bi-robot me-1"></i>AI Planning Briefing</h6>
-        <span class="risk-badge risk-moderate ms-auto">
+<div class="rk-card mb-3">
+    <div class="card-title-grid grid-cols-12 gap-4">
+        <h6><i class="bi bi-robot mr-1"></i>AI Planning Briefing</h6>
+        <span class="risk-rk-badge rk-badge-slate risk-moderate ml-auto">
             AI-generated · advisory · validate with current conditions and expert judgment
         </span>
     </div>

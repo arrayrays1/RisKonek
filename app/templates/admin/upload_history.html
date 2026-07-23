@@ -47,14 +47,14 @@
         <div class="col-span-4">
             <div class="text-slate-500 text-sm">File</div>
             <div class="font-semibold">{{ report.file_name }}</div>
-            <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate">{{ report.file_type.value | upper }}</span>
+            <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-slate">{{ report.file_type.value | upper }}</span>
         </div>
         <div class="col-span-4">
             <div class="text-slate-500 text-sm">Lifecycle</div>
-            {% if lifecycle_status == 'draft' %}<span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-amber">Draft</span>
-            {% elif lifecycle_status == 'confirmed' %}<span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-green">Confirmed</span>
-            {% elif lifecycle_status == 'archived' %}<span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate"><i class="bi bi-archive mr-1"></i>Archived</span>
-            {% elif lifecycle_status == 'discarded' %}<span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-red">Discarded</span>
+            {% if lifecycle_status == 'draft' %}<span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-amber">Draft</span>
+            {% elif lifecycle_status == 'confirmed' %}<span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-green">Confirmed</span>
+            {% elif lifecycle_status == 'archived' %}<span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-slate"><i class="bi bi-archive mr-1"></i>Archived</span>
+            {% elif lifecycle_status == 'discarded' %}<span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-red">Discarded</span>
             {% endif %}
         </div>
         <div class="col-span-4">
@@ -114,10 +114,10 @@
 <div class="rk-card">
     <div class="flex justify-between items-center flex-wrap gap-2 mb-2">
         <span class="text-sm">
-            <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate" style="background:#b7950b">Edit</span>
-            <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate" style="background:#1a6b47">Confirm / Restore</span>
-            <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate">Archive</span>
-            <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate" style="background:#c0392b">Discard</span>
+            <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate" style="background:#b7950b">Edit</span>
+            <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate" style="background:#1a6b47">Confirm / Restore</span>
+            <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-slate">Archive</span>
+            <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate" style="background:#c0392b">Discard</span>
         </span>
     </div>
     {% if events %}

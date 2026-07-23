@@ -28,7 +28,7 @@
 
         .bg-photo {
             position: fixed; inset: 0; z-index: 0;
-            background-image: url('/static/images/login-bg.jpg');
+            background-image: url('/static/img/login-bg.jpg');
             background-size: cover; background-position: center;
             filter: brightness(0.55);
         }
@@ -181,13 +181,13 @@
         <!-- ── Left brand panel ─────────────────────────────────── -->
         <div class="login-brand">
             <div class="emblem">
-                <img src="/static/images/RisKonek-Logo-v1.png"
-                     alt="CDRRMO Logo"
+                <img src="/static/img/RisKonek-Logo-v1.png"
+                     alt="RisKonek logo"
                      onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
                 <i class="bi bi-shield-fill-check" style="display:none;"></i>
             </div>
             <h1>Welcome to <span class="accent">RisKonek</span></h1>
-            <div class="tagline">Disaster Risk Management System</div>
+            <div class="tagline">Disaster Resource Management System</div>
             <div class="divider"></div>
             <div class="footer-loc">San Pedro, Laguna</div>
             <div class="footer-off">City Disaster Risk Reduction Management Office</div>
@@ -267,7 +267,7 @@
             var img = new Image();
             img.onload  = function () { div.style.display = 'block'; document.body.classList.remove('bg-blob'); };
             img.onerror = function () { div.style.display = 'none'; };
-            img.src = '/static/images/login-bg.jpg';
+            img.src = '/static/img/login-bg.jpg';
         })();
     </script>
 </body>

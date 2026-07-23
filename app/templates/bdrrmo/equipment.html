@@ -161,13 +161,13 @@
                     <td>
                         {{ e.equipment_type.value.replace('_', ' ').title() }}
                         {% if e.equipment_type.value in vehicle_types %}
-                        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate ml-1" style="font-size:10px">Vehicle</span>
+                        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-slate ml-1" style="font-size:10px">Vehicle</span>
                         {% endif %}
                     </td>
                     <td class="text-right">{{ e.quantity if e.quantity is not none else 1 }}</td>
                     <td class="text-slate-500">{{ e.plate_or_serial or '—' }}</td>
                     <td>
-                        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate {{ status_classes[sval] }}">{{ status_labels[sval] }}</span>
+                        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-slate {{ status_classes[sval] }}">{{ status_labels[sval] }}</span>
                     </td>
                     <td class="px-3 text-right">
                         {% if show_archived %}

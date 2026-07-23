@@ -325,11 +325,11 @@ function popupHtml(f) {
 
     const badges = [];
     if (f.is_city_level)
-        badges.push('<span class="popup-rk-badge rk-badge-slate rk-badge rk-badge-slate-slate city">City-level</span>');
+        badges.push('<span class="popup-rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate city">City-level</span>');
     if (f.is_approximate_location)
-        badges.push('<span class="popup-rk-badge rk-badge-slate rk-badge rk-badge-slate-slate approx">Approximate location</span>');
+        badges.push('<span class="popup-rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate approx">Approximate location</span>');
     if (f.status)
-        badges.push(`<span class="popup-rk-badge rk-badge-slate rk-badge rk-badge-slate-slate">${esc(f.status)}</span>`);
+        badges.push(`<span class="popup-rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate">${esc(f.status)}</span>`);
 
     function row(label, value) {
         if (value === null || value === undefined || value === '') return '';
