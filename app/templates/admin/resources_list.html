@@ -31,14 +31,14 @@
 <div class="rk-alert rk-alert-green">
     <i class="bi bi-check-circle-fill mr-1"></i>
     {{ request.query_params.get('success') }}
-    <button type="button" class="-close" data-bs-dismiss="alert"></button>
+    <button type="button" class="btn-close" aria-label="Close" data-bs-dismiss="alert"></button>
 </div>
 {% endif %}
 {% if request.query_params.get('error') %}
 <div class="rk-alert rk-alert-red">
     <i class="bi bi-exclamation-triangle-fill mr-1"></i>
     {{ request.query_params.get('error') }}
-    <button type="button" class="-close" data-bs-dismiss="alert"></button>
+    <button type="button" class="btn-close" aria-label="Close" data-bs-dismiss="alert"></button>
 </div>
 {% endif %}
 
@@ -226,7 +226,7 @@
             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
       <div class="modal-header">
         <h6 class="modal-title">Stock change — {{ r.name }}</h6>
-        <button type="button" class="-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        <button type="button" class="btn-close" aria-label="Close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
         <div class="mb-2 text-sm text-slate-500">

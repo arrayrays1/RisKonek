@@ -10,10 +10,10 @@
            resource decisions before an event occurs.</p>
     </div>
     <div class="flex gap-2">
-        <a href="#saved-scenarios" class="btn btn-soft">
+        <a href="#saved-scenarios" class="rk-btn-secondary">
             <i class="bi bi-bookmark-check"></i> Saved Scenarios
         </a>
-        <a href="/admin/simulator/settings" class="btn btn-soft">
+        <a href="/admin/simulator/settings" class="rk-btn-secondary">
             <i class="bi bi-sliders"></i> Planning Thresholds
         </a>
     </div>
@@ -48,9 +48,9 @@
 
 <div class="grid grid-cols-12 gap-4">
     <!-- ── LEFT (narrower): Scenario Setup ──────────────────────────────── -->
-    <div class="col-lg-5">
+    <div class="col-span-5">
         <div class="rk-card">
-            <div class="card-title-grid grid-cols-12 gap-4">
+            <div class="rk-section-head">
                 <h6><i class="bi bi-sliders mr-1"></i>Scenario Setup</h6>
             </div>
 
@@ -107,7 +107,7 @@
                     </div>
                 </div>
 
-                <button type="submit" class="btn rk-btn-primary">
+                <button type="submit" class="rk-btn-primary">
                     <i class="bi bi-graph-up-arrow mr-1"></i>Generate Analysis
                 </button>
             </form>
@@ -119,7 +119,7 @@
        its bottom aligns with the Scenario Setup card on the left. The global
        .dash-card{height:100%} is overridden inline so the weather strip stays
        compact instead of stretching. #}
-    <div class="col-lg-7 flex flex-col">
+    <div class="col-span-7 flex flex-col">
         {# ── Weather Outlook — compact 7-day horizontal strip ───────────── #}
         <div class="rk-card mb-4" style="height:auto;">
             {% if weather and weather.days %}
@@ -155,17 +155,17 @@
            compact — no long list, no awkward empty space. flex-grow-1 lets it
            fill the remaining column height so its bottom aligns with the left. #}
         <div class="rk-card flex-grow-1" style="height:auto;">
-            <div class="card-title-grid grid-cols-12 gap-4">
+            <div class="rk-section-head">
                 <h6 class="mb-0"><i class="bi bi-exclamation-triangle-fill mr-1 text-red-600"></i>Priority Barangays (Frequently Affected)</h6>
                 {% if priority_rows | length > 1 %}
                 <div class="ml-auto flex items-center gap-1">
-                    <button type="button" class="btn-soft" data-pb-nav data-dir="prev" aria-label="Previous barangay">
+                    <button type="button" class="rk-btn-ghost rk-btn-sm" data-pb-nav data-dir="prev" aria-label="Previous barangay">
                         <i class="bi bi-chevron-left"></i>
                     </button>
                     <span class="text-slate-500" style="font-size:12px; white-space:nowrap;">
                         <span id="pb-current">1</span> / {{ priority_rows | length }}
                     </span>
-                    <button type="button" class="btn-soft" data-pb-nav data-dir="next" aria-label="Next barangay">
+                    <button type="button" class="rk-btn-ghost rk-btn-sm" data-pb-nav data-dir="next" aria-label="Next barangay">
                         <i class="bi bi-chevron-right"></i>
                     </button>
                 </div>
@@ -188,13 +188,13 @@
                         <div class="flex-grow-1">
                             <div class="flex justify-between items-center">
                                 <span class="font-semibold">{{ p.name }}</span>
-                                <span class="risk-rk-badge rk-badge-slate risk-{{ p.level }}">{{ p.level.title() }}</span>
+                                <span class="rk-badge rk-badge-slate risk-{{ p.level }}">{{ p.level.title() }}</span>
                             </div>
                             <div class="text-slate-500" style="font-size:12px;">
                                 Hazards: {{ p.hazards }} · Population: {{ "{:,}".format(p.population) }}
                             </div>
-                            <div class="progress mt-2" style="height:6px;">
-                                <div class="progress-bar {{ p.bar_class }}" role="progressbar"
+                            <div class="mt-2 w-full bg-slate-200 rounded-full overflow-hidden" style="height:6px;" style="height:6px;">
+                                <div class="h-full bg-emerald-500" role="progressbar"
                                      style="width: {{ p.score }}%;"
                                      aria-valuenow="{{ p.score }}" aria-valuemin="0" aria-valuemax="100"></div>
                             </div>
@@ -225,7 +225,7 @@
     'Critical': {'label': 'High Risk',      'class': 'status-unavailable'}
 } %}
 <div class="rk-card mt-4" id="saved-scenarios">
-    <div class="card-title-grid grid-cols-12 gap-4">
+    <div class="rk-section-head">
         <h6><i class="bi bi-bookmark-check mr-1"></i>Saved Scenarios</h6>
         <div class="ml-auto flex items-center gap-2">
             {% if total_saved %}
@@ -234,7 +234,7 @@
             </span>
             {% endif %}
             {% if saved_rows %}
-            <button type="button" id="cmp-btn" class="btn rk-btn-primary rk-btn-sm" disabled
+            <button type="button" id="cmp-btn" class="rk-btn-primary rk-btn-sm" disabled
                     title="Select exactly two scenarios to compare">
                 <i class="bi bi-bar-chart-steps"></i> Compare
             </button>
@@ -266,7 +266,7 @@
                 {% set rb = readiness_badge.get(s.readiness, readiness_badge['Critical']) %}
                 <tr style="font-size:13px">
                     <td>
-                        <input type="checkbox" class="form-check-input cmp-check"
+                        <input type="checkbox" class="cmp-check"
                                value="{{ s.id }}" aria-label="Select {{ s.name }} to compare">
                     </td>
                     <td class="font-semibold">{{ s.name }}</td>
@@ -277,14 +277,14 @@
                     <td class="text-slate-500">{{ s.saved_by }}</td>
                     <td class="text-slate-500">{{ s.created_at | pht }}</td>
                     <td class="text-right">
-                        <a href="/admin/simulator/scenarios/{{ s.id }}" class="btn-soft" title="View">
+                        <a href="/admin/simulator/scenarios/{{ s.id }}" class="rk-btn-ghost rk-btn-sm" title="View">
                             <i class="bi bi-eye"></i> View
                         </a>
                         <form method="POST" action="/admin/simulator/scenarios/{{ s.id }}/delete"
-                              class="d-inline"
-                              data-confirm="Delete saved scenario '{{ s.name }}'? This cannot be undone.">
+                              class="inline"
+                              onsubmit="event.preventDefault(); rkConfirm('Delete saved scenario \'{{ s.name }}\'? This cannot be undone.', this)">
                             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
-                            <button type="submit" class="btn-soft" style="color:#c0392b" title="Delete">
+                            <button type="submit" class="rk-btn-ghost rk-btn-sm" style="color:#c0392b" title="Delete">
                                 <i class="bi bi-trash"></i>
                             </button>
                         </form>

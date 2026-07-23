@@ -57,6 +57,7 @@
         .col-span-5  { grid-column: span 5  / span 5; }
         .col-span-6  { grid-column: span 6  / span 6; }
         .col-span-7  { grid-column: span 7  / span 7; }
+        .col-span-7  { grid-column: span 7  / span 7; }
         .col-span-8  { grid-column: span 8  / span 8; }
         .col-span-9  { grid-column: span 9  / span 9; }
         .col-span-10 { grid-column: span 10 / span 10; }
@@ -164,6 +165,16 @@
         .inset-0        {top:0;right:0;bottom:0;left:0}
         .z-10           {z-index:10}
         .opacity-50     {opacity:.5}
+        /* Simulator-specific utilities */
+        .flex-fill      {flex:1 1 auto}
+        .flex-nowrap    {flex-wrap:nowrap}
+        .flex-grow-1    {flex-grow:1}
+        .align-middle   {vertical-align:middle}
+        .text-capitalize{text-transform:capitalize}
+        .text-right     {text-align:right}
+        .min-w-0        {min-width:0}
+        .whitespace-nowrap{white-space:nowrap}
+        .py-1\.5        {padding-top:.375rem;padding-bottom:.375rem}
 
         /* ── CSS variables (kept for JS/inline references) ─────────── */
         :root {
@@ -434,6 +445,28 @@
 
         /* Separator */
         .rk-divider { border:none; border-top:1px solid #f1f5f9; margin:16px 0; }
+        /* ── Bootstrap modal CSS (JS kept, CSS removed — must define manually) ── */
+        .modal { display:none; position:fixed; inset:0; z-index:1055; overflow-x:hidden; overflow-y:auto; outline:0; }
+        .modal.show { display:block; }
+        .modal-backdrop { position:fixed; inset:0; z-index:1050; background:#000; opacity:0.5; }
+        .modal-dialog { position:relative; margin:1.75rem auto; pointer-events:none; max-width:500px; }
+        .modal-dialog-centered { display:flex; align-items:center; min-height:calc(100% - 3.5rem); }
+        .modal-content { position:relative; display:flex; flex-direction:column; pointer-events:auto;
+            background:#fff; border-radius:12px; box-shadow:0 10px 40px rgba(0,0,0,0.18); outline:0; overflow:hidden; }
+        .modal-header { display:flex; align-items:center; justify-content:space-between;
+            padding:16px 20px; border-bottom:1px solid #f1f5f9; }
+        .modal-title { font-size:14px; font-weight:700; color:#1a1a2e; margin:0; }
+        .modal-body { padding:20px; flex:1 1 auto; }
+        .modal-footer { display:flex; align-items:center; justify-content:flex-end; gap:8px;
+            padding:14px 20px; border-top:1px solid #f1f5f9; }
+        .btn-close { background:none; border:none; font-size:18px; cursor:pointer;
+            color:#9ca3af; padding:4px 8px; line-height:1; border-radius:4px; }
+        .btn-close:hover { color:#374151; background:#f1f5f9; }
+        .modal.fade .modal-dialog { transform:translateY(-50px); transition:transform .3s ease-out; }
+        .modal.show .modal-dialog { transform:none; }
+        body.modal-open { overflow:hidden; }
+        /* Ensure rkConfirmOverlay always sits above Bootstrap modals */
+        #rkConfirmOverlay { z-index:9999 !important; }
     </style>
     {% block head_extra %}{% endblock %}
 </head>
@@ -554,7 +587,7 @@
            class="nav-item-link nav-accent-orange {{ 'active' if active == 'map' else '' }}">
             <i class="bi bi-map-fill nav-icon"></i><span class="nav-label">Hazard Reference Map</span>
         </a>
-        <a href="/admin/simulator"
+        <a href="/admin/simulator/setup"
            class="nav-item-link {{ 'active' if active == 'simulator' else '' }}">
             <i class="bi bi-lightning-fill nav-icon"></i><span class="nav-label">Disaster Simulator</span>
         </a>

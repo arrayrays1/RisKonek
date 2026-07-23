@@ -20,7 +20,7 @@
         <p>Side-by-side comparison of two saved snapshots. Figures reflect the
            data and thresholds at the time each was run — nothing is recomputed.</p>
     </div>
-    <a href="/admin/simulator/setup" class="btn btn-soft">
+    <a href="/admin/simulator/setup" class="rk-btn-secondary">
         <i class="bi bi-arrow-left"></i> Back to Simulator
     </a>
 </div>
@@ -48,7 +48,7 @@
     {% set band = band_ui.get(s.readiness, band_ui['Critical']) %}
     <div class="col-span-6">
         <div class="rk-card h-100">
-            <div class="card-title-grid grid-cols-12 gap-4">
+            <div class="rk-section-head">
                 <h6 class="mb-0">
                     <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate mr-1">{{ 'A' if loop.first else 'B' }}</span>
                     {{ s.name }}
@@ -72,7 +72,7 @@
 
 {# ── Per-class comparison table ───────────────────────────────────────── #}
 <div class="rk-card">
-    <div class="card-title-grid grid-cols-12 gap-4">
+    <div class="rk-section-head">
         <h6 class="mb-0"><i class="bi bi-rk-table mr-1"></i>Resource Comparison</h6>
     </div>
     {% if compare_rows %}

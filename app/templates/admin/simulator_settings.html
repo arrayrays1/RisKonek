@@ -8,7 +8,7 @@
         <h1><i class="bi bi-sliders mr-2"></i>Planning Thresholds</h1>
         <p>The simulator computes gaps against these values.</p>
     </div>
-    <a href="/admin/simulator/setup" class="btn btn-soft">
+    <a href="/admin/simulator/setup" class="rk-btn-secondary">
         <i class="bi bi-arrow-left"></i> Back to Simulator
     </a>
 </div>
@@ -25,7 +25,7 @@
 
     {# ── Cited Standards (floored) ─────────────────────────────────────── #}
     <div class="rk-card mb-3">
-        <div class="card-title-grid grid-cols-12 gap-4">
+        <div class="rk-section-head">
             <h6><i class="bi bi-award mr-1"></i>Cited Standards</h6>
         </div>
         <p class="text-slate-500" style="font-size: 12px;">
@@ -51,7 +51,7 @@
                 </div>
             </div>
             <div class="col-span-3">
-                <button type="submit" name="reset_key" value="{{ f.key }}" class="btn btn-soft rk-btn-sm"
+                <button type="submit" name="reset_key" value="{{ f.key }}" class="rk-btn-secondary rk-btn-sm"
                         title="Restore the default value">
                     <i class="bi bi-arrow-counterclockwise"></i> Reset ({{ f.default | round(2) }})
                 </button>
@@ -62,7 +62,7 @@
 
     {# ── Local Planning Targets (local) ────────────────────────────────── #}
     <div class="rk-card mb-3">
-        <div class="card-title-grid grid-cols-12 gap-4">
+        <div class="rk-section-head">
             <h6><i class="bi bi-geo mr-1"></i>Local Planning Targets</h6>
         </div>
         <p class="text-slate-500" style="font-size: 12px;">
@@ -108,7 +108,7 @@
                 {% endif %}
             </div>
             <div class="col-span-3">
-                <button type="submit" name="reset_key" value="{{ f.key }}" class="btn btn-soft rk-btn-sm"
+                <button type="submit" name="reset_key" value="{{ f.key }}" class="rk-btn-secondary rk-btn-sm"
                         title="Restore the default value">
                     <i class="bi bi-arrow-counterclockwise"></i>
                     {% if is_exposure %}
@@ -124,7 +124,7 @@
 
     {# ── Locked Constants (locked, read-only) ──────────────────────────── #}
     <div class="rk-card mb-3">
-        <div class="card-title-grid grid-cols-12 gap-4">
+        <div class="rk-section-head">
             <h6><i class="bi bi-lock-fill mr-1"></i>Locked Constants</h6>
         </div>
         <p class="text-slate-500" style="font-size: 12px;">
@@ -146,7 +146,7 @@
         {% endfor %}
     </div>
 
-    <button type="submit" class="btn rk-btn-primary">
+    <button type="submit" class="rk-btn-primary">
         <i class="bi bi-save mr-1"></i>Save Changes
     </button>
 </form>

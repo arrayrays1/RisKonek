@@ -43,13 +43,13 @@
 {% if request.query_params.get('success') %}
 <div class="rk-alert rk-alert-green">
     <i class="bi bi-check-circle-fill mr-1"></i>{{ request.query_params.get('success') }}
-    <button type="button" class="-close" data-bs-dismiss="alert"></button>
+    <button type="button" class="btn-close" aria-label="Close" data-bs-dismiss="alert"></button>
 </div>
 {% endif %}
 {% if request.query_params.get('error') %}
 <div class="rk-alert rk-alert-red">
     <i class="bi bi-exclamation-triangle-fill mr-1"></i>{{ request.query_params.get('error') }}
-    <button type="button" class="-close" data-bs-dismiss="alert"></button>
+    <button type="button" class="btn-close" aria-label="Close" data-bs-dismiss="alert"></button>
 </div>
 {% endif %}
 

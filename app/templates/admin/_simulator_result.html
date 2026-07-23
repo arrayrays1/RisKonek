@@ -102,7 +102,7 @@
     <!-- ── Affected population card ─────────────────────────────────────── -->
     <div class="col-span-4 mb-3">
         <div class="rk-card h-100">
-            <div class="card-title-grid grid-cols-12 gap-4">
+            <div class="rk-section-head">
                 <h6><i class="bi bi-people-fill mr-1"></i>Estimated Affected Population</h6>
             </div>
             <div class="rk-stat-value" style="font-size: 32px;">
@@ -118,7 +118,7 @@
                     <div class="rk-stat-label">Vulnerable (PWD + elderly + children)</div>
                     <div class="font-semibold">{{ "{:,}".format(result.estimated_vulnerable) }}</div>
                 </div>
-                <span class="risk-rk-badge rk-badge-slate risk-moderate">{{ vpct | round(1) }}% of affected</span>
+                <span class="rk-badge rk-badge-slate risk-moderate">{{ vpct | round(1) }}% of affected</span>
             </div>
         </div>
     </div>
@@ -126,7 +126,7 @@
     <!-- ── Planning status summary (alert rows per class) ───────────────── -->
     <div class="col-span-8 mb-3">
         <div class="rk-card h-100">
-            <div class="card-title-grid grid-cols-12 gap-4">
+            <div class="rk-section-head">
                 <h6><i class="bi bi-ui-checks mr-1"></i>Planning Status Summary</h6>
             </div>
             {% for c in display_order %}
@@ -151,7 +151,7 @@
 
 <!-- ── Resource analysis table ─────────────────────────────────────────── -->
 <div class="rk-card mb-3">
-    <div class="card-title-grid grid-cols-12 gap-4">
+    <div class="rk-section-head">
         <h6><i class="bi bi-rk-table mr-1"></i>Resource Analysis</h6>
     </div>
     <div class="overflow-x-auto">
@@ -206,7 +206,7 @@
 <!-- ── Operational risks ───────────────────────────────────────────────── -->
 {% if result.operational_risks %}
 <div class="rk-card mb-3">
-    <div class="card-title-grid grid-cols-12 gap-4">
+    <div class="rk-section-head">
         <h6><i class="bi bi-shield-exclamation mr-1"></i>Operational Risks</h6>
     </div>
     <ul class="mb-0">
@@ -219,7 +219,7 @@
 
 <!-- ── Need vs Available chart ─────────────────────────────────────────── -->
 <div class="rk-card mb-3">
-    <div class="card-title-grid grid-cols-12 gap-4">
+    <div class="rk-section-head">
         <h6><i class="bi bi-bar-chart-fill mr-1"></i>Need vs. Available</h6>
     </div>
     <canvas id="needChart" height="110"></canvas>
@@ -227,9 +227,9 @@
 
 <!-- ── AI briefing (optional; below the numeric tables) ─────────────────── -->
 <div class="rk-card mb-3">
-    <div class="card-title-grid grid-cols-12 gap-4">
+    <div class="rk-section-head">
         <h6><i class="bi bi-robot mr-1"></i>AI Planning Briefing</h6>
-        <span class="risk-rk-badge rk-badge-slate risk-moderate ml-auto">
+        <span class="rk-badge rk-badge-slate risk-moderate ml-auto">
             AI-generated · advisory · validate with current conditions and expert judgment
         </span>
     </div>
