@@ -17,20 +17,20 @@
 {% endblock %}
 
 {% block content %}
-<div class="flex justify-between items-start mb-5">
+<div class="d-flex justify-content-between align-items-start page-header">
     <div>
         <h1>Audit Entry #{{ log.id }}</h1>
         <p>Detailed view of a single logged action.</p>
     </div>
-    <a href="/admin/audit" class="rk-btn-secondary">
+    <a href="/admin/audit" class="btn btn-outline-secondary">
         <i class="bi bi-arrow-left"></i> Back to Audit Trail
     </a>
 </div>
 
-<div class="rk-card mb-3">
-    <div class="kv flex flex-col gap-2">
+<div class="dash-card mb-3">
+    <div class="kv d-flex flex-column gap-2">
         <div><span class="k">Action performed</span>
-            <span class="v"><span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-slate">{{ log.action }}</span></span></div>
+            <span class="v"><span class="badge bg-light text-dark border">{{ log.action }}</span></span></div>
         <div><span class="k">Category / Module</span><span class="v">{{ category }}</span></div>
         <div><span class="k">Affected table</span><span class="v">{{ log.target_table or '—' }}</span></div>
         <div><span class="k">Affected record ID</span><span class="v">{{ log.target_id if log.target_id is not none else '—' }}</span></div>
@@ -38,7 +38,7 @@
         <div><span class="k">Performed by</span>
             <span class="v">
                 {% if actor %}{{ actor.username }}
-                    <a href="/admin/audit?user_id={{ actor.id }}" class="text-sm ml-2">(view this user's trail)</a>
+                    <a href="/admin/audit?user_id={{ actor.id }}" class="small ms-2">(view this user's trail)</a>
                 {% else %}user #{{ log.user_id }}{% endif %}
             </span></div>
         <div><span class="k">Description</span><span class="v">{{ log.description or '—' }}</span></div>
@@ -47,63 +47,63 @@
 
 <!-- ── Related entity links ───────────────────────────────────────── -->
 {% if related_upload %}
-<div class="rk-card mb-3">
-    <div class="rk-section-head">
+<div class="dash-card mb-3">
+    <div class="card-title-row">
         <i class="bi bi-link-45deg"></i>
         <h6>Related Upload</h6>
     </div>
-    <p class="text-sm mb-2">
+    <p class="small mb-2">
         <strong>{{ related_upload.file_name }}</strong>
-        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-slate">{{ related_upload.file_type.value | upper }}</span>
+        <span class="badge bg-light text-dark border">{{ related_upload.file_type.value | upper }}</span>
         — lifecycle: {{ related_upload.lifecycle_status.value }}
         {% if related_upload.extracted_data and related_upload.extracted_data.get('linked_incident_ids') %}
         <br>Linked Incident IDs: {{ related_upload.extracted_data.get('linked_incident_ids') | join(', ') }}
         {% endif %}
     </p>
-    <div class="flex gap-2">
-        <a href="/admin/uploads/{{ related_upload.id }}/review" class="rk-btn-secondary rk-btn-sm">
+    <div class="d-flex gap-2">
+        <a href="/admin/uploads/{{ related_upload.id }}/review" class="btn btn-outline-secondary btn-sm">
             <i class="bi bi-eye"></i> Open Upload
         </a>
-        <a href="/admin/uploads/{{ related_upload.id }}/history" class="rk-btn-secondary rk-btn-sm">
+        <a href="/admin/uploads/{{ related_upload.id }}/history" class="btn btn-outline-secondary btn-sm">
             <i class="bi bi-clock-history"></i> Full Upload History
         </a>
     </div>
 </div>
 
 {% if upload_changes %}
-<div class="rk-card">
-    <div class="rk-section-head">
+<div class="dash-card">
+    <div class="card-title-row">
         <i class="bi bi-pencil-square"></i>
         <h6>Before / After — recorded field changes for this upload</h6>
     </div>
-    <p class="text-sm text-slate-500">
+    <p class="small text-muted">
         Field-level edits from the upload's append-only history (newest first).
     </p>
     {% for c in upload_changes %}
     <div class="mb-3">
-        <div class="flex justify-between">
-            <div class="font-semibold text-sm">{{ c.field_changed }}</div>
-            <div class="text-slate-500 text-sm">{{ c.timestamp | pht }}{% if c.user %} · {{ c.user.username }}{% endif %}</div>
+        <div class="d-flex justify-content-between">
+            <div class="fw-semibold small">{{ c.field_changed }}</div>
+            <div class="text-muted small">{{ c.timestamp | pht }}{% if c.user %} · {{ c.user.username }}{% endif %}</div>
         </div>
-        <div class="grid grid-cols-12 gap-2 mt-1">
-            <div class="col-span-6">
+        <div class="row g-2 mt-1">
+            <div class="col-md-6">
                 <div class="diff-label mb-1">Before</div>
                 <div class="diff-box diff-old">{{ c.old_value if c.old_value else '(empty)' }}</div>
             </div>
-            <div class="col-span-6">
+            <div class="col-md-6">
                 <div class="diff-label mb-1">After</div>
                 <div class="diff-box diff-new">{{ c.new_value if c.new_value else '(empty)' }}</div>
             </div>
         </div>
-        {% if c.reason %}<div class="text-sm text-slate-500 mt-1"><i class="bi bi-chat-left-text mr-1"></i>Reason: {{ c.reason }}</div>{% endif %}
+        {% if c.reason %}<div class="small text-muted mt-1"><i class="bi bi-chat-left-text me-1"></i>Reason: {{ c.reason }}</div>{% endif %}
     </div>
     {% endfor %}
 </div>
 {% endif %}
 {% else %}
-<div class="rk-card">
-    <p class="text-slate-500 text-sm mb-0">
-        <i class="bi bi-info-circle mr-1"></i>
+<div class="dash-card">
+    <p class="text-muted small mb-0">
+        <i class="bi bi-info-circle me-1"></i>
         No before/after detail is recorded for this action type. Field-level
         comparisons are available for upload edits.
     </p>

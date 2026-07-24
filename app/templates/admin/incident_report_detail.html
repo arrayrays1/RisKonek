@@ -5,30 +5,30 @@
 {% set active_nav = 'incident_reports_review' %}
 
 {% block content %}
-<div class="flex justify-between items-start mb-5">
+<div class="d-flex justify-content-between align-items-start page-header">
     <div>
-        <div class="flex items-center gap-2 flex-wrap">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
             <h1 class="mb-0">Post-Incident Report #{{ r.id }}</h1>
             {% if source_upload %}
-            <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-blue"><i class="bi bi-cloud-arrow-up mr-1"></i>Uploaded</span>
+            <span class="badge bg-info text-dark"><i class="bi bi-cloud-arrow-up me-1"></i>Uploaded</span>
             {% else %}
-            <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-slate"><i class="bi bi-pencil mr-1"></i>Manual</span>
+            <span class="badge bg-light text-dark border"><i class="bi bi-pencil me-1"></i>Manual</span>
             {% endif %}
         </div>
         <p class="mt-1">{{ disaster_type }} · {{ barangay }}
            {% if incident and incident.date_occurred %} · {{ incident.date_occurred.strftime('%B %d, %Y') }}{% endif %}</p>
     </div>
-    <a href="/admin/incident-reports" class="rk-btn-secondary">
+    <a href="/admin/incident-reports" class="btn btn-outline-secondary">
         <i class="bi bi-arrow-left"></i> Back
     </a>
 </div>
 
-<div class="grid grid-cols-12 gap-3">
-    <div class="col-span-8">
-        <div class="rk-card">
+<div class="row g-3">
+    <div class="col-md-8">
+        <div class="dash-card">
             {% macro section(title, value) %}
             <div class="mb-3">
-                <div class="rk-stat-label">{{ title }}</div>
+                <div class="stat-label">{{ title }}</div>
                 <p class="mb-0" style="white-space:pre-wrap">{{ value or '—' }}</p>
             </div>
             {% endmacro %}
@@ -40,21 +40,21 @@
         </div>
     </div>
 
-    <div class="col-span-4">
-        <div class="rk-card">
-            <div class="rk-section-head">
+    <div class="col-md-4">
+        <div class="dash-card">
+            <div class="card-title-row">
                 <i class="bi bi-clock-history" style="color:var(--rk-green);font-size:16px"></i>
                 <h6>Status</h6>
             </div>
-            <p><span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-slate">{{ workflow_label }}</span></p>
-            <ul class="list-unstyled text-sm text-slate-500 mb-3">
+            <p><span class="badge bg-secondary">{{ workflow_label }}</span></p>
+            <ul class="list-unstyled small text-muted mb-3">
                 <li><strong>Reporter:</strong> {{ r.submitted_by_user.username if r.submitted_by_user else '—' }}</li>
                 <li><strong>Personnel deployed:</strong> {{ r.personnel_count or 0 }}</li>
                 {% if r.personnel_notes %}<li><strong>Personnel notes:</strong> {{ r.personnel_notes }}</li>{% endif %}
                 <li><strong>Created:</strong> {{ r.created_at | pht }}</li>
                 <li><strong>Submitted:</strong> {{ (r.submitted_at | pht) or 'Not yet submitted' }}</li>
             </ul>
-            <p class="text-sm text-slate-500 mb-0">
+            <p class="small text-muted mb-0">
                 <i class="bi bi-shield-lock"></i>
                 Admin view is read-only. CFAU authors and submits these reports;
                 IncidentReport remains the single source of truth.
@@ -63,23 +63,23 @@
 
         {% if source_upload %}
         <!-- ── Source Upload (provenance — Week 8.1 linkage) ───────── -->
-        <div class="rk-card mt-3">
-            <div class="rk-section-head">
+        <div class="dash-card mt-3">
+            <div class="card-title-row">
                 <i class="bi bi-file-earmark-arrow-up" style="color:var(--rk-green);font-size:16px"></i>
                 <h6>Source Upload</h6>
             </div>
-            <p class="text-sm mb-2">
+            <p class="small mb-2">
                 Created from an uploaded document in the
                 <strong>Incident Data Uploads</strong> module.<br>
                 <strong>{{ source_upload.file_name }}</strong>
-                <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-slate ml-1">{{ source_upload.file_type.value.upper() }}</span>
+                <span class="badge bg-light text-dark border ms-1">{{ source_upload.file_type.value.upper() }}</span>
             </p>
-            <p class="text-sm text-slate-500 mb-3">Uploaded {{ source_upload.uploaded_at | pht }}</p>
+            <p class="small text-muted mb-3">Uploaded {{ source_upload.uploaded_at | pht }}</p>
             <div class="d-grid gap-2">
-                <a href="/admin/uploads/{{ source_upload.id }}/history" class="rk-btn-secondary rk-btn-sm">
+                <a href="/admin/uploads/{{ source_upload.id }}/history" class="btn btn-outline-secondary btn-sm">
                     <i class="bi bi-clock-history"></i> View Upload Record &amp; History
                 </a>
-                <a href="/admin/uploads/{{ source_upload.id }}/file" class="rk-btn-secondary rk-btn-sm">
+                <a href="/admin/uploads/{{ source_upload.id }}/file" class="btn btn-outline-secondary btn-sm">
                     <i class="bi bi-download"></i> View Original File
                 </a>
             </div>

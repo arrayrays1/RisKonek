@@ -6,14 +6,14 @@
 
 {% macro workflow_pill(v, label) -%}
     {% if v == 'submitted' %}
-        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-green">{{ label }}</span>
+        <span class="status-pill status-operational">{{ label }}</span>
     {% else %}
-        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-slate">{{ label }}</span>
+        <span class="badge bg-light text-dark border">{{ label }}</span>
     {% endif %}
 {%- endmacro %}
 
 {% block content %}
-<div class="flex justify-between items-start mb-5">
+<div class="d-flex justify-content-between align-items-start page-header">
     <div>
         <h1>Post-Incident Reports</h1>
         <p>
@@ -22,18 +22,18 @@
         </p>
     </div>
     <div class="dropdown">
-        <button class="rk-btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+        <button class="btn btn-rk dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
             <i class="bi bi-plus-lg"></i> New Report
         </button>
         <ul class="dropdown-menu dropdown-menu-end">
             <li>
                 <a class="dropdown-item" href="/cfau/incident-reports/new">
-                    <i class="bi bi-pencil-square mr-1"></i> Fill Manually
+                    <i class="bi bi-pencil-square me-1"></i> Fill Manually
                 </a>
             </li>
             <li>
                 <a class="dropdown-item" href="/cfau/incident-reports/upload">
-                    <i class="bi bi-cloud-upload mr-1"></i> Upload Existing Report
+                    <i class="bi bi-cloud-upload me-1"></i> Upload Existing Report
                 </a>
             </li>
         </ul>
@@ -41,40 +41,40 @@
 </div>
 
 {% if request.query_params.get('success') %}
-<div class="rk-alert rk-alert-green">
-    <i class="bi bi-check-circle-fill mr-1"></i>{{ request.query_params.get('success') }}
-    <button type="button" class="btn-close" aria-label="Close" data-bs-dismiss="alert"></button>
+<div class="alert alert-success alert-dismissible fade show">
+    <i class="bi bi-check-circle-fill me-1"></i>{{ request.query_params.get('success') }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
 </div>
 {% endif %}
 {% if request.query_params.get('error') %}
-<div class="rk-alert rk-alert-red">
-    <i class="bi bi-exclamation-triangle-fill mr-1"></i>{{ request.query_params.get('error') }}
-    <button type="button" class="btn-close" aria-label="Close" data-bs-dismiss="alert"></button>
+<div class="alert alert-danger alert-dismissible fade show">
+    <i class="bi bi-exclamation-triangle-fill me-1"></i>{{ request.query_params.get('error') }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
 </div>
 {% endif %}
 
 <!-- ── Filter ─────────────────────────────────────────────────── -->
-<div class="rk-card mb-3">
-    <form method="GET" action="/cfau/incident-reports" class="grid grid-cols-12 gap-2 items-end js-live-filter">
-        <div class="col-span-3">
-            <label class="rk-label mb-1">Status</label>
-            <select name="status" class="rk-select text-xs py-1.5">
+<div class="dash-card mb-3">
+    <form method="GET" action="/cfau/incident-reports" class="row g-2 align-items-end js-live-filter">
+        <div class="col-md-3">
+            <label class="form-label small fw-semibold mb-1">Status</label>
+            <select name="status" class="form-select form-select-sm">
                 <option value="">All statuses</option>
                 {% for v, label in statuses %}
                 <option value="{{ v }}" {% if f_status == v %}selected{% endif %}>{{ label }}</option>
                 {% endfor %}
             </select>
         </div>
-        <div class="col-span-2 d-grid">
-            <a href="/cfau/incident-reports" class="rk-btn-secondary rk-btn-sm"><i class="bi bi-x-circle"></i> Reset</a>
+        <div class="col-md-2 d-grid">
+            <a href="/cfau/incident-reports" class="btn btn-outline-secondary btn-sm"><i class="bi bi-x-circle"></i> Reset</a>
         </div>
     </form>
 </div>
 
 <!-- ── Table ──────────────────────────────────────────────────── -->
-<div class="rk-card p-0">
-    <div class="overflow-x-auto">
-        <table class="rk-table align-middle mb-0">
+<div class="dash-card p-0">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
             <thead style="background:#f9fafb">
                 <tr style="font-size:12px;color:var(--rk-muted);text-transform:uppercase;letter-spacing:0.04em">
                     <th class="px-3 py-3">Disaster Type</th>
@@ -83,37 +83,38 @@
                     <th class="py-3">Personnel</th>
                     <th class="py-3">Status</th>
                     {% if is_admin_view %}<th class="py-3">Reporter</th>{% endif %}
-                    <th class="py-3 text-right px-3">Actions</th>
+                    <th class="py-3 text-end px-3">Actions</th>
                 </tr>
             </thead>
             <tbody>
                 {% for r in rows %}
                 <tr style="font-size:13px">
-                    <td class="px-3 font-semibold">{{ r.disaster_type }}</td>
+                    <td class="px-3 fw-semibold">{{ r.disaster_type }}</td>
                     <td>{{ r.barangay }}</td>
-                    <td class="text-slate-500">{{ r.date_occurred.strftime('%Y-%m-%d') if r.date_occurred else '—' }}</td>
-                    <td class="text-slate-500">{{ r.personnel_count }}</td>
+                    <td class="text-muted">{{ r.date_occurred.strftime('%Y-%m-%d') if r.date_occurred else '—' }}</td>
+                    <td class="text-muted">{{ r.personnel_count }}</td>
                     <td>{{ workflow_pill(r.report_status, r.report_status_label) }}</td>
-                    {% if is_admin_view %}<td class="text-slate-500">{{ r.reporter }}</td>{% endif %}
-                    <td class="text-right px-3">
-                        <a href="/cfau/incident-reports/{{ r.id }}" class="rk-btn-secondary rk-btn-sm">
+                    {% if is_admin_view %}<td class="text-muted">{{ r.reporter }}</td>{% endif %}
+                    <td class="text-end px-3">
+                        <a href="/cfau/incident-reports/{{ r.id }}" class="btn btn-outline-secondary btn-sm">
                             <i class="bi bi-eye"></i> View
                         </a>
                         {% if r.report_status == 'draft' %}
-                        <a href="/cfau/incident-reports/{{ r.id }}/edit" class="rk-btn-secondary rk-btn-sm">
+                        <a href="/cfau/incident-reports/{{ r.id }}/edit" class="btn btn-outline-secondary btn-sm">
                             <i class="bi bi-pencil"></i>
                         </a>
-                        <form method="POST" action="/cfau/incident-reports/{{ r.id }}/submit" class="inline"
-                              onsubmit="event.preventDefault(); rkConfirm('Submit this report? You will no longer be able to edit it.', this)">
-                            <button type="submit" class="rk-btn-primary rk-btn-sm"><i class="bi bi-send"></i> Submit</button>
+                        <form method="POST" action="/cfau/incident-reports/{{ r.id }}/submit" class="d-inline"
+                              data-confirm='Submit this report? You will no longer be able to edit it.'>
+            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+                            <button type="submit" class="btn btn-rk btn-sm"><i class="bi bi-send"></i> Submit</button>
                         </form>
                         {% endif %}
                     </td>
                 </tr>
                 {% else %}
-                <tr><td colspan="{{ 7 if is_admin_view else 6 }}" class="text-center text-slate-500 py-4">
+                <tr><td colspan="{{ 7 if is_admin_view else 6 }}" class="text-center text-muted py-4">
                     No post-incident reports found.
-                    {% if f_status %}<a href="/cfau/incident-reports" class="ml-2">Clear filter</a>{% endif %}
+                    {% if f_status %}<a href="/cfau/incident-reports" class="ms-2">Clear filter</a>{% endif %}
                 </td></tr>
                 {% endfor %}
             </tbody>

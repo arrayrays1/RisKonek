@@ -5,481 +5,371 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ request.session.get('csrf_token', '') }}">
     <title>{% block title %}Admin — RisKonek{% endblock %}</title>
-
-    <!-- Sidebar collapse pre-paint (no flash) -->
+    <link rel="icon" type="image/png" href="/static/img/favicon.png">
     <script nonce="{{ request.state.csp_nonce }}">
-    (function(){
-        var h=document.documentElement;
-        h.classList.add('rk-no-anim');
-        try{ if(localStorage.getItem('rk_sidebar_collapsed')==='1') h.classList.add('rk-sidebar-collapsed'); }catch(e){}
+    // Apply the saved sidebar state BEFORE any CSS paints so the
+    // collapsed/expanded layout is correct on first frame (no flash).
+    // Also add rk-no-anim to suppress transitions on initial render;
+    // it's removed after first frame by the script at end of body.
+    (function () {
+        var html = document.documentElement;
+        html.classList.add('rk-no-anim');
+        try {
+            if (localStorage.getItem('rk_sidebar_collapsed') === '1') {
+                html.classList.add('rk-sidebar-collapsed');
+            }
+        } catch (e) { /* localStorage unavailable — ignore */ }
     })();
     </script>
-
-    <!-- Tailwind CSS Play CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-    tailwind.config = {
-        theme: {
-            extend: {
-                colors: {
-                    rk: {
-                        green:     '#10b981',
-                        'green-mid':  '#059669',
-                        'green-dark': '#047857',
-                        'green-light':'#d1fae5',
-                        bg:        '#f4f6f9',
-                        text:      '#1a1a2e',
-                        muted:     '#6c757d',
-                    }
-                },
-                borderRadius: { rk: '14px' },
-                fontFamily:   { rk: ['"Segoe UI"','sans-serif'] },
-            }
-        }
-    }
-    </script>
-
-    <!-- Bootstrap Icons (kept — icons only, no Bootstrap CSS) -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"
+          integrity="sha384-9ndCyUaIbzAi2FUVXJi0CjmCapSmO7SnpJef0486qhLnuZ2cdeRhO02iuK6FUUVM" crossorigin="anonymous">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css"
           integrity="sha384-tViUnnbYAV00FLIhhi3v/dWt3Jxw4gZQcNoSCxCIFNJVCx7/D55/wXsrNIRANwdD" crossorigin="anonymous">
-
     <style>
-        /* ── Explicit grid (Tailwind Play CDN can't JIT-scan Jinja2) ── */
-        .grid { display: grid; }
-        .grid-cols-12 { grid-template-columns: repeat(12, minmax(0, 1fr)); }
-        .gap-2 { gap: 0.5rem; }
-        .gap-3 { gap: 0.75rem; }
-        .gap-4 { gap: 1rem; }
-        .col-span-1  { grid-column: span 1  / span 1; }
-        .col-span-2  { grid-column: span 2  / span 2; }
-        .col-span-3  { grid-column: span 3  / span 3; }
-        .col-span-4  { grid-column: span 4  / span 4; }
-        .col-span-5  { grid-column: span 5  / span 5; }
-        .col-span-6  { grid-column: span 6  / span 6; }
-        .col-span-7  { grid-column: span 7  / span 7; }
-        .col-span-7  { grid-column: span 7  / span 7; }
-        .col-span-8  { grid-column: span 8  / span 8; }
-        .col-span-9  { grid-column: span 9  / span 9; }
-        .col-span-10 { grid-column: span 10 / span 10; }
-        .col-span-11 { grid-column: span 11 / span 11; }
-        .col-span-12 { grid-column: span 12 / span 12; }
-
-        /* ── Explicit flex utilities ───────────────────────────────── */
-        .flex           { display: flex; }
-        .inline-flex    { display: inline-flex; }
-        .flex-col       { flex-direction: column; }
-        .flex-wrap      { flex-wrap: wrap; }
-        .items-center   { align-items: center; }
-        .items-start    { align-items: flex-start; }
-        .items-end      { align-items: flex-end; }
-        .justify-between{ justify-content: space-between; }
-        .justify-end    { justify-content: flex-end; }
-        .justify-center { justify-content: center; }
-        .gap-1 { gap: 0.25rem; }
-        .gap-2 { gap: 0.5rem; }
-        .gap-3 { gap: 0.75rem; }
-        .flex-1         { flex: 1 1 0%; }
-        .flex-shrink-0  { flex-shrink: 0; }
-        .flex-grow      { flex-grow: 1; }
-        .flex-grow-1    { flex-grow: 1; }
-        .ml-auto        { margin-left: auto; }
-        .mr-auto        { margin-right: auto; }
-
-        /* ── Explicit spacing ──────────────────────────────────────── */
-        .mb-0{margin-bottom:0}.mb-1{margin-bottom:.25rem}.mb-2{margin-bottom:.5rem}
-        .mb-3{margin-bottom:.75rem}.mb-4{margin-bottom:1rem}.mb-5{margin-bottom:1.25rem}
-        .mt-0{margin-top:0}.mt-1{margin-top:.25rem}.mt-2{margin-top:.5rem}
-        .mt-3{margin-top:.75rem}.mt-4{margin-top:1rem}
-        .mr-1{margin-right:.25rem}.mr-2{margin-right:.5rem}.mr-3{margin-right:.75rem}
-        .ml-1{margin-left:.25rem}.ml-2{margin-left:.5rem}.ml-3{margin-left:.75rem}
-        .pt-2{padding-top:.5rem}.pt-3{padding-top:.75rem}
-        .pb-2{padding-bottom:.5rem}.pb-3{padding-bottom:.75rem}
-        .pl-3{padding-left:.75rem}.pr-2{padding-right:.5rem}.pr-3{padding-right:.75rem}
-        .px-2{padding-left:.5rem;padding-right:.5rem}
-        .px-3{padding-left:.75rem;padding-right:.75rem}
-        .px-4{padding-left:1rem;padding-right:1rem}
-        .py-1{padding-top:.25rem;padding-bottom:.25rem}
-        .py-2{padding-top:.5rem;padding-bottom:.5rem}
-        .py-3{padding-top:.75rem;padding-bottom:.75rem}
-        .py-4{padding-top:1rem;padding-bottom:1rem}
-        .p-2{padding:.5rem}.p-3{padding:.75rem}.p-4{padding:1rem}
-
-        /* ── Explicit sizing ───────────────────────────────────────── */
-        .w-full{width:100%}.h-full{height:100%}
-        .w-auto{width:auto}.h-auto{height:auto}
-        .min-w-0{min-width:0}
-        .overflow-hidden{overflow:hidden}
-        .overflow-x-auto{overflow-x:auto}
-        .overflow-auto{overflow:auto}
-
-        /* ── Explicit typography ───────────────────────────────────── */
-        .text-xs  {font-size:.75rem;line-height:1rem}
-        .text-sm  {font-size:.875rem;line-height:1.25rem}
-        .text-base{font-size:1rem;line-height:1.5rem}
-        .text-lg  {font-size:1.125rem;line-height:1.75rem}
-        .text-xl  {font-size:1.25rem;line-height:1.75rem}
-        .text-2xl {font-size:1.5rem;line-height:2rem}
-        .font-normal  {font-weight:400}
-        .font-medium  {font-weight:500}
-        .font-semibold{font-weight:600}
-        .font-bold    {font-weight:700}
-        .text-right  {text-align:right}
-        .text-center {text-align:center}
-        .truncate    {overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-        .sr-only     {position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
-        .hidden      {display:none}
-        .block       {display:block}
-        .inline      {display:inline}
-
-        /* ── Explicit colors (commonly used) ───────────────────────── */
-        .text-slate-400 {color:#94a3b8}
-        .text-slate-500 {color:#64748b}
-        .text-slate-600 {color:#475569}
-        .text-slate-900 {color:#0f172a}
-        .text-red-600   {color:#dc2626}
-        .text-emerald-600{color:#059669}
-        .text-emerald-700{color:#047857}
-        .text-amber-600 {color:#d97706}
-        .text-blue-600  {color:#2563eb}
-        .text-sky-600   {color:#0284c7}
-        .bg-white       {background:white}
-        .bg-slate-50    {background:#f8fafc}
-        .bg-transparent {background:transparent}
-
-        /* ── Borders ───────────────────────────────────────────────── */
-        .border         {border:1px solid #e5e7eb}
-        .border-t       {border-top:1px solid #e5e7eb}
-        .border-0       {border:0}
-        .rounded        {border-radius:.25rem}
-        .rounded-lg     {border-radius:.5rem}
-        .rounded-full   {border-radius:9999px}
-        .shadow-sm      {box-shadow:0 1px 2px rgba(0,0,0,.05)}
-
-        /* ── Misc ──────────────────────────────────────────────────── */
-        .cursor-pointer {cursor:pointer}
-        .select-none    {user-select:none}
-        .float-right    {float:right}
-        .float-left     {float:left}
-        .relative       {position:relative}
-        .absolute       {position:absolute}
-        .inset-0        {top:0;right:0;bottom:0;left:0}
-        .z-10           {z-index:10}
-        .opacity-50     {opacity:.5}
-        /* Simulator-specific utilities */
-        .flex-fill      {flex:1 1 auto}
-        .flex-nowrap    {flex-wrap:nowrap}
-        .flex-grow-1    {flex-grow:1}
-        .align-middle   {vertical-align:middle}
-        .text-capitalize{text-transform:capitalize}
-        .text-right     {text-align:right}
-        .min-w-0        {min-width:0}
-        .whitespace-nowrap{white-space:nowrap}
-        .py-1\.5        {padding-top:.375rem;padding-bottom:.375rem}
-
-        /* ── CSS variables (kept for JS/inline references) ─────────── */
         :root {
-            --rk-green: #10b981; --rk-green-mid: #059669;
-            --rk-green-dark: #047857; --rk-green-light: #d1fae5;
-            --rk-bg: #f4f6f9; --rk-text: #1a1a2e; --rk-muted: #6c757d;
-            --sidebar-w: 240px; --sidebar-w-collapsed: 64px;
+            --rk-green: #10b981;
+            --rk-green-mid: #059669;
+            --rk-green-dark: #047857;
+            --rk-green-light: #d1fae5;
+            --rk-bg: #f4f6f9;
+            --rk-text: #1a1a2e;
+            --rk-muted: #6c757d;
+            --rk-radius: 14px;
+            --sidebar-w: 240px;
+            --sidebar-w-collapsed: 64px;
         }
 
-        /* ── Base ───────────────────────────────────────────────────── */
-        body { background:#f4f6f9; font-family:'Segoe UI',sans-serif; color:#1a1a2e; font-size:14px; }
+        body {
+            background: var(--rk-bg);
+            font-family: 'Segoe UI', sans-serif;
+            color: var(--rk-text);
+        }
 
-        /* ── Sidebar ────────────────────────────────────────────────── */
+        /* ── Sidebar (default = expanded) ──────────────────────────── */
         .sidebar {
-            width:var(--sidebar-w); height:100vh;
-            background:linear-gradient(180deg,#059669 0%,#047857 100%);
-            position:fixed; top:0; left:0;
-            display:flex; flex-direction:column;
-            z-index:100; transition:width 0.2s ease; overflow:hidden;
+            width: var(--sidebar-w);
+            height: 100vh;           /* exact viewport height — no overflow */
+            background: linear-gradient(180deg, var(--rk-green-mid) 0%, var(--rk-green-dark) 100%);
+            position: fixed;
+            top: 0; left: 0;
+            display: flex; flex-direction: column;
+            z-index: 100;
+            transition: width 0.2s ease;
+            overflow: hidden;         /* clip horizontal; nav scrolls vertically */
         }
-        .sidebar.sidebar-personnel { background:linear-gradient(180deg,#f54900 0%,#c10107 100%); }
-        .sidebar.sidebar-personnel .brand-icon { color:#c10107; }
 
-        /* Brand header */
         .sidebar-brand {
-            padding:14px 16px; border-bottom:1px solid rgba(255,255,255,0.15);
-            display:flex; align-items:center; gap:10px; min-height:64px; flex-shrink:0;
+            padding: 14px 16px;
+            border-bottom: 1px solid rgba(255,255,255,0.15);
+            display: flex; align-items: center; gap: 10px;
+            min-height: 64px;
+            flex-shrink: 0;           /* never squish the header */
         }
-        .brand-icon {
-            width:38px; height:38px; background:white; border-radius:11px;
-            display:flex; align-items:center; justify-content:center;
-            font-weight:800; color:#047857; font-size:16px; flex-shrink:0;
-            box-shadow:0 2px 6px rgba(0,0,0,0.12);
+        .sidebar-brand .brand-icon {
+            width: 38px; height: 38px; background: white;
+            border-radius: 11px; display: flex; align-items: center;
+            justify-content: center; font-weight: 800;
+            color: var(--rk-green-dark); font-size: 16px;
+            flex-shrink: 0;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.12);
         }
-        .brand-text { line-height:1.2; flex:1; min-width:0; }
-        .brand-name  { color:white; font-weight:700; font-size:15px; }
-        .brand-sub   { color:rgba(255,255,255,0.65); font-size:11px; }
+
+        /* Personnel roles (BDRRMO / CFAU / CDRRMO Staff) — red→orange sidebar
+           gradient per Figma, scoped so Admin keeps the original green look. */
+        .sidebar.sidebar-personnel {
+            background: linear-gradient(180deg, #f54900 0%, #c10107 100%);
+        }
+        .sidebar.sidebar-personnel .brand-icon {
+            color: #c10107;
+        }
+        .sidebar-brand .brand-text { line-height: 1.2; flex: 1; min-width: 0; }
+        .sidebar-brand .brand-name {
+            color: white; font-weight: 700; font-size: 15px;
+        }
+        .sidebar-brand .brand-sub {
+            color: rgba(255,255,255,0.65); font-size: 11px;
+        }
+
         .sidebar-toggle {
-            background:transparent; border:none; color:rgba(255,255,255,0.85);
-            font-size:20px; cursor:pointer; padding:6px 8px; border-radius:6px;
-            flex-shrink:0; line-height:1;
+            background: transparent;
+            border: none;
+            color: rgba(255,255,255,0.85);
+            font-size: 20px;
+            cursor: pointer;
+            padding: 6px 8px;
+            border-radius: 6px;
+            flex-shrink: 0;
+            line-height: 1;
         }
-        .sidebar-toggle:hover { background:rgba(255,255,255,0.15); color:white; }
+        .sidebar-toggle:hover { background: rgba(255,255,255,0.15); color: white; }
 
-        /* User card */
         .sidebar-user {
-            padding:12px 14px; background:rgba(255,255,255,0.12);
-            border:1px solid rgba(255,255,255,0.1); margin:12px; border-radius:12px;
-            display:flex; align-items:center; gap:10px; min-height:56px; flex-shrink:0;
+            padding: 12px 14px;
+            background: rgba(255,255,255,0.12);
+            border: 1px solid rgba(255,255,255,0.1);
+            margin: 12px;
+            border-radius: 12px;
+            display: flex; align-items: center; gap: 10px;
+            min-height: 56px;
+            flex-shrink: 0;           /* never squish the user card */
         }
-        .user-avatar {
-            width:32px; height:32px; background:rgba(255,255,255,0.3); border-radius:50%;
-            display:flex; align-items:center; justify-content:center;
-            font-weight:700; color:white; font-size:13px; flex-shrink:0;
+        .sidebar-user .user-avatar {
+            width: 32px; height: 32px;
+            background: rgba(255,255,255,0.3);
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 700; color: white; font-size: 13px;
+            flex-shrink: 0;
         }
-        .user-info { line-height:1.25; }
-        .user-name { color:white; font-size:13px; font-weight:500; }
-        .user-role { color:rgba(255,255,255,0.6); font-size:11px; }
+        .sidebar-user .user-info { line-height: 1.25; }
+        .sidebar-user .user-name { color: white; font-size: 13px; font-weight: 500; }
+        .sidebar-user .user-role { color: rgba(255,255,255,0.6); font-size: 11px; }
 
-        /* Nav */
-        .sidebar nav { flex:1; padding:8px 0; overflow-y:auto; overflow-x:hidden; }
-        .sidebar nav::-webkit-scrollbar { width:4px; }
-        .sidebar nav::-webkit-scrollbar-track { background:transparent; }
-        .sidebar nav::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.25); border-radius:4px; }
+        /* Nav scrolls; sidebar-footer stays pinned at bottom */
+        .sidebar nav {
+            flex: 1;
+            padding: 8px 0;
+            overflow-y: auto;         /* scroll when nav items overflow */
+            overflow-x: hidden;
+        }
+        /* Custom scrollbar — thin + matches brand colour */
+        .sidebar nav::-webkit-scrollbar { width: 4px; }
+        .sidebar nav::-webkit-scrollbar-track { background: transparent; }
+        .sidebar nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.25); border-radius: 4px; }
+
+        /* Non-clickable grouping label */
         .nav-section {
-            padding:14px 20px 4px; color:rgba(255,255,255,0.45); font-size:10px;
-            font-weight:700; letter-spacing:0.08em; text-transform:uppercase;
-            white-space:nowrap; user-select:none;
+            padding: 14px 20px 4px;
+            color: rgba(255,255,255,0.45);
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            white-space: nowrap;
+            user-select: none;
         }
-        .nav-item-link {
-            display:flex; align-items:center; gap:12px; padding:10px 16px; margin:2px 10px;
-            border-radius:10px; color:rgba(255,255,255,0.75); text-decoration:none;
-            font-size:13px; font-weight:400; transition:background 0.15s,color 0.15s; white-space:nowrap;
-        }
-        .nav-item-link:hover, .nav-item-link.active {
-            background:rgba(255,255,255,0.16); color:white; font-weight:500;
-        }
-        .nav-item-link.active.nav-accent-green  { background:linear-gradient(135deg,#10b981,#059669); box-shadow:0 2px 8px rgba(5,150,105,0.35); }
-        .nav-item-link.active.nav-accent-blue   { background:linear-gradient(135deg,#3b82f6,#2563eb); box-shadow:0 2px 8px rgba(37,99,235,0.35); }
-        .nav-item-link.active.nav-accent-orange { background:linear-gradient(135deg,#f97316,#ea580c); box-shadow:0 2px 8px rgba(234,88,12,0.35); }
-        .nav-item-link.active.nav-accent-purple { background:linear-gradient(135deg,#a855f7,#7c3aed); box-shadow:0 2px 8px rgba(124,58,237,0.35); }
-        .nav-item-link.active.nav-accent-pink   { background:linear-gradient(135deg,#ec4899,#db2777); box-shadow:0 2px 8px rgba(219,39,119,0.35); }
-        .nav-item-link.active.nav-accent-slate  { background:linear-gradient(135deg,#475569,#1e293b); box-shadow:0 2px 8px rgba(30,41,59,0.35); }
-        .nav-icon { font-size:16px; width:20px; text-align:center; flex-shrink:0; }
 
-        /* Footer */
+        .nav-item-link {
+            display: flex; align-items: center; gap: 12px;
+            padding: 10px 16px;
+            margin: 2px 10px;
+            border-radius: 10px;
+            color: rgba(255,255,255,0.75);
+            text-decoration: none;
+            font-size: 13px;          /* px — consistent at all zoom levels */
+            font-weight: 400;         /* explicit — blocks Bootstrap .active bold override */
+            transition: background 0.15s, color 0.15s;
+            white-space: nowrap;
+        }
+        .nav-item-link:hover,
+        .nav-item-link.active {
+            background: rgba(255,255,255,0.16);
+            color: white;
+            font-weight: 500;   /* prevent Bootstrap .active bold from inflating text size */
+        }
+        .nav-item-link.active.nav-accent-blue   { background: linear-gradient(135deg,#3b82f6,#2563eb); box-shadow: 0 2px 8px rgba(37,99,235,0.35); }
+        .nav-item-link.active.nav-accent-pink   { background: linear-gradient(135deg,#ec4899,#db2777); box-shadow: 0 2px 8px rgba(219,39,119,0.35); }
+        .nav-item-link.active.nav-accent-orange { background: linear-gradient(135deg,#f97316,#ea580c); box-shadow: 0 2px 8px rgba(234,88,12,0.35); }
+        .nav-item-link.active.nav-accent-slate  { background: linear-gradient(135deg,#475569,#1e293b); box-shadow: 0 2px 8px rgba(30,41,59,0.35); }
+        .nav-item-link.active.nav-accent-purple { background: linear-gradient(135deg,#a855f7,#7c3aed); box-shadow: 0 2px 8px rgba(124,58,237,0.35); }
+        .nav-item-link.active.nav-accent-green  { background: linear-gradient(135deg,#10b981,#059669); box-shadow: 0 2px 8px rgba(5,150,105,0.35); }
+        .nav-item-link .nav-icon {
+            font-size: 16px;
+            width: 20px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+
+        /* Footer always visible — pinned at bottom, never part of scroll */
         .sidebar-footer {
-            padding:14px 20px; border-top:1px solid rgba(255,255,255,0.15); flex-shrink:0;
+            padding: 14px 20px;
+            border-top: 1px solid rgba(255,255,255,0.15);
+            flex-shrink: 0;
         }
         .sidebar-footer a {
-            color:rgba(255,255,255,0.7); font-size:13px; text-decoration:none;
-            display:flex; align-items:center; gap:10px; padding:8px 0;
+            color: rgba(255,255,255,0.7);
+            font-size: 13px;
+            text-decoration: none;
+            display: flex; align-items: center; gap: 10px;
+            padding: 8px 0;
         }
-        .sidebar-footer a:hover { color:white; }
+        .sidebar-footer a:hover { color: white; }
 
-        /* Collapsed state */
-        html.rk-sidebar-collapsed .sidebar { width:var(--sidebar-w-collapsed); }
-        html.rk-sidebar-collapsed .sidebar-brand { padding:14px 0; justify-content:center; }
-        html.rk-sidebar-collapsed .brand-icon,
-        html.rk-sidebar-collapsed .brand-text { display:none; }
-        html.rk-sidebar-collapsed .sidebar-toggle { margin:0 auto; }
-        html.rk-sidebar-collapsed .sidebar-user { justify-content:center; padding:12px 0; margin:12px 8px; }
-        html.rk-sidebar-collapsed .user-info { display:none; }
-        html.rk-sidebar-collapsed .nav-section { display:none; }
-        html.rk-sidebar-collapsed .nav-item-link { justify-content:center; padding:12px 0; margin:2px 6px; }
-        html.rk-sidebar-collapsed .nav-label { display:none; }
-        html.rk-sidebar-collapsed .sidebar-footer { padding:14px 0; }
-        html.rk-sidebar-collapsed .sidebar-footer a { justify-content:center; padding:8px 0; }
-        html.rk-sidebar-collapsed .sidebar-footer .nav-label { display:none; }
-
-        /* Main content */
-        .main-content { margin-left:var(--sidebar-w); padding:24px; transition:margin-left 0.2s ease; min-height:100vh; }
-        html.rk-sidebar-collapsed .main-content { margin-left:var(--sidebar-w-collapsed); }
-        html.rk-no-anim .sidebar, html.rk-no-anim .main-content { transition:none !important; }
-
-        /* ── RK component classes (Tailwind @apply equivalents) ──────── */
-
-        /* Cards */
-        .rk-card {
-            background:white; border-radius:14px;
-            box-shadow:0 1px 3px rgba(16,24,40,0.06),0 1px 8px rgba(16,24,40,0.04);
-            border:1px solid rgba(16,24,40,0.05); padding:20px;
+        /* ── Collapsed state — CLICK-ONLY (no hover expand) ───────────
+           Only the burger button toggles `rk-sidebar-collapsed` on <html>.
+           Hover-expand has been removed entirely; the rail is static.
+        */
+        html.rk-sidebar-collapsed .sidebar {
+            width: var(--sidebar-w-collapsed);
         }
-        .rk-stat-card {
-            background:white; border-radius:14px;
-            box-shadow:0 1px 3px rgba(16,24,40,0.06),0 1px 8px rgba(16,24,40,0.04);
-            border:1px solid rgba(16,24,40,0.05); padding:18px 20px; height:100%;
+        html.rk-sidebar-collapsed .sidebar .sidebar-brand {
+            padding: 14px 0;
+            justify-content: center;
+        }
+        html.rk-sidebar-collapsed .sidebar .brand-icon,
+        html.rk-sidebar-collapsed .sidebar .brand-text { display: none; }
+
+        html.rk-sidebar-collapsed .sidebar .sidebar-toggle {
+            margin: 0 auto;
         }
 
-        /* Page header */
-        .rk-page-title { font-size:22px; font-weight:700; color:#1a1a2e; margin:0; }
-        .rk-page-sub   { color:#6c757d; font-size:13px; margin:3px 0 0; }
-
-        /* Stat values */
-        .rk-stat-value { font-size:clamp(15px,2vw,26px); font-weight:700; color:#1a1a2e; word-break:break-word; }
-        .rk-stat-label { font-size:12px; color:#6c757d; margin-bottom:6px; }
-        .rk-stat-icon  { width:38px; height:38px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:16px; }
-
-        /* Card section title row */
-        .rk-section-head { display:flex; align-items:center; gap:10px; margin-bottom:14px; }
-        .rk-section-head span { font-size:14px; font-weight:600; color:#1a1a2e; }
-
-        /* Buttons */
-        .rk-btn-primary {
-            display:inline-flex; align-items:center; gap:6px;
-            background:linear-gradient(135deg,#10b981,#047857); color:white;
-            border:none; border-radius:9px; font-weight:500; font-size:13px;
-            padding:8px 16px; cursor:pointer; text-decoration:none;
-            box-shadow:0 1px 3px rgba(4,120,87,0.3); transition:opacity 0.15s;
+        html.rk-sidebar-collapsed .sidebar .sidebar-user {
+            justify-content: center;
+            padding: 12px 0;
+            margin: 12px 8px;
         }
-        .rk-btn-primary:hover   { opacity:0.9; color:white; }
-        .rk-btn-primary:disabled{ background:#cbd5e1; box-shadow:none; opacity:1; }
+        html.rk-sidebar-collapsed .sidebar .user-info { display: none; }
 
-        .rk-btn-secondary {
-            display:inline-flex; align-items:center; gap:6px;
-            background:white; color:#374151; border:1px solid #d1d5db;
-            border-radius:9px; font-weight:500; font-size:13px;
-            padding:8px 16px; cursor:pointer; text-decoration:none; transition:background 0.15s;
+        html.rk-sidebar-collapsed .sidebar .nav-section { display: none; }
+
+        html.rk-sidebar-collapsed .sidebar .nav-item-link {
+            justify-content: center;
+            padding: 12px 0;
+            margin: 2px 6px;
         }
-        .rk-btn-secondary:hover { background:#f9fafb; color:#374151; }
+        html.rk-sidebar-collapsed .sidebar .nav-label { display: none; }
 
-        .rk-btn-ghost {
-            display:inline-flex; align-items:center; gap:6px;
-            background:#f3f4f6; color:#1a1a2e; border:1px solid #e5e7eb;
-            border-radius:8px; font-size:12.5px; font-weight:500;
-            padding:6px 14px; cursor:pointer; text-decoration:none; transition:background 0.15s;
+        html.rk-sidebar-collapsed .sidebar .sidebar-footer {
+            padding: 14px 0;
         }
-        .rk-btn-ghost:hover { background:#e5e7eb; color:#1a1a2e; }
-
-        .rk-btn-danger {
-            display:inline-flex; align-items:center; gap:6px;
-            background:linear-gradient(135deg,#ef4444,#dc2626); color:white;
-            border:none; border-radius:9px; font-weight:500; font-size:13px;
-            padding:8px 16px; cursor:pointer; text-decoration:none;
+        html.rk-sidebar-collapsed .sidebar .sidebar-footer a {
+            justify-content: center;
+            padding: 8px 0;
         }
-        .rk-btn-danger:hover { opacity:0.9; color:white; }
-
-        /* sm variants */
-        .rk-btn-sm { padding:5px 12px; font-size:12px; }
-
-        /* Form inputs */
-        .rk-input {
-            width:100%; border:1px solid #d1d5db; border-radius:8px;
-            padding:8px 12px; font-size:13px; color:#1a1a2e; background:white;
-            outline:none; transition:border-color 0.15s, box-shadow 0.15s;
+        html.rk-sidebar-collapsed .sidebar .sidebar-footer .nav-label {
+            display: none;
         }
-        .rk-input:focus { border-color:#10b981; box-shadow:0 0 0 3px rgba(16,185,129,0.1); }
-        .rk-input:disabled { background:#f9fafb; color:#6c757d; }
-        .rk-input.is-invalid { border-color:#ef4444; }
-        .rk-input.is-invalid:focus { box-shadow:0 0 0 3px rgba(239,68,68,0.1); }
 
-        .rk-select {
-            width:100%; border:1px solid #d1d5db; border-radius:8px;
-            padding:8px 12px; font-size:13px; color:#1a1a2e; background:white;
-            outline:none; transition:border-color 0.15s; appearance:auto;
+        /* ── Main content ──────────────────────────────────────────── */
+        body {
+            font-size: 14px; /* px baseline — scales identically with sidebar under zoom */
         }
-        .rk-select:focus { border-color:#10b981; box-shadow:0 0 0 3px rgba(16,185,129,0.1); }
-        .rk-select.is-invalid { border-color:#ef4444; }
-
-        .rk-textarea {
-            width:100%; border:1px solid #d1d5db; border-radius:8px;
-            padding:8px 12px; font-size:13px; color:#1a1a2e; background:white;
-            outline:none; resize:vertical; transition:border-color 0.15s;
+        .main-content {
+            margin-left: var(--sidebar-w);
+            padding: 24px;
+            transition: margin-left 0.2s ease;
+            min-height: 100vh;
         }
-        .rk-textarea:focus { border-color:#10b981; box-shadow:0 0 0 3px rgba(16,185,129,0.1); }
-
-        .rk-label { display:block; font-size:12px; font-weight:600; color:#374151; margin-bottom:4px; }
-        .rk-field-hint { font-size:11px; color:#6c757d; margin-top:3px; }
-        .rk-invalid-msg { font-size:11px; color:#ef4444; margin-top:3px; display:none; }
-        .rk-input.is-invalid ~ .rk-invalid-msg,
-        .rk-select.is-invalid ~ .rk-invalid-msg { display:block; }
-
-        /* Table */
-        .rk-table { width:100%; border-collapse:collapse; font-size:13px; }
-        .rk-table th { padding:10px 14px; text-align:left; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:#6c757d; border-bottom:2px solid #f1f5f9; }
-        .rk-table td { padding:12px 14px; border-bottom:1px solid #f8fafc; color:#1a1a2e; vertical-align:middle; }
-        .rk-table tr:last-child td { border-bottom:none; }
-        .rk-table tr:hover td { background:#fafafa; }
-
-        /* Badges / pills */
-        .rk-badge {
-            display:inline-flex; align-items:center; padding:3px 10px;
-            border-radius:20px; font-size:11px; font-weight:700; white-space:nowrap;
+        html.rk-sidebar-collapsed .main-content {
+            margin-left: var(--sidebar-w-collapsed);
         }
-        .rk-badge-green  { background:#d1fae5; color:#047857; }
-        .rk-badge-blue   { background:#dbeafe; color:#1d4ed8; }
-        .rk-badge-amber  { background:#fef3c7; color:#b45309; }
-        .rk-badge-red    { background:#fee2e2; color:#dc2626; }
-        .rk-badge-slate  { background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; }
-        .rk-badge-purple { background:#f3e8ff; color:#7c3aed; }
-        .rk-badge-pink   { background:#fce7f3; color:#be185d; }
-        .rk-badge-orange { background:#ffedd5; color:#c2410c; }
 
-        /* Risk badges */
-        .rk-risk { display:inline-block; padding:4px 12px; border-radius:20px; font-size:11px; font-weight:700; letter-spacing:0.01em; }
-        .rk-risk-critical { background:linear-gradient(135deg,#ef4444,#dc2626); color:#fff; }
-        .rk-risk-high     { background:linear-gradient(135deg,#f87171,#ef4444); color:#fff; }
-        .rk-risk-moderate { background:#f3f4f6; color:#6b7280; border:1px solid #e5e7eb; }
-        .rk-risk-low      { background:#f3f4f6; color:#6b7280; border:1px solid #e5e7eb; }
+        /* During the very first paint, suppress the width/margin
+           transitions so the saved state doesn't animate in. The class
+           is removed by JS after the first frame. */
+        html.rk-no-anim .sidebar,
+        html.rk-no-anim .main-content { transition: none !important; }
 
-        /* Alert banners */
-        .rk-alert {
-            display:flex; align-items:flex-start; gap:10px; padding:12px 16px;
-            border-radius:10px; font-size:13px; margin-bottom:16px;
+        /* ── Page header ───────────────────────────────────────────── */
+        .page-header { margin-bottom: 20px; }
+        .page-header h1 { font-size: 22px; font-weight: 700; color: var(--rk-text); margin: 0; }
+        .page-header p { color: var(--rk-muted); font-size: 13px; margin: 3px 0 0; }
+        .last-updated { font-size: 12px; color: var(--rk-muted); text-align: right; }
+
+        /* ── Shared card styles ────────────────────────────────────── */
+        .stat-card,
+        .dash-card {
+            background: white;
+            border-radius: var(--rk-radius);
+            box-shadow: 0 1px 3px rgba(16,24,40,0.06), 0 1px 8px rgba(16,24,40,0.04);
+            border: 1px solid rgba(16,24,40,0.04);
         }
-        .rk-alert i { flex-shrink:0; margin-top:1px; }
-        .rk-alert-amber { background:#fffbeb; border:1px solid #fde68a; color:#92400e; }
-        .rk-alert-red   { background:#fef2f2; border:1px solid #fecaca; color:#991b1b; }
-        .rk-alert-green { background:#f0fdf4; border:1px solid #bbf7d0; color:#166534; }
-        .rk-alert-blue  { background:#eff6ff; border:1px solid #bfdbfe; color:#1e40af; }
-        .rk-alert-slate { background:#f8fafc; border:1px solid #e2e8f0; color:#475569; }
+        .stat-card { padding: 18px 20px; height: 100%; }
+        .dash-card { padding: 20px; height: 100%; }
 
-        /* Drop zone */
-        .rk-dropzone {
-            border:2px dashed #d1d5db; border-radius:12px; padding:36px 24px;
-            text-align:center; background:#f9fafb; cursor:pointer;
-            transition:border-color 0.2s, background 0.2s;
+        .stat-card .stat-label { font-size: 12px; color: var(--rk-muted); margin-bottom: 6px; }
+        .stat-card .stat-value { font-size: clamp(15px, 2vw, 26px); font-weight: 700; color: var(--rk-text); margin: 0; word-break: break-word; }
+        .stat-card .stat-change { font-size: 12px; margin-top: 4px; }
+        .stat-card .stat-icon {
+            width: 38px; height: 38px; border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 16px;
         }
-        .rk-dropzone:hover, .rk-dropzone.active { border-color:#10b981; background:#f0fdf4; }
 
-        /* Search bar */
-        .rk-search {
-            display:flex; align-items:center; gap:8px; background:white;
-            border:1px solid #d1d5db; border-radius:10px; padding:7px 12px;
+        .dash-card .card-title-row {
+            display: flex; align-items: center; gap: 10px;
+            margin-bottom: 16px;
         }
-        .rk-search input { border:none; outline:none; font-size:13px; color:#1a1a2e; background:transparent; flex:1; }
-        .rk-search i { color:#9ca3af; }
+        .dash-card .card-title-row h6 {
+            font-size: 14px; font-weight: 600; color: var(--rk-text); margin: 0;
+        }
 
-        /* Separator */
-        .rk-divider { border:none; border-top:1px solid #f1f5f9; margin:16px 0; }
-        /* ── Bootstrap modal CSS (JS kept, CSS removed — must define manually) ── */
-        .modal { display:none; position:fixed; inset:0; z-index:1055; overflow-x:hidden; overflow-y:auto; outline:0; }
-        .modal.show { display:block; }
-        .modal-backdrop { position:fixed; inset:0; z-index:1050; background:#000; opacity:0.5; }
-        .modal-dialog { position:relative; margin:1.75rem auto; pointer-events:none; max-width:500px; }
-        .modal-dialog-centered { display:flex; align-items:center; min-height:calc(100% - 3.5rem); }
-        .modal-content { position:relative; display:flex; flex-direction:column; pointer-events:auto;
-            background:#fff; border-radius:12px; box-shadow:0 10px 40px rgba(0,0,0,0.18); outline:0; overflow:hidden; }
-        .modal-header { display:flex; align-items:center; justify-content:space-between;
-            padding:16px 20px; border-bottom:1px solid #f1f5f9; }
-        .modal-title { font-size:14px; font-weight:700; color:#1a1a2e; margin:0; }
-        .modal-body { padding:20px; flex:1 1 auto; }
-        .modal-footer { display:flex; align-items:center; justify-content:flex-end; gap:8px;
-            padding:14px 20px; border-top:1px solid #f1f5f9; }
-        .btn-close { background:none; border:none; font-size:18px; cursor:pointer;
-            color:#9ca3af; padding:4px 8px; line-height:1; border-radius:4px; }
-        .btn-close:hover { color:#374151; background:#f1f5f9; }
-        .modal.fade .modal-dialog { transform:translateY(-50px); transition:transform .3s ease-out; }
-        .modal.show .modal-dialog { transform:none; }
-        body.modal-open { overflow:hidden; }
-        /* Ensure rkConfirmOverlay always sits above Bootstrap modals */
-        #rkConfirmOverlay { z-index:9999 !important; }
+        /* ── Risk badges ───────────────────────────────────────────── */
+        /* High/Critical are filled & bold so they stand out at a glance;
+           Moderate/Low stay neutral so attention isn't spread evenly —
+           this mirrors the emphasis used across the reference screens. */
+        .risk-badge {
+            font-size: 11px; font-weight: 700;
+            padding: 4px 12px; border-radius: 20px;
+            display: inline-block;
+            letter-spacing: 0.01em;
+        }
+        .risk-critical { background: linear-gradient(135deg,#ef4444,#dc2626); color: #fff; }
+        .risk-high     { background: linear-gradient(135deg,#f87171,#ef4444); color: #fff; }
+        .risk-moderate { background: #f3f4f6; color: #6b7280; border: 1px solid #e5e7eb; font-weight: 600; }
+        .risk-low      { background: #f3f4f6; color: #6b7280; border: 1px solid #e5e7eb; font-weight: 600; }
+
+        /* ── Status pills ──────────────────────────────────────────── */
+        .status-pill {
+            font-size: 11px; font-weight: 700;
+            padding: 4px 12px; border-radius: 20px;
+            display: inline-block;
+        }
+        .status-operational     { background: #d1fae5; color: #047857; }
+        .status-maintenance     { background: #fef3c7; color: #b45309; }
+        .status-unavailable     { background: #fee2e2; color: #dc2626; }
+
+        /* ── Buttons ───────────────────────────────────────────────── */
+        .btn-rk {
+            background: linear-gradient(135deg, var(--rk-green), var(--rk-green-dark));
+            color: white;
+            border: none;
+            border-radius: 9px;
+            font-weight: 500;
+            box-shadow: 0 1px 3px rgba(4,120,87,0.3);
+        }
+        .btn-rk:hover { background: linear-gradient(135deg, var(--rk-green-mid), var(--rk-green-dark)); color: white; }
+        .btn-rk:disabled, .btn-rk.disabled {
+            background: #cbd5e1; box-shadow: none; opacity: 1; color: #fff;
+        }
+
+        /* Soft "ghost" pill button — used for secondary row actions like
+           "View Profile" so they read as calm, not competing with .btn-rk. */
+        .btn-soft {
+            background: #f3f4f6; color: var(--rk-text);
+            border: 1px solid #e5e7eb; border-radius: 8px;
+            font-size: 12.5px; font-weight: 500;
+            padding: 6px 14px;
+            transition: background 0.15s;
+            display: inline-flex; align-items: center; gap: 4px;
+        }
+        .btn-soft:hover { background: #e5e7eb; color: var(--rk-text); }
+
+        /* Rounded search bar used in list/filter toolbars */
+        .search-bar-rk .input-group-text { background: white; border-right: 0; border-radius: 10px 0 0 10px; }
+        .search-bar-rk input { border-left: 0; border-radius: 0 10px 10px 0; }
+        .search-bar-rk input:focus { box-shadow: none; border-color: #ced4da; }
+
+        /* Reusable alert / insight banner (amber notice strip) */
+        .alert-banner {
+            background: #fff8e1; border-left: 4px solid #ffc107;
+            border-radius: 8px; padding: 10px 14px;
+            font-size: 13px; color: #856404; margin-bottom: 16px;
+            display: flex; align-items: center; gap: 8px;
+        }
     </style>
     {% block head_extra %}{% endblock %}
 </head>
 <body>
 
-{# ── Role-aware sidebar locals ── #}
+{# ── Role-aware sidebar locals (hoisted so brand subtitle can use them) ── #}
 {% set role = (user.role if user else '') %}
-{% set is_admin  = role == 'admin' %}
-{% set is_staff  = role == 'cdrrmo_staff' %}
-{% set is_cfau   = role == 'cfau_oic' %}
+{% set is_admin = role == 'admin' %}
+{% set is_staff = role == 'cdrrmo_staff' %}
+{% set is_cfau  = role == 'cfau_oic' %}
 {% set is_bdrrmo = role == 'bdrrmo' %}
 {% set portal_label = 'Admin Portal' if is_admin else ('Logistics Portal' if is_staff else ('Operations Portal' if is_cfau else ('Barangay Portal' if is_bdrrmo else 'Portal'))) %}
-{% set role_label   = 'CDRRMO Admin' if is_admin else ('CDRRMO Logistics Staff' if is_staff else ('CFAU / Operations' if is_cfau else ('BDRRMO / Barangay Focal' if is_bdrrmo else ''))) %}
+{% set role_label = 'CDRRMO Admin' if is_admin else ('CDRRMO Logistics Staff' if is_staff else ('CFAU / Operations' if is_cfau else ('BDRRMO / Barangay Focal' if is_bdrrmo else ''))) %}
 
 <!-- ── SIDEBAR ────────────────────────────────────────────────────── -->
 <div class="sidebar {{ 'sidebar-personnel' if not is_admin else '' }}" id="sidebar">
@@ -489,7 +379,8 @@
             <div class="brand-name">RISKONEK</div>
             <div class="brand-sub">{{ portal_label }}</div>
         </div>
-        <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Toggle sidebar">
+        <button class="sidebar-toggle" id="sidebarToggle" type="button"
+                aria-label="Toggle sidebar" title="Toggle sidebar">
             <i class="bi bi-list" id="sidebarToggleIcon"></i>
         </button>
     </div>
@@ -532,57 +423,70 @@
 
         {% if is_bdrrmo %}
         <a href="/bdrrmo/profile"
-           class="nav-item-link nav-accent-green {{ 'active' if active == 'bdrrmo_profile' else '' }}">
+           class="nav-item-link nav-accent-green {{ 'active' if active == 'bdrrmo_profile' else '' }}"
+           title="Disaster profile and planning priority for your barangay">
             <i class="bi bi-geo-alt-fill nav-icon"></i><span class="nav-label">Barangay Profile</span>
         </a>
         <a href="/bdrrmo/incidents"
-           class="nav-item-link nav-accent-orange {{ 'active' if active == 'bdrrmo_incidents' else '' }}">
+           class="nav-item-link nav-accent-orange {{ 'active' if active == 'bdrrmo_incidents' else '' }}"
+           title="Historical disaster incidents in your barangay">
             <i class="bi bi-clock-history nav-icon"></i><span class="nav-label">Incident History</span>
         </a>
         <a href="/bdrrmo/facilities"
-           class="nav-item-link nav-accent-blue {{ 'active' if active == 'bdrrmo_facilities' else '' }}">
+           class="nav-item-link nav-accent-blue {{ 'active' if active == 'bdrrmo_facilities' else '' }}"
+           title="Critical facilities in your barangay">
             <i class="bi bi-building nav-icon"></i><span class="nav-label">Critical Facilities</span>
         </a>
         <a href="/bdrrmo/population"
-           class="nav-item-link nav-accent-purple {{ 'active' if active == 'bdrrmo_population' else '' }}">
+           class="nav-item-link nav-accent-purple {{ 'active' if active == 'bdrrmo_population' else '' }}"
+           title="Record and view population data for your barangay">
             <i class="bi bi-people-fill nav-icon"></i><span class="nav-label">Population Records</span>
         </a>
         <a href="/bdrrmo/contacts"
-           class="nav-item-link nav-accent-pink {{ 'active' if active == 'bdrrmo_contacts' else '' }}">
+           class="nav-item-link nav-accent-pink {{ 'active' if active == 'bdrrmo_contacts' else '' }}"
+           title="Manage officials and emergency responder contacts">
             <i class="bi bi-person-vcard nav-icon"></i><span class="nav-label">Contact Details</span>
         </a>
         {% endif %}
 
         {% if is_admin or is_staff %}
         <a href="/admin/resources"
-           class="nav-item-link nav-accent-pink {{ 'active' if active == 'resources' else '' }}">
+           class="nav-item-link nav-accent-pink {{ 'active' if active == 'resources' else '' }}"
+           title="Stockpile / resource goods owned by CDRRMO Logistics Staff (food packs, water, medicine, hygiene kits, blankets, and other relief goods)">
             <i class="bi bi-box-seam-fill nav-icon"></i><span class="nav-label">Resources Module</span>
         </a>
         {% endif %}
 
         {% if is_admin or is_staff or is_cfau %}
         <a href="/admin/equipment"
-           class="nav-item-link {{ 'active' if active == 'equipment' else '' }}">
+           class="nav-item-link {{ 'active' if active == 'equipment' else '' }}"
+           title="Shared module — accessible to CDRRMO Logistics Staff and CFAU / Operations Personnel (vehicles, generators, chainsaws, flashlights, rescue tools, boats, ambulances, and other operational equipment)">
             <i class="bi bi-wrench-adjustable nav-icon"></i><span class="nav-label">Vehicle &amp; Equipment</span>
         </a>
         {% endif %}
 
         {% if is_cfau %}
         <a href="/cfau/serviceability"
-           class="nav-item-link nav-accent-blue {{ 'active' if active == 'serviceability' else '' }}">
+           class="nav-item-link nav-accent-blue {{ 'active' if active == 'serviceability' else '' }}"
+           title="Equipment inspection, maintenance, and serviceability reports">
             <i class="bi bi-clipboard2-check nav-icon"></i><span class="nav-label">Serviceability Reports</span>
         </a>
         <a href="/cfau/incident-reports"
-           class="nav-item-link nav-accent-purple {{ 'active' if active == 'incident_reports' else '' }}">
+           class="nav-item-link nav-accent-purple {{ 'active' if active == 'incident_reports' else '' }}"
+           title="Document response actions and operational outcomes for incidents.">
             <i class="bi bi-journal-text nav-icon"></i><span class="nav-label">Post-Incident Reports</span>
         </a>
         {% endif %}
 
         {% if is_admin %}
         <a href="/admin/serviceability"
-           class="nav-item-link {{ 'active' if active == 'serviceability_review' else '' }}">
+           class="nav-item-link {{ 'active' if active == 'serviceability_review' else '' }}"
+           title="Review and resolve CFAU equipment serviceability reports">
             <i class="bi bi-clipboard2-check nav-icon"></i><span class="nav-label">Serviceability Review</span>
         </a>
+        {% endif %}
+
+        {% if is_admin %}
         <a href="/admin/map"
            class="nav-item-link nav-accent-orange {{ 'active' if active == 'map' else '' }}">
             <i class="bi bi-map-fill nav-icon"></i><span class="nav-label">Hazard Reference Map</span>
@@ -593,15 +497,18 @@
         </a>
         <div class="nav-section">Incident Management</div>
         <a href="/admin/uploads"
-           class="nav-item-link {{ 'active' if active == 'uploads' else '' }}">
-            <i class="bi bi-cloud-upload-fill nav-icon"></i><span class="nav-label">Incident Data Uploads</span>
+            class="nav-item-link {{ 'active' if active == 'uploads' else '' }}"
+            title="Upload and convert disaster reports into incident records.">
+                <i class="bi bi-cloud-upload-fill nav-icon"></i><span class="nav-label">Incident Data Uploads</span>
         </a>
         <a href="/admin/incident-reports"
-           class="nav-item-link {{ 'active' if active == 'incident_reports_review' else '' }}">
+           class="nav-item-link {{ 'active' if active == 'incident_reports_review' else '' }}"
+           title="Document response actions and operational outcomes for incidents.">
             <i class="bi bi-journal-text nav-icon"></i><span class="nav-label">Post-Incident Reports</span>
         </a>
         <a href="/admin/audit"
-           class="nav-item-link nav-accent-slate {{ 'active' if active == 'audit' else '' }}">
+           class="nav-item-link nav-accent-slate {{ 'active' if active == 'audit' else '' }}"
+           title="System-wide audit trail of all logged actions">
             <i class="bi bi-file-earmark-text-fill nav-icon"></i><span class="nav-label">Audit Trail</span>
         </a>
         <a href="/admin/users"
@@ -623,119 +530,91 @@
     {% block content %}{% endblock %}
 </div>
 
-<!-- Bootstrap JS bundle kept only for Bootstrap modal usage in resources_list -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"
         integrity="sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz" crossorigin="anonymous"></script>
 <script src="/static/js/rk-forms.js" nonce="{{ request.state.csp_nonce }}"></script>
-
 <script nonce="{{ request.state.csp_nonce }}">
-/* CSRF fallback injection */
-(function(){
-    var meta=document.querySelector('meta[name="csrf-token"]');
-    var token=meta?meta.getAttribute('content'):'';
-    if(!token)return;
-    document.querySelectorAll('form').forEach(function(f){
-        if((f.getAttribute('method')||'get').toLowerCase()==='get')return;
-        if(f.querySelector('input[name="csrf_token"]'))return;
-        var i=document.createElement('input');
-        i.type='hidden';i.name='csrf_token';i.value=token;f.appendChild(i);
+// ── CSRF token injection (fallback) ────────────────────────────────
+// Every server-rendered POST form already ships a hidden csrf_token field
+// (so the token is present in the raw HTML for passive scanners and works
+// without JS). This script is a belt-and-suspenders fallback that stamps the
+// token onto any form that lacks it — e.g. forms created dynamically at
+// runtime. Forged cross-site POSTs carry no token and are rejected with 403.
+(function () {
+    var meta = document.querySelector('meta[name="csrf-token"]');
+    var token = meta ? meta.getAttribute('content') : '';
+    if (!token) return;
+    document.querySelectorAll('form').forEach(function (form) {
+        var method = (form.getAttribute('method') || 'get').toLowerCase();
+        if (method === 'get') return;                       // safe method
+        if (form.querySelector('input[name="csrf_token"]')) return;  // already present
+        var input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'csrf_token';
+        input.value = token;
+        form.appendChild(input);
     });
 })();
 </script>
-
 <script nonce="{{ request.state.csp_nonce }}">
-/* Collapsible sidebar */
-(function(){
-    const html=document.documentElement,toggle=document.getElementById('sidebarToggle'),
-          icon=document.getElementById('sidebarToggleIcon'),KEY='rk_sidebar_collapsed',CLS='rk-sidebar-collapsed';
-    function syncIcon(){icon.className=html.classList.contains(CLS)?'bi bi-list':'bi bi-chevron-double-left';}
+// ── Collapsible sidebar (state persisted in localStorage) ──────────
+(function () {
+    const html   = document.documentElement;
+    const toggle = document.getElementById('sidebarToggle');
+    const icon   = document.getElementById('sidebarToggleIcon');
+    const KEY    = 'rk_sidebar_collapsed';
+    const CLS    = 'rk-sidebar-collapsed';
+
+    function syncIcon() {
+        icon.className = html.classList.contains(CLS)
+            ? 'bi bi-list'
+            : 'bi bi-chevron-double-left';
+    }
     syncIcon();
-    toggle.addEventListener('click',function(){
-        const next=!html.classList.contains(CLS);
-        html.classList.toggle(CLS,next);localStorage.setItem(KEY,next?'1':'0');syncIcon();
+
+    toggle.addEventListener('click', function () {
+        const next = !html.classList.contains(CLS);
+        html.classList.toggle(CLS, next);
+        localStorage.setItem(KEY, next ? '1' : '0');
+        syncIcon();
     });
-    requestAnimationFrame(function(){requestAnimationFrame(function(){html.classList.remove('rk-no-anim');});});
+
+    // Remove the no-anim guard after first frame so subsequent toggles
+    // animate normally.
+    requestAnimationFrame(function () {
+        requestAnimationFrame(function () {
+            html.classList.remove('rk-no-anim');
+        });
+    });
 })();
 </script>
-
 <script nonce="{{ request.state.csp_nonce }}">
-/* Live filter forms */
-(function(){
-    document.querySelectorAll('form.js-live-filter').forEach(function(form){
-        form.querySelectorAll('select,input[type="date"]').forEach(function(el){
-            el.addEventListener('change',function(){form.submit();});
+// ── Live filtering ────────────────────────────────────────────────
+// Any <form class="js-live-filter"> auto-applies its filters: selects and
+// date inputs submit immediately on change; text inputs submit after a short
+// debounce so the page doesn't reload on every keystroke. No Apply button
+// needed — mirrors the audit-trail filter behaviour across the system.
+(function () {
+    document.querySelectorAll('form.js-live-filter').forEach(function (form) {
+        form.querySelectorAll('select, input[type="date"]').forEach(function (el) {
+            el.addEventListener('change', function () { form.submit(); });
         });
-        form.querySelectorAll('input[type="text"],input[type="search"]').forEach(function(el){
-            let t;el.addEventListener('input',function(){clearTimeout(t);t=setTimeout(function(){form.submit();},400);});
-            if(el.value){el.focus();el.setSelectionRange(el.value.length,el.value.length);}
+
+        form.querySelectorAll('input[type="text"], input[type="search"]').forEach(function (el) {
+            let timer;
+            el.addEventListener('input', function () {
+                clearTimeout(timer);
+                timer = setTimeout(function () { form.submit(); }, 400);
+            });
+            // After an auto-submit reload, keep the cursor in the search box.
+            if (el.value) {
+                el.focus();
+                el.setSelectionRange(el.value.length, el.value.length);
+            }
         });
     });
 })();
 </script>
-
 {% block scripts %}{% endblock %}
-
-<!-- ── RisKonek Confirm Modal ─────────────────────────────────────── -->
-<div id="rkConfirmOverlay" class="fixed inset-0 z-[9999] hidden items-center justify-center"
-     style="background:rgba(15,23,42,0.45);backdrop-filter:blur(2px);">
-    <div class="bg-white rounded-2xl w-full max-w-sm mx-4 overflow-hidden shadow-2xl">
-        <div id="rkConfirmHeader" class="flex items-center gap-3 px-5 py-4 border-b border-slate-100">
-            <div id="rkConfirmIconWrap" class="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0"></div>
-            <div>
-                <div id="rkConfirmTitle" class="font-bold text-sm text-slate-900">Confirm Action</div>
-                <div class="text-xs text-slate-400 mt-0.5">RisKonek · Action requires confirmation</div>
-            </div>
-        </div>
-        <div class="px-5 py-4">
-            <p id="rkConfirmMsg" class="text-sm text-slate-600 leading-relaxed m-0"></p>
-        </div>
-        <div class="px-5 pb-5 flex justify-end gap-2">
-            <button id="rkConfirmCancel" type="button" class="rk-btn-secondary rk-btn-sm">Cancel</button>
-            <button id="rkConfirmOk"     type="button" class="rk-btn-primary  rk-btn-sm">Confirm</button>
-        </div>
-    </div>
-</div>
-<script>
-(function(){
-    var ov=document.getElementById('rkConfirmOverlay'),
-        msg=document.getElementById('rkConfirmMsg'),
-        ttl=document.getElementById('rkConfirmTitle'),
-        ico=document.getElementById('rkConfirmIconWrap'),
-        ok=document.getElementById('rkConfirmOk'),
-        cn=document.getElementById('rkConfirmCancel'),
-        res=null;
-    var V={
-        danger: {icon:'&#9888;',ic:'#dc2626',ib:'#fef2f2',t:'Confirm Action',ob:'#dc2626',ol:'Confirm'},
-        warning:{icon:'&#9888;',ic:'#d97706',ib:'#fffbeb',t:'Are you sure?', ob:'#d97706',ol:'Proceed'},
-        info:   {icon:'&#8505;',ic:'#2563eb',ib:'#eff6ff',t:'Confirm Action',ob:'#2563eb',ol:'Confirm'},
-        success:{icon:'&#10003;',ic:'#059669',ib:'#ecfdf5',t:'Confirm Action',ob:'#059669',ol:'Confirm'}
-    };
-    function apply(v){var p=V[v]||V.danger;
-        ico.innerHTML='<span style="color:'+p.ic+';font-size:20px;">'+p.icon+'</span>';
-        ico.style.background=p.ib; ttl.textContent=p.t;
-        ok.style.background=p.ob; ok.textContent=p.ol;}
-    function open(m,v){msg.textContent=m;apply(v||'danger');
-        ov.style.display='flex';setTimeout(function(){ok.focus();},50);
-        return new Promise(function(r){res=r;});}
-    function close(r){ov.style.display='none';if(res){res(r);res=null;}}
-    ok.addEventListener('click',function(){close(true);});
-    cn.addEventListener('click',function(){close(false);});
-    ov.addEventListener('mousedown',function(e){if(e.target===ov){e.preventDefault();close(false);}});
-    document.addEventListener('keydown',function(e){
-        if(ov.style.display!=='none'){if(e.key==='Enter')close(true);if(e.key==='Escape')close(false);}
-    });
-    window.rkConfirm=function(m,target,v){
-        open(m,v).then(function(ok){
-            if(!ok)return;
-            if(typeof target==='function'){target();}
-            else if(target&&target.tagName==='BUTTON'&&target.type==='submit'){
-                var f=target.closest('form');if(!f)return;f.onsubmit=null;
-                if(target.name){var h=document.createElement('input');h.type='hidden';h.name=target.name;h.value=target.value||'';f.appendChild(h);}
-                f.submit();
-            }else if(target&&target.tagName==='FORM'){target.onsubmit=null;target.submit();}
-        });
-    };
-})();
-</script>
 </body>
 </html>
