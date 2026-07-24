@@ -5,101 +5,102 @@
 {% set active_nav = 'bdrrmo_incidents' %}
 
 {% block content %}
-<div class="flex justify-between items-start mb-5">
+<div class="d-flex justify-content-between align-items-start page-header">
     <div>
         <h1>Incident History</h1>
         <p>Historical disaster incidents recorded for
            {% if barangay %}Barangay {{ barangay.name }}{% else %}your barangay{% endif %}.</p>
     </div>
     {% if barangay %}
-    <a href="/bdrrmo/incidents/upload" class="rk-btn-secondary">
+    <a href="/bdrrmo/incidents/upload" class="btn btn-outline-primary">
         <i class="bi bi-cloud-upload"></i> Upload Report
     </a>
     {% endif %}
 </div>
 
 {% if success %}
-<div class="rk-alert rk-alert-green">
-    <i class="bi bi-check-circle-fill mr-1"></i>{{ success }}
-    <button type="button" class="-close" data-bs-dismiss="alert"></button>
+<div class="alert alert-success alert-dismissible fade show">
+    <i class="bi bi-check-circle-fill me-1"></i>{{ success }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
 </div>
 {% endif %}
 {% if error %}
-<div class="rk-alert rk-alert-red">
-    <i class="bi bi-exclamation-triangle-fill mr-1"></i>{{ error }}
-    <button type="button" class="-close" data-bs-dismiss="alert"></button>
+<div class="alert alert-danger alert-dismissible fade show">
+    <i class="bi bi-exclamation-triangle-fill me-1"></i>{{ error }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
 </div>
 {% endif %}
 
 {% if not barangay %}
-<div class="rk-alert rk-alert-amber">
-    <i class="bi bi-exclamation-triangle-fill mr-1"></i>
+<div class="alert alert-warning">
+    <i class="bi bi-exclamation-triangle-fill me-1"></i>
     No barangay is currently assigned to your account. Please contact the CDRRMO Admin.
 </div>
 {% else %}
 
 <!-- ── Submit a disaster / risk report (TR-BDR-01/02) ──────────── -->
-<div class="rk-card mb-4">
-    <div class="rk-section-head">
+<div class="dash-card mb-4">
+    <div class="card-title-row">
         <i class="bi bi-plus-circle" style="color:var(--rk-green)"></i>
         <h6>Submit Disaster / Risk Report</h6>
     </div>
-    <form method="POST" action="/bdrrmo/incidents" class="grid grid-cols-12 gap-3"
-          onsubmit="event.preventDefault(); rkConfirm('Submit this incident report for your barangay?', this)">
-        <div class="col-span-4">
-            <label class="rk-label mb-1">Disaster Type</label>
-            <select name="disaster_type" class="rk-select text-xs py-1.5" required>
+    <form method="POST" action="/bdrrmo/incidents" class="row g-3"
+          data-confirm='Submit this incident report for your barangay?'>
+            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+        <div class="col-md-4">
+            <label class="form-label small fw-semibold mb-1">Disaster Type</label>
+            <select name="disaster_type" class="form-select form-select-sm" required>
                 {% for d in disaster_types %}
                 <option value="{{ d }}">{{ d.replace('_', ' ').title() }}</option>
                 {% endfor %}
             </select>
         </div>
-        <div class="col-span-4">
-            <label class="rk-label mb-1">Date Occurred</label>
-            <input type="date" name="date_occurred" class="rk-input text-xs py-1.5" required>
+        <div class="col-md-4">
+            <label class="form-label small fw-semibold mb-1">Date Occurred</label>
+            <input type="date" name="date_occurred" class="form-control form-control-sm" required>
         </div>
-        <div class="col-span-4">
-            <label class="rk-label mb-1">Severity</label>
-            <select name="severity" class="rk-select text-xs py-1.5">
+        <div class="col-md-4">
+            <label class="form-label small fw-semibold mb-1">Severity</label>
+            <select name="severity" class="form-select form-select-sm">
                 {% for s in severities %}
                 <option value="{{ s }}" {{ 'selected' if s == 'moderate' else '' }}>{{ s.title() }}</option>
                 {% endfor %}
             </select>
         </div>
-        <div class="col-span-4">
-            <label class="rk-label mb-1">Affected Families</label>
-            <input type="number" name="affected_families" min="0" class="rk-input text-xs py-1.5" required>
+        <div class="col-md-4">
+            <label class="form-label small fw-semibold mb-1">Affected Families</label>
+            <input type="number" name="affected_families" min="0" class="form-control form-control-sm" required>
         </div>
-        <div class="col-span-4">
-            <label class="rk-label mb-1">Casualties</label>
-            <input type="number" name="casualties" min="0" class="rk-input text-xs py-1.5" required>
+        <div class="col-md-4">
+            <label class="form-label small fw-semibold mb-1">Casualties</label>
+            <input type="number" name="casualties" min="0" class="form-control form-control-sm" required>
         </div>
-        <div class="col-span-12">
-            <label class="rk-label mb-1">Description</label>
-            <textarea name="description" rows="2" class="rk-input text-xs py-1.5"
+        <div class="col-12">
+            <label class="form-label small fw-semibold mb-1">Description</label>
+            <textarea name="description" rows="2" class="form-control form-control-sm"
                       placeholder="What happened, areas affected, response taken…"></textarea>
         </div>
-        <div class="col-span-12">
-            <button type="submit" class="rk-btn-primary rk-btn-sm">
+        <div class="col-12">
+            <button type="submit" class="btn btn-rk btn-sm">
                 <i class="bi bi-send"></i> Submit Report
             </button>
-            <span class="text-slate-500 text-sm ml-2">
+            <span class="text-muted small ms-2">
                 Saved against your barangay and your account; appears in the history below.
             </span>
         </div>
     </form>
 </div>
 
-<div class="rk-card p-0">
-    <div class="overflow-x-auto">
-        <table class="rk-table align-middle mb-0">
+<div class="dash-card p-0">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
             <thead style="background:#f9fafb">
                 <tr style="font-size:12px;color:var(--rk-muted);text-transform:uppercase;letter-spacing:0.04em">
                     <th class="px-3 py-3">Date</th>
                     <th class="py-3">Type</th>
                     <th class="py-3">Severity</th>
-                    <th class="py-3 text-right">Affected Families</th>
-                    <th class="py-3 text-right">Casualties</th>
+                    <th class="py-3 text-end">Affected Families</th>
+                    <th class="py-3 text-end">Casualties</th>
                     <th class="py-3 px-3">Source</th>
                 </tr>
             </thead>
@@ -109,12 +110,12 @@
                     <td class="px-3">{{ inc.date_occurred.strftime('%b %d, %Y') if inc.date_occurred else '—' }}</td>
                     <td>{{ inc.disaster_type.value.replace('_', ' ').title() }}</td>
                     <td>{{ inc.severity.value.title() if inc.severity else '—' }}</td>
-                    <td class="text-right">{{ "{:,}".format(inc.affected_families or 0) }}</td>
-                    <td class="text-right">{{ inc.casualties or 0 }}</td>
-                    <td class="px-3 text-slate-500">{{ inc.source or '—' }}</td>
+                    <td class="text-end">{{ "{:,}".format(inc.affected_families or 0) }}</td>
+                    <td class="text-end">{{ inc.casualties or 0 }}</td>
+                    <td class="px-3 text-muted">{{ inc.source or '—' }}</td>
                 </tr>
                 {% else %}
-                <tr><td colspan="6" class="text-center text-slate-500 py-4">
+                <tr><td colspan="6" class="text-center text-muted py-4">
                     No incidents recorded for this barangay yet.
                 </td></tr>
                 {% endfor %}

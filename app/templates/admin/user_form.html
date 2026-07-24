@@ -5,7 +5,7 @@
 {% set active_nav = 'users' %}
 
 {% block content %}
-<div class="flex justify-between items-start mb-5">
+<div class="d-flex justify-content-between align-items-start page-header">
     <div>
         <h1>{{ 'Edit User' if edit_mode else 'Create New User' }}</h1>
         <p>
@@ -16,18 +16,18 @@
             {% endif %}
         </p>
     </div>
-    <a href="/admin/users" class="rk-btn-secondary">
+    <a href="/admin/users" class="btn btn-outline-secondary">
         <i class="bi bi-arrow-left"></i> Back to Users
     </a>
 </div>
 
-<div class="grid grid-cols-12 gap-4 justify-center">
-    <div class="col-span-8">
-        <div class="rk-card">
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="dash-card">
 
             {% if error %}
-            <div class="rk-alert rk-alert-red">
-                <i class="bi bi-exclamation-triangle-fill mr-1"></i> {{ error }}
+            <div class="alert alert-danger">
+                <i class="bi bi-exclamation-triangle-fill me-1"></i> {{ error }}
             </div>
             {% endif %}
 
@@ -37,43 +37,43 @@
 
                 {% if not edit_mode %}
                 <div class="mb-3">
-                    <label class="rk-label fw-medium">
-                        Username <span class="text-red-600">*</span>
+                    <label class="form-label fw-medium">
+                        Username <span class="text-danger">*</span>
                     </label>
-                    <input type="text" name="username" class="rk-input" required
+                    <input type="text" name="username" class="form-control" required
                            placeholder="e.g. bdrrmo_cuyab">
-                    <div class="rk-field-hint">Cannot be changed after creation.</div>
+                    <div class="form-text">Cannot be changed after creation.</div>
                 </div>
                 {% endif %}
 
                 <div class="mb-3">
-                    <label class="rk-label fw-medium">
-                        Email <span class="text-slate-500 text-sm">(optional)</span>
+                    <label class="form-label fw-medium">
+                        Email <span class="text-muted small">(optional)</span>
                     </label>
-                    <input type="email" name="email" class="rk-input"
+                    <input type="email" name="email" class="form-control"
                            value="{{ target_user.email or '' if edit_mode else '' }}"
                            placeholder="user@example.com">
-                    <div class="rk-field-hint">Login uses username only — email is stored for contact/reference.</div>
+                    <div class="form-text">Login uses username only — email is stored for contact/reference.</div>
                 </div>
 
                 <div class="mb-3">
-                    <label class="rk-label fw-medium">
+                    <label class="form-label fw-medium">
                         {{ 'New Password' if edit_mode else 'Password' }}
-                        {% if not edit_mode %}<span class="text-red-600">*</span>{% endif %}
+                        {% if not edit_mode %}<span class="text-danger">*</span>{% endif %}
                     </label>
                     <input type="password"
                            name="{{ 'new_password' if edit_mode else 'password' }}"
-                           class="rk-input"
+                           class="form-control"
                            {{ 'required' if not edit_mode else '' }}
                            placeholder="{{ 'Leave blank to keep current password' if edit_mode else 'Set initial password' }}">
                     {% if edit_mode %}
-                    <div class="rk-field-hint">Leave blank to keep the existing password.</div>
+                    <div class="form-text">Leave blank to keep the existing password.</div>
                     {% endif %}
                 </div>
 
                 <div class="mb-3">
-                    <label class="rk-label fw-medium">
-                        Role <span class="text-red-600">*</span>
+                    <label class="form-label fw-medium">
+                        Role <span class="text-danger">*</span>
                     </label>
                     {% set role_display = {
                         'admin': 'CDRRMO Admin',
@@ -81,7 +81,7 @@
                         'bdrrmo': 'BDRRMO / Barangay Focal',
                         'cdrrmo_staff': 'CDRRMO Logistics Staff'
                     } %}
-                    <select name="role" class="rk-select" required id="roleSelect">
+                    <select name="role" class="form-select" required id="roleSelect">
                         <option value="">-- Select role --</option>
                         {% for r in roles %}
                         <option value="{{ r }}"
@@ -94,8 +94,8 @@
 
                 <div class="mb-3" id="barangayField"
                      style="display: {{ 'block' if edit_mode and target_user.role.value == 'bdrrmo' else 'none' }}">
-                    <label class="rk-label fw-medium">Assigned Barangay</label>
-                    <select name="barangay_id" class="rk-select">
+                    <label class="form-label fw-medium">Assigned Barangay</label>
+                    <select name="barangay_id" class="form-select">
                         <option value="">-- Select barangay --</option>
                         {% for b in barangays %}
                         <option value="{{ b.id }}"
@@ -104,22 +104,22 @@
                         </option>
                         {% endfor %}
                     </select>
-                    <div class="rk-field-hint">Required for BDRRMO / Barangay Focal role.</div>
+                    <div class="form-text">Required for BDRRMO / Barangay Focal role.</div>
                 </div>
 
                 <div class="mb-4">
-                    <label class="rk-label fw-medium">Contact Number</label>
-                    <input type="text" name="contact_number" class="rk-input"
+                    <label class="form-label fw-medium">Contact Number</label>
+                    <input type="text" name="contact_number" class="form-control"
                            value="{{ target_user.contact_number or '' if edit_mode else '' }}"
                            placeholder="e.g. 09171234567">
                 </div>
 
-                <div class="flex gap-2">
-                    <button type="submit" class="rk-btn-primary">
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-rk">
                         <i class="bi bi-check2-circle"></i>
                         {{ 'Save Changes' if edit_mode else 'Create User' }}
                     </button>
-                    <a href="/admin/users" class="rk-btn-secondary">Cancel</a>
+                    <a href="/admin/users" class="btn btn-outline-secondary">Cancel</a>
                 </div>
 
             </form>

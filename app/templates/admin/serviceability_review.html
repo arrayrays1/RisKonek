@@ -6,110 +6,110 @@
 
 {% macro workflow_pill(v, label) -%}
     {% if v == 'draft' %}
-        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-slate">{{ label }}</span>
+        <span class="badge bg-light text-dark border">{{ label }}</span>
     {% elif v == 'submitted' %}
-        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-amber">{{ label }}</span>
+        <span class="status-pill status-maintenance">{{ label }}</span>
     {% elif v == 'reviewed' %}
-        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-blue">{{ label }}</span>
+        <span class="badge bg-info text-dark">{{ label }}</span>
     {% elif v == 'resolved' %}
-        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-green">{{ label }}</span>
+        <span class="status-pill status-operational">{{ label }}</span>
     {% else %}
-        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-slate">{{ label }}</span>
+        <span class="badge bg-light text-dark border">{{ label }}</span>
     {% endif %}
 {%- endmacro %}
 
 {% macro urgency_badge(v, label) -%}
     {% if v == 'critical' %}
-        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-slate" style="background:#fde8e8;color:#c0392b;border:1px solid #f4c2bd">
+        <span class="status-pill" style="background:#fde8e8;color:#c0392b;border:1px solid #f4c2bd">
             <i class="bi bi-exclamation-triangle-fill"></i> {{ label }}</span>
     {% elif v == 'high' %}
-        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-slate" style="background:#fdebd0;color:#b9770e;border:1px solid #f5cba7">
+        <span class="status-pill" style="background:#fdebd0;color:#b9770e;border:1px solid #f5cba7">
             <i class="bi bi-exclamation-circle-fill"></i> {{ label }}</span>
     {% elif v == 'moderate' %}
-        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-amber">{{ label }}</span>
+        <span class="status-pill status-maintenance">{{ label }}</span>
     {% else %}
-        <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-slate" style="background:#eef0f2;color:#6c757d;border:1px solid #dee2e6">{{ label }}</span>
+        <span class="status-pill" style="background:#eef0f2;color:#6c757d;border:1px solid #dee2e6">{{ label }}</span>
     {% endif %}
 {%- endmacro %}
 
 {% block content %}
-<div class="mb-5">
+<div class="page-header">
     <h1>Equipment Serviceability Review</h1>
     <p>Review serviceability reports submitted by CFAU, update their status, and add remarks.</p>
 </div>
 
 {% if request.query_params.get('success') %}
-<div class="rk-alert rk-alert-green">
-    <i class="bi bi-check-circle-fill mr-1"></i>{{ request.query_params.get('success') }}
-    <button type="button" class="-close" data-bs-dismiss="alert"></button>
+<div class="alert alert-success alert-dismissible fade show">
+    <i class="bi bi-check-circle-fill me-1"></i>{{ request.query_params.get('success') }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
 </div>
 {% endif %}
 {% if request.query_params.get('error') %}
-<div class="rk-alert rk-alert-red">
-    <i class="bi bi-exclamation-triangle-fill mr-1"></i>{{ request.query_params.get('error') }}
-    <button type="button" class="-close" data-bs-dismiss="alert"></button>
+<div class="alert alert-danger alert-dismissible fade show">
+    <i class="bi bi-exclamation-triangle-fill me-1"></i>{{ request.query_params.get('error') }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
 </div>
 {% endif %}
 
 {% if summary.priority %}
-<div class="rk-alert rk-alert-red flex items-center">
-    <i class="bi bi-exclamation-triangle-fill mr-2 fs-5"></i>
+<div class="alert alert-danger d-flex align-items-center">
+    <i class="bi bi-exclamation-triangle-fill me-2 fs-5"></i>
     <div>
         <strong>{{ summary.priority }}</strong> high/critical-urgency
         report{{ 's' if summary.priority != 1 else '' }} awaiting review.
-        <a href="/admin/serviceability?status=submitted&urgency=critical" class="-link ml-1">View critical</a>
+        <a href="/admin/serviceability?status=submitted&urgency=critical" class="alert-link ms-1">View critical</a>
     </div>
 </div>
 {% endif %}
 
-<div class="grid grid-cols-12 gap-3 mb-3">
-    <div class="col-span-3"><div class="rk-stat-card flex justify-between items-center">
+<div class="row g-3 mb-3">
+    <div class="col-md-3"><div class="stat-card d-flex justify-content-between align-items-center">
         <div>
-            <div class="rk-stat-label">Needs Urgent Attention</div>
-            <div class="rk-stat-value {{ 'text-red-600' if summary.priority else '' }}">{{ summary.priority }}</div>
+            <div class="stat-label">Needs Urgent Attention</div>
+            <div class="stat-value {{ 'text-danger' if summary.priority else '' }}">{{ summary.priority }}</div>
         </div>
-        <div class="rk-stat-icon" style="background:#fde8e8;color:#c0392b"><i class="bi bi-exclamation-triangle"></i></div>
+        <div class="stat-icon" style="background:#fde8e8;color:#c0392b"><i class="bi bi-exclamation-triangle"></i></div>
     </div></div>
-    <div class="col-span-3"><div class="rk-stat-card">
-        <div class="rk-stat-label">Awaiting Review</div><div class="rk-stat-value">{{ summary.submitted }}</div>
+    <div class="col-md-3"><div class="stat-card">
+        <div class="stat-label">Awaiting Review</div><div class="stat-value">{{ summary.submitted }}</div>
     </div></div>
-    <div class="col-span-3"><div class="rk-stat-card">
-        <div class="rk-stat-label">Reviewed</div><div class="rk-stat-value">{{ summary.reviewed }}</div>
+    <div class="col-md-3"><div class="stat-card">
+        <div class="stat-label">Reviewed</div><div class="stat-value">{{ summary.reviewed }}</div>
     </div></div>
-    <div class="col-span-3"><div class="rk-stat-card">
-        <div class="rk-stat-label">Resolved</div><div class="rk-stat-value">{{ summary.resolved }}</div>
+    <div class="col-md-3"><div class="stat-card">
+        <div class="stat-label">Resolved</div><div class="stat-value">{{ summary.resolved }}</div>
     </div></div>
 </div>
 
-<div class="rk-card mb-3">
-    <form method="GET" action="/admin/serviceability" class="grid grid-cols-12 gap-2 items-end js-live-filter">
-        <div class="col-span-3">
-            <label class="rk-label mb-1">Status</label>
-            <select name="status" class="rk-select text-xs py-1.5">
+<div class="dash-card mb-3">
+    <form method="GET" action="/admin/serviceability" class="row g-2 align-items-end js-live-filter">
+        <div class="col-md-3">
+            <label class="form-label small fw-semibold mb-1">Status</label>
+            <select name="status" class="form-select form-select-sm">
                 <option value="">All statuses</option>
                 {% for v, label in statuses %}
                 <option value="{{ v }}" {% if f_status == v %}selected{% endif %}>{{ label }}</option>
                 {% endfor %}
             </select>
         </div>
-        <div class="col-span-3">
-            <label class="rk-label mb-1">Urgency</label>
-            <select name="urgency" class="rk-select text-xs py-1.5">
+        <div class="col-md-3">
+            <label class="form-label small fw-semibold mb-1">Urgency</label>
+            <select name="urgency" class="form-select form-select-sm">
                 <option value="">Any urgency</option>
                 {% for v, label in urgencies %}
                 <option value="{{ v }}" {% if f_urgency == v %}selected{% endif %}>{{ label }}</option>
                 {% endfor %}
             </select>
         </div>
-        <div class="col-span-2 d-grid">
-            <a href="/admin/serviceability" class="rk-btn-secondary rk-btn-sm"><i class="bi bi-x-circle"></i> Reset</a>
+        <div class="col-md-2 d-grid">
+            <a href="/admin/serviceability" class="btn btn-outline-secondary btn-sm"><i class="bi bi-x-circle"></i> Reset</a>
         </div>
     </form>
 </div>
 
-<div class="rk-card p-0">
-    <div class="overflow-x-auto">
-        <table class="rk-table align-middle mb-0">
+<div class="dash-card p-0">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
             <thead style="background:#f9fafb">
                 <tr style="font-size:12px;color:var(--rk-muted);text-transform:uppercase;letter-spacing:0.04em">
                     <th class="px-3 py-3">Urgency</th>
@@ -119,7 +119,7 @@
                     <th class="py-3">Finding</th>
                     <th class="py-3">Reporter</th>
                     <th class="py-3">Status</th>
-                    <th class="py-3 text-right px-3">Actions</th>
+                    <th class="py-3 text-end px-3">Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -127,22 +127,22 @@
                 <tr style="font-size:13px;{% if r.is_priority %}background:#fff5f5{% endif %}"
                     {% if r.is_priority %}class="border-start border-danger border-3"{% endif %}>
                     <td class="px-3">{{ urgency_badge(r.urgency, r.urgency_label) }}</td>
-                    <td class="font-semibold">{{ r.title }}</td>
+                    <td class="fw-semibold">{{ r.title }}</td>
                     <td>{{ r.equipment }}</td>
-                    <td class="text-slate-500">{{ r.report_type }}</td>
+                    <td class="text-muted">{{ r.report_type }}</td>
                     <td>{{ r.finding }}</td>
-                    <td class="text-slate-500">{{ r.reporter }}</td>
+                    <td class="text-muted">{{ r.reporter }}</td>
                     <td>{{ workflow_pill(r.report_status, r.report_status_label) }}</td>
-                    <td class="text-right px-3">
-                        <a href="/admin/serviceability/{{ r.id }}" class="rk-btn-secondary rk-btn-sm">
+                    <td class="text-end px-3">
+                        <a href="/admin/serviceability/{{ r.id }}" class="btn btn-outline-primary btn-sm">
                             <i class="bi bi-eye"></i> Review
                         </a>
                     </td>
                 </tr>
                 {% else %}
-                <tr><td colspan="8" class="text-center text-slate-500 py-4">
+                <tr><td colspan="8" class="text-center text-muted py-4">
                     No serviceability reports found.
-                    {% if f_status or f_urgency %}<a href="/admin/serviceability" class="ml-2">Clear filters</a>{% endif %}
+                    {% if f_status or f_urgency %}<a href="/admin/serviceability" class="ms-2">Clear filters</a>{% endif %}
                 </td></tr>
                 {% endfor %}
             </tbody>

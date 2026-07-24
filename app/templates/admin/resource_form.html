@@ -5,34 +5,34 @@
 {% set active_nav = 'resources' %}
 
 {% block content %}
-<div class="mb-5">
+<div class="page-header">
     <h1>{{ 'Edit Resource' if edit_mode else 'Add Resource' }}</h1>
     <p>{{ 'Update resource details. Quantity changes are handled via Add/Deduct Stock so they are audited individually.' if edit_mode else 'Register a new consumable resource item in the inventory.' }}</p>
 </div>
 
 {% if request.query_params.get('error') %}
-<div class="rk-alert rk-alert-red">{{ request.query_params.get('error') }}</div>
+<div class="alert alert-danger">{{ request.query_params.get('error') }}</div>
 {% endif %}
 {% if error %}
-<div class="rk-alert rk-alert-red">{{ error }}</div>
+<div class="alert alert-danger">{{ error }}</div>
 {% endif %}
 
-<div class="rk-card">
+<div class="dash-card">
     <form method="POST"
           action="{{ '/admin/resources/' ~ target.id ~ '/edit' if edit_mode else '/admin/resources/new' }}"
-          class="grid grid-cols-12 gap-3">
+          class="row g-3">
             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
 
-        <div class="col-span-8">
-            <label class="rk-label">Item Name *</label>
-            <input type="text" name="name" required class="rk-input"
+        <div class="col-md-8">
+            <label class="form-label small fw-semibold">Item Name *</label>
+            <input type="text" name="name" required class="form-control"
                    value="{{ target.name if target else '' }}"
                    placeholder="e.g. Family Food Packs">
         </div>
 
-        <div class="col-span-4">
-            <label class="rk-label">Category *</label>
-            <select name="category" required class="rk-select">
+        <div class="col-md-4">
+            <label class="form-label small fw-semibold">Category *</label>
+            <select name="category" required class="form-select">
                 {% for c in categories %}
                 <option value="{{ c }}"
                   {% if target and target.category.value == c %}selected{% endif %}>
@@ -43,54 +43,54 @@
         </div>
 
         {% if not edit_mode %}
-        <div class="col-span-4">
-            <label class="rk-label">Initial Quantity</label>
-            <input type="number" name="quantity" min="0" class="rk-input" required>
-            <div class="rk-field-hint">After creation, use Add/Deduct Stock to adjust.</div>
+        <div class="col-md-4">
+            <label class="form-label small fw-semibold">Initial Quantity</label>
+            <input type="number" name="quantity" min="0" class="form-control" required>
+            <div class="form-text small">After creation, use Add/Deduct Stock to adjust.</div>
         </div>
         {% endif %}
 
-        <div class="col-span-4">
-            <label class="rk-label">Unit</label>
-            <input type="text" name="unit" class="rk-input"
+        <div class="col-md-4">
+            <label class="form-label small fw-semibold">Unit</label>
+            <input type="text" name="unit" class="form-control"
                    value="{{ target.unit if target else '' }}"
                    placeholder="packs, liters, kg, pieces">
         </div>
 
-        <div class="col-span-4">
-            <label class="rk-label">Restock Threshold</label>
-            <input type="number" name="restock_threshold" min="0" class="rk-input" required
+        <div class="col-md-4">
+            <label class="form-label small fw-semibold">Restock Threshold</label>
+            <input type="number" name="restock_threshold" min="0" class="form-control" required
                    value="{{ target.restock_threshold if target else '' }}">
-            <div class="rk-field-hint">Alert fires when quantity ≤ threshold.</div>
+            <div class="form-text small">Alert fires when quantity ≤ threshold.</div>
         </div>
 
-        <div class="col-span-8">
-            <label class="rk-label">Storage Location</label>
-            <input type="text" name="storage_location" class="rk-input"
+        <div class="col-md-8">
+            <label class="form-label small fw-semibold">Storage Location</label>
+            <input type="text" name="storage_location" class="form-control"
                    value="{{ target.storage_location if target else '' }}"
                    placeholder="e.g. Warehouse A, Shelf 3">
         </div>
 
-        <div class="col-span-4 flex items-center pt-3">
+        <div class="col-md-4 d-flex align-items-center pt-3">
             <div class="form-check">
                 <input class="form-check-input" type="checkbox" id="is_perishable" name="is_perishable" value="1"
                        {% if target and target.is_perishable %}checked{% endif %}>
-                <label class="form-check-label text-sm font-semibold" for="is_perishable">
+                <label class="form-check-label small fw-semibold" for="is_perishable">
                     Perishable
                 </label>
             </div>
         </div>
 
-        <div class="col-span-4">
-            <label class="rk-label">Expiry Date</label>
-            <input type="date" name="expiry_date" class="rk-input"
+        <div class="col-md-4">
+            <label class="form-label small fw-semibold">Expiry Date</label>
+            <input type="date" name="expiry_date" class="form-control"
                    value="{{ target.expiry_date.strftime('%Y-%m-%d') if (target and target.expiry_date) else '' }}">
-            <div class="rk-field-hint">Used only for perishable items.</div>
+            <div class="form-text small">Used only for perishable items.</div>
         </div>
 
-        <div class="col-span-12 flex justify-end gap-2 pt-2">
-            <a href="/admin/resources" class="rk-btn-secondary">Cancel</a>
-            <button type="submit" class="rk-btn-primary">
+        <div class="col-12 d-flex justify-content-end gap-2 pt-2">
+            <a href="/admin/resources" class="btn btn-outline-secondary">Cancel</a>
+            <button type="submit" class="btn btn-rk">
                 <i class="bi bi-check2"></i> {{ 'Save Changes' if edit_mode else 'Create Resource' }}
             </button>
         </div>
