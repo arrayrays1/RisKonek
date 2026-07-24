@@ -5,7 +5,7 @@
 {% set active_nav = 'bdrrmo_population' %}
 
 {% block content %}
-<div class="page-header">
+<div class="mb-5">
     <h1>Population Records</h1>
     <p>Log and review population data for
        {% if barangay %}Barangay {{ barangay.name }}{% else %}your barangay{% endif %}.
@@ -13,56 +13,56 @@
 </div>
 
 {% if success %}
-<div class="alert alert-success alert-dismissible fade show">
-    <i class="bi bi-check-circle-fill me-1"></i>{{ success }}
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+<div class="rk-alert rk-alert-green">
+    <i class="bi bi-check-circle-fill mr-1"></i>{{ success }}
+    <button type="button" class="-close" data-bs-dismiss="alert"></button>
 </div>
 {% endif %}
 {% if error %}
-<div class="alert alert-danger alert-dismissible fade show">
-    <i class="bi bi-exclamation-triangle-fill me-1"></i>{{ error }}
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+<div class="rk-alert rk-alert-red">
+    <i class="bi bi-exclamation-triangle-fill mr-1"></i>{{ error }}
+    <button type="button" class="-close" data-bs-dismiss="alert"></button>
 </div>
 {% endif %}
 
 {% if not barangay %}
-<div class="alert alert-warning">
-    <i class="bi bi-exclamation-triangle-fill me-1"></i>
+<div class="rk-alert rk-alert-amber">
+    <i class="bi bi-exclamation-triangle-fill mr-1"></i>
     No barangay is currently assigned to your account. Please contact the CDRRMO Admin.
 </div>
 {% else %}
 
 <!-- ── Latest snapshot ────────────────────────────────────────── -->
-<div class="row g-3 mb-4">
-    <div class="col-md-3">
-        <div class="stat-card">
-            <div class="stat-label">Total Population</div>
-            <div class="stat-value">{{ "{:,}".format(latest.total_population) if latest else "—" }}</div>
-            <div class="stat-change text-muted">
+<div class="grid grid-cols-12 gap-3 mb-4">
+    <div class="col-span-3">
+        <div class="rk-stat-card">
+            <div class="rk-stat-label">Total Population</div>
+            <div class="rk-stat-value">{{ "{:,}".format(latest.total_population) if latest else "—" }}</div>
+            <div class="text-sm mt-1 text-slate-500">
                 {% if latest %}{{ "{:,}".format(latest.total_households) }} households{% else %}No record yet{% endif %}
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="stat-card">
-            <div class="stat-label">Vulnerable %</div>
-            <div class="stat-value">{{ vulnerable_pct }}%</div>
-            <div class="stat-change text-muted">Elderly, PWDs, Children</div>
+    <div class="col-span-3">
+        <div class="rk-stat-card">
+            <div class="rk-stat-label">Vulnerable %</div>
+            <div class="rk-stat-value">{{ vulnerable_pct }}%</div>
+            <div class="text-sm mt-1 text-slate-500">Elderly, PWDs, Children</div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="stat-card">
-            <div class="stat-label">Elderly / PWD</div>
-            <div class="stat-value" style="font-size:20px">
+    <div class="col-span-3">
+        <div class="rk-stat-card">
+            <div class="rk-stat-label">Elderly / PWD</div>
+            <div class="rk-stat-value" style="font-size:20px">
                 {% if latest %}{{ "{:,}".format(latest.elderly_count) }} / {{ "{:,}".format(latest.pwd_count) }}{% else %}—{% endif %}
             </div>
-            <div class="stat-change text-muted">Latest record</div>
+            <div class="text-sm mt-1 text-slate-500">Latest record</div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="stat-card">
-            <div class="stat-label">Last Recorded</div>
-            <div class="stat-value" style="font-size:16px">
+    <div class="col-span-3">
+        <div class="rk-stat-card">
+            <div class="rk-stat-label">Last Recorded</div>
+            <div class="rk-stat-value" style="font-size:16px">
                 {{ latest.recorded_at | pht if latest else "—" }}
             </div>
         </div>
@@ -70,39 +70,38 @@
 </div>
 
 <!-- ── Logging form ───────────────────────────────────────────── -->
-<div class="dash-card mb-4">
-    <div class="card-title-row">
+<div class="rk-card mb-4">
+    <div class="rk-section-head">
         <i class="bi bi-plus-circle" style="color:var(--rk-green)"></i>
         <h6>Record New Population Data</h6>
     </div>
-    <form method="POST" action="/bdrrmo/population" class="row g-3"
-          data-confirm='Save this population record? It will be added as a new dated entry.'>
-            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
-        <div class="col-md-4">
-            <label class="form-label small fw-semibold mb-1">Total Population</label>
-            <input type="number" name="total_population" min="1" value="{{ latest.total_population if latest else '' }}" class="form-control form-control-sm" required>
+    <form method="POST" action="/bdrrmo/population" class="grid grid-cols-12 gap-3"
+          onsubmit="event.preventDefault(); rkConfirm('Save this population record? It will be added as a new dated entry.', this)">
+        <div class="col-span-4">
+            <label class="rk-label mb-1">Total Population</label>
+            <input type="number" name="total_population" min="1" value="{{ latest.total_population if latest else '' }}" class="rk-input text-xs py-1.5" required>
         </div>
-        <div class="col-md-4">
-            <label class="form-label small fw-semibold mb-1">Total Households</label>
-            <input type="number" name="total_households" min="1" value="{{ latest.total_households if latest else '' }}" class="form-control form-control-sm" required>
+        <div class="col-span-4">
+            <label class="rk-label mb-1">Total Households</label>
+            <input type="number" name="total_households" min="1" value="{{ latest.total_households if latest else '' }}" class="rk-input text-xs py-1.5" required>
         </div>
-        <div class="col-md-4">
-            <label class="form-label small fw-semibold mb-1">PWD Count</label>
-            <input type="number" name="pwd_count" min="0" value="{{ latest.pwd_count if latest else '' }}" class="form-control form-control-sm" required>
+        <div class="col-span-4">
+            <label class="rk-label mb-1">PWD Count</label>
+            <input type="number" name="pwd_count" min="0" value="{{ latest.pwd_count if latest else '' }}" class="rk-input text-xs py-1.5" required>
         </div>
-        <div class="col-md-4">
-            <label class="form-label small fw-semibold mb-1">Elderly Count (65+)</label>
-            <input type="number" name="elderly_count" min="0" value="{{ latest.elderly_count if latest else '' }}" class="form-control form-control-sm" required>
+        <div class="col-span-4">
+            <label class="rk-label mb-1">Elderly Count (65+)</label>
+            <input type="number" name="elderly_count" min="0" value="{{ latest.elderly_count if latest else '' }}" class="rk-input text-xs py-1.5" required>
         </div>
-        <div class="col-md-4">
-            <label class="form-label small fw-semibold mb-1">Children Count (0–12)</label>
-            <input type="number" name="children_count" min="0" value="{{ latest.children_count if latest else '' }}" class="form-control form-control-sm" required>
+        <div class="col-span-4">
+            <label class="rk-label mb-1">Children Count (0–12)</label>
+            <input type="number" name="children_count" min="0" value="{{ latest.children_count if latest else '' }}" class="rk-input text-xs py-1.5" required>
         </div>
-        <div class="col-12">
-            <button type="submit" class="btn btn-rk btn-sm">
+        <div class="col-span-12">
+            <button type="submit" class="rk-btn-primary rk-btn-sm">
                 <i class="bi bi-save"></i> Save Population Record
             </button>
-            <span class="text-muted small ms-2">
+            <span class="text-slate-500 text-sm ml-2">
                 Pre-filled from your latest snapshot — adjust only what changed.
                 Saved against your barangay and your account. Existing records are kept as history.
             </span>
@@ -111,32 +110,32 @@
 </div>
 
 <!-- ── History ────────────────────────────────────────────────── -->
-<div class="dash-card p-0">
+<div class="rk-card p-0">
     <div class="p-3 border-bottom"><h6 class="mb-0">Population History</h6></div>
-    <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
+    <div class="overflow-x-auto">
+        <table class="rk-table align-middle mb-0">
             <thead style="background:#f9fafb">
                 <tr style="font-size:12px;color:var(--rk-muted);text-transform:uppercase;letter-spacing:0.04em">
                     <th class="px-3 py-3">Recorded</th>
-                    <th class="py-3 text-end">Population</th>
-                    <th class="py-3 text-end">Households</th>
-                    <th class="py-3 text-end">PWD</th>
-                    <th class="py-3 text-end">Elderly</th>
-                    <th class="py-3 text-end px-3">Children</th>
+                    <th class="py-3 text-right">Population</th>
+                    <th class="py-3 text-right">Households</th>
+                    <th class="py-3 text-right">PWD</th>
+                    <th class="py-3 text-right">Elderly</th>
+                    <th class="py-3 text-right px-3">Children</th>
                 </tr>
             </thead>
             <tbody>
                 {% for p in history %}
                 <tr style="font-size:13px">
                     <td class="px-3">{{ p.recorded_at | pht }}</td>
-                    <td class="text-end">{{ "{:,}".format(p.total_population or 0) }}</td>
-                    <td class="text-end">{{ "{:,}".format(p.total_households or 0) }}</td>
-                    <td class="text-end">{{ "{:,}".format(p.pwd_count or 0) }}</td>
-                    <td class="text-end">{{ "{:,}".format(p.elderly_count or 0) }}</td>
-                    <td class="text-end px-3">{{ "{:,}".format(p.children_count or 0) }}</td>
+                    <td class="text-right">{{ "{:,}".format(p.total_population or 0) }}</td>
+                    <td class="text-right">{{ "{:,}".format(p.total_households or 0) }}</td>
+                    <td class="text-right">{{ "{:,}".format(p.pwd_count or 0) }}</td>
+                    <td class="text-right">{{ "{:,}".format(p.elderly_count or 0) }}</td>
+                    <td class="text-right px-3">{{ "{:,}".format(p.children_count or 0) }}</td>
                 </tr>
                 {% else %}
-                <tr><td colspan="6" class="text-center text-muted py-4">
+                <tr><td colspan="6" class="text-center text-slate-500 py-4">
                     No population records yet. Use the form above to add the first one.
                 </td></tr>
                 {% endfor %}

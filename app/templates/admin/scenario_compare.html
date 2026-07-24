@@ -14,20 +14,20 @@
 } %}
 
 {% block content %}
-<div class="page-header d-flex justify-content-between align-items-start flex-wrap gap-2">
+<div class="mb-5 flex justify-between items-start flex-wrap gap-2">
     <div>
-        <h1><i class="bi bi-bar-chart-steps me-2"></i>Compare Scenarios</h1>
+        <h1><i class="bi bi-bar-chart-steps mr-2"></i>Compare Scenarios</h1>
         <p>Side-by-side comparison of two saved snapshots. Figures reflect the
            data and thresholds at the time each was run — nothing is recomputed.</p>
     </div>
-    <a href="/admin/simulator/setup" class="btn btn-soft">
+    <a href="/admin/simulator/setup" class="rk-btn-secondary">
         <i class="bi bi-arrow-left"></i> Back to Simulator
     </a>
 </div>
 
 {# ── Threshold-difference warning ─────────────────────────────────────── #}
 {% if threshold_diffs %}
-<div class="alert alert-warning d-flex align-items-start gap-2">
+<div class="rk-alert rk-alert-amber flex items-start gap-2">
     <i class="bi bi-exclamation-triangle-fill" style="font-size:16px"></i>
     <div>
         <strong>These scenarios span different planning assumptions.</strong>
@@ -43,27 +43,27 @@
 {% endif %}
 
 {# ── Metadata + readiness side by side ────────────────────────────────── #}
-<div class="row g-3 mb-3">
+<div class="grid grid-cols-12 gap-3 mb-3">
     {% for s in [a, b] %}
     {% set band = band_ui.get(s.readiness, band_ui['Critical']) %}
-    <div class="col-md-6">
-        <div class="dash-card h-100">
-            <div class="card-title-row">
+    <div class="col-span-6">
+        <div class="rk-card h-100">
+            <div class="rk-section-head">
                 <h6 class="mb-0">
-                    <span class="badge bg-secondary me-1">{{ 'A' if loop.first else 'B' }}</span>
+                    <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate mr-1">{{ 'A' if loop.first else 'B' }}</span>
                     {{ s.name }}
                 </h6>
             </div>
             <div class="text-center my-2">
-                <div class="stat-label">Overall Readiness</div>
+                <div class="rk-stat-label">Overall Readiness</div>
                 <div class="{{ band.text }}" style="font-size:26px; font-weight:800;">{{ band.label }}</div>
             </div>
-            <table class="table table-sm mb-0" style="font-size:13px;">
-                <tr><td class="text-muted">Barangay</td><td class="fw-semibold">{{ s.barangay }}</td></tr>
-                <tr><td class="text-muted">Disaster Type</td><td class="fw-semibold text-capitalize">{{ s.disaster_type }}</td></tr>
-                <tr><td class="text-muted">Duration</td><td class="fw-semibold">{{ s.duration_label }}</td></tr>
-                <tr><td class="text-muted">Saved By</td><td class="fw-semibold">{{ s.saved_by }}</td></tr>
-                <tr><td class="text-muted">Saved On</td><td class="fw-semibold">{{ s.created_at | pht }}</td></tr>
+            <table class="rk-table mb-0" style="font-size:13px;">
+                <tr><td class="text-slate-500">Barangay</td><td class="font-semibold">{{ s.barangay }}</td></tr>
+                <tr><td class="text-slate-500">Disaster Type</td><td class="font-semibold text-capitalize">{{ s.disaster_type }}</td></tr>
+                <tr><td class="text-slate-500">Duration</td><td class="font-semibold">{{ s.duration_label }}</td></tr>
+                <tr><td class="text-slate-500">Saved By</td><td class="font-semibold">{{ s.saved_by }}</td></tr>
+                <tr><td class="text-slate-500">Saved On</td><td class="font-semibold">{{ s.created_at | pht }}</td></tr>
             </table>
         </div>
     </div>
@@ -71,23 +71,23 @@
 </div>
 
 {# ── Per-class comparison table ───────────────────────────────────────── #}
-<div class="dash-card">
-    <div class="card-title-row">
-        <h6 class="mb-0"><i class="bi bi-table me-1"></i>Resource Comparison</h6>
+<div class="rk-card">
+    <div class="rk-section-head">
+        <h6 class="mb-0"><i class="bi bi-rk-table mr-1"></i>Resource Comparison</h6>
     </div>
     {% if compare_rows %}
-    <div class="table-responsive">
-        <table class="table align-middle">
+    <div class="overflow-x-auto">
+        <table class="rk-table align-middle">
             <thead>
                 <tr>
                     <th rowspan="2" class="align-middle">Resource Class</th>
                     <th colspan="4" class="text-center border-start">A — {{ a.name | truncate(28) }}</th>
                     <th colspan="4" class="text-center border-start">B — {{ b.name | truncate(28) }}</th>
-                    <th rowspan="2" class="text-center align-middle border-start">Change<br><span class="text-muted" style="font-size:11px;">(shortfall)</span></th>
+                    <th rowspan="2" class="text-center align-middle border-start">Change<br><span class="text-slate-500" style="font-size:11px;">(shortfall)</span></th>
                 </tr>
                 <tr style="font-size:12px;">
-                    <th class="text-end border-start">Need</th><th class="text-end">Avail</th><th class="text-end">Gap</th><th>Status</th>
-                    <th class="text-end border-start">Need</th><th class="text-end">Avail</th><th class="text-end">Gap</th><th>Status</th>
+                    <th class="text-right border-start">Need</th><th class="text-right">Avail</th><th class="text-right">Gap</th><th>Status</th>
+                    <th class="text-right border-start">Need</th><th class="text-right">Avail</th><th class="text-right">Gap</th><th>Status</th>
                 </tr>
             </thead>
             <tbody>
@@ -95,25 +95,25 @@
                 {% set sa = status_ui.get(r.status_a, status_ui['Critical']) %}
                 {% set sb = status_ui.get(r.status_b, status_ui['Critical']) %}
                 <tr style="font-size:13px;">
-                    <td>{{ r.label }}<span class="text-muted"> ({{ r.unit }})</span></td>
-                    <td class="text-end border-start">{{ "{:,}".format(r.a.need) }}</td>
-                    <td class="text-end">{{ "{:,}".format(r.a.available) }}</td>
-                    <td class="text-end">{% if r.a.gap > 0 %}<span class="text-danger">{{ "{:,}".format(r.a.gap) }}</span>{% else %}0{% endif %}</td>
-                    <td><span class="status-pill {{ sa.pill }}">{{ sa.label }}</span></td>
-                    <td class="text-end border-start">{{ "{:,}".format(r.b.need) }}</td>
-                    <td class="text-end">{{ "{:,}".format(r.b.available) }}</td>
-                    <td class="text-end">{% if r.b.gap > 0 %}<span class="text-danger">{{ "{:,}".format(r.b.gap) }}</span>{% else %}0{% endif %}</td>
-                    <td><span class="status-pill {{ sb.pill }}">{{ sb.label }}</span></td>
+                    <td>{{ r.label }}<span class="text-slate-500"> ({{ r.unit }})</span></td>
+                    <td class="text-right border-start">{{ "{:,}".format(r.a.need) }}</td>
+                    <td class="text-right">{{ "{:,}".format(r.a.available) }}</td>
+                    <td class="text-right">{% if r.a.gap > 0 %}<span class="text-red-600">{{ "{:,}".format(r.a.gap) }}</span>{% else %}0{% endif %}</td>
+                    <td><span class="rk-badge rk-badge-slate {{ sa.pill }}">{{ sa.label }}</span></td>
+                    <td class="text-right border-start">{{ "{:,}".format(r.b.need) }}</td>
+                    <td class="text-right">{{ "{:,}".format(r.b.available) }}</td>
+                    <td class="text-right">{% if r.b.gap > 0 %}<span class="text-red-600">{{ "{:,}".format(r.b.gap) }}</span>{% else %}0{% endif %}</td>
+                    <td><span class="rk-badge rk-badge-slate {{ sb.pill }}">{{ sb.label }}</span></td>
                     <td class="text-center border-start">
                         {% if r.direction == 'improved' %}
-                            <span class="text-success fw-semibold"><i class="bi bi-arrow-down-circle-fill"></i> −{{ "{:,}".format(r.abs_delta) }}</span>
-                            <div class="text-success" style="font-size:11px;">improved</div>
+                            <span class="text-emerald-600 font-semibold"><i class="bi bi-arrow-down-circle-fill"></i> −{{ "{:,}".format(r.abs_delta) }}</span>
+                            <div class="text-emerald-600" style="font-size:11px;">improved</div>
                         {% elif r.direction == 'worsened' %}
-                            <span class="text-danger fw-semibold"><i class="bi bi-arrow-up-circle-fill"></i> +{{ "{:,}".format(r.abs_delta) }}</span>
-                            <div class="text-danger" style="font-size:11px;">worsened</div>
+                            <span class="text-red-600 font-semibold"><i class="bi bi-arrow-up-circle-fill"></i> +{{ "{:,}".format(r.abs_delta) }}</span>
+                            <div class="text-red-600" style="font-size:11px;">worsened</div>
                         {% else %}
-                            <span class="text-muted"><i class="bi bi-dash-circle"></i> 0</span>
-                            <div class="text-muted" style="font-size:11px;">no change</div>
+                            <span class="text-slate-500"><i class="bi bi-dash-circle"></i> 0</span>
+                            <div class="text-slate-500" style="font-size:11px;">no change</div>
                         {% endif %}
                     </td>
                 </tr>
@@ -121,14 +121,14 @@
             </tbody>
         </table>
     </div>
-    <p class="text-muted mb-0" style="font-size:12px;">
-        <i class="bi bi-info-circle me-1"></i>“Change” is the difference in shortfall (gap)
-        from A to B. A <span class="text-success fw-semibold">down arrow / improved</span>
-        means the shortfall shrank; an <span class="text-danger fw-semibold">up arrow / worsened</span>
+    <p class="text-slate-500 mb-0" style="font-size:12px;">
+        <i class="bi bi-info-circle mr-1"></i>“Change” is the difference in shortfall (gap)
+        from A to B. A <span class="text-emerald-600 font-semibold">down arrow / improved</span>
+        means the shortfall shrank; an <span class="text-red-600 font-semibold">up arrow / worsened</span>
         means it grew.
     </p>
     {% else %}
-    <p class="text-muted mb-0">These two scenarios share no comparable resource classes.</p>
+    <p class="text-slate-500 mb-0">These two scenarios share no comparable resource classes.</p>
     {% endif %}
 </div>
 {% endblock %}

@@ -5,7 +5,7 @@
 {% set active_nav = 'uploads' %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-start page-header">
+<div class="flex justify-between items-start mb-5">
     <div>
         <h1>Review Extracted Data</h1>
         <p>Preview from <strong>{{ report.file_name }}</strong>.
@@ -17,42 +17,42 @@
         {% endif %}
         </p>
     </div>
-    <div class="d-flex gap-2">
-        <a href="/admin/uploads/{{ report.id }}/history" class="btn btn-outline-secondary">
+    <div class="flex gap-2">
+        <a href="/admin/uploads/{{ report.id }}/history" class="rk-btn-secondary">
             <i class="bi bi-clock-history"></i> History
         </a>
-        <a href="/admin/uploads" class="btn btn-outline-secondary">
+        <a href="/admin/uploads" class="rk-btn-secondary">
             <i class="bi bi-arrow-left"></i> Back to History
         </a>
     </div>
 </div>
 
 {% if editable %}
-<div class="alert alert-light border py-2 small">
-    <i class="bi bi-info-circle me-1"></i>
+<div class="rk-alert rk-alert-slate py-2 text-sm">
+    <i class="bi bi-info-circle mr-1"></i>
     This is an unconfirmed <strong>draft</strong>. If you leave or click Cancel, your upload is kept as a draft &mdash; nothing is lost.
     Use <strong>Discard Unconfirmed Upload</strong> below to remove it.
 </div>
 {% endif %}
 
 {% if request.query_params.get('success') %}
-<div class="alert alert-success alert-dismissible fade show">
-    <i class="bi bi-check-circle-fill me-1"></i>
+<div class="rk-alert rk-alert-green">
+    <i class="bi bi-check-circle-fill mr-1"></i>
     {{ request.query_params.get('success') | replace('+', ' ') }}
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <button type="button" class="-close" data-bs-dismiss="alert"></button>
 </div>
 {% endif %}
 
 {% if request.query_params.get('error') %}
-<div class="alert alert-danger alert-dismissible fade show">
-    <i class="bi bi-exclamation-triangle-fill me-1"></i>
+<div class="rk-alert rk-alert-red">
+    <i class="bi bi-exclamation-triangle-fill mr-1"></i>
     {{ request.query_params.get('error') | replace('+', ' ') }}
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <button type="button" class="-close" data-bs-dismiss="alert"></button>
 </div>
 {% endif %}
 
 {% if data.validation_errors %}
-<div class="alert alert-warning">
+<div class="rk-alert rk-alert-amber">
     <strong>Validation issues from the last save attempt:</strong>
     <ul class="mb-0">
         {% for err in data.validation_errors %}<li>{{ err }}</li>{% endfor %}
@@ -61,54 +61,52 @@
 {% endif %}
 
 <!-- ── File / status summary ──────────────────────────────────────── -->
-<div class="dash-card mb-3">
-    <div class="row g-3">
-        <div class="col-md-3">
-            <div class="text-muted small">File</div>
-            <div class="fw-semibold">{{ report.file_name }}</div>
-            <div class="small"><span class="badge bg-light text-dark border">{{ report.file_type.value | upper }}</span></div>
+<div class="rk-card mb-3">
+    <div class="grid grid-cols-12 gap-3">
+        <div class="col-span-3">
+            <div class="text-slate-500 text-sm">File</div>
+            <div class="font-semibold">{{ report.file_name }}</div>
+            <div class="text-sm"><span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-slate">{{ report.file_type.value | upper }}</span></div>
         </div>
-        <div class="col-md-3">
-            <div class="text-muted small">Uploaded</div>
+        <div class="col-span-3">
+            <div class="text-slate-500 text-sm">Uploaded</div>
             <div>{{ report.uploaded_at | pht }}</div>
-            <div class="small text-muted">by {{ report.uploaded_by_user.username if report.uploaded_by_user else '—' }}</div>
+            <div class="text-sm text-slate-500">by {{ report.uploaded_by_user.username if report.uploaded_by_user else '—' }}</div>
         </div>
-        <div class="col-md-3">
-            <div class="text-muted small">Lifecycle</div>
+        <div class="col-span-3">
+            <div class="text-slate-500 text-sm">Lifecycle</div>
             <div>
                 {% if lifecycle_status == 'draft' %}
-                    <span class="status-pill status-maintenance">Draft</span>
+                    <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-amber">Draft</span>
                 {% elif lifecycle_status == 'confirmed' %}
-                    <span class="status-pill status-operational">Confirmed</span>
+                    <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-green">Confirmed</span>
                 {% elif lifecycle_status == 'archived' %}
-                    <span class="badge bg-secondary"><i class="bi bi-archive me-1"></i>Archived</span>
+                    <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-slate"><i class="bi bi-archive mr-1"></i>Archived</span>
                 {% elif lifecycle_status == 'discarded' %}
-                    <span class="status-pill status-unavailable">Discarded</span>
+                    <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-red">Discarded</span>
                 {% endif %}
             </div>
             {% if is_archived and report.archived_at %}
-            <div class="small text-muted">on {{ report.archived_at | pht }}</div>
+            <div class="text-sm text-slate-500">on {{ report.archived_at | pht }}</div>
             {% elif is_discarded and report.discarded_at %}
-            <div class="small text-muted">on {{ report.discarded_at | pht }}</div>
+            <div class="text-sm text-slate-500">on {{ report.discarded_at | pht }}</div>
             {% endif %}
         </div>
-        <div class="col-md-3 d-flex flex-column gap-2">
-            <a href="/admin/uploads/{{ report.id }}/file" class="btn btn-outline-secondary btn-sm">
+        <div class="col-span-3 flex flex-col gap-2">
+            <a href="/admin/uploads/{{ report.id }}/file" class="rk-btn-secondary rk-btn-sm">
                 <i class="bi bi-download"></i> Download raw file
             </a>
             {% if is_confirmed %}
             <form method="POST" action="/admin/uploads/{{ report.id }}/archive"
-                  data-confirm='Archive this upload? It stays searchable and auditable and can be restored later.'>
-            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
-                <button type="submit" class="btn btn-outline-secondary btn-sm w-100">
+                  onsubmit="event.preventDefault(); rkConfirm('Archive this upload? It stays searchable and auditable and can be restored later.', this)">
+                <button type="submit" class="rk-btn-secondary rk-btn-sm w-full">
                     <i class="bi bi-archive"></i> Archive Upload
                 </button>
             </form>
             {% elif is_archived %}
             <form method="POST" action="/admin/uploads/{{ report.id }}/restore"
-                  data-confirm='Restore this upload from the archive?'>
-            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
-                <button type="submit" class="btn btn-outline-success btn-sm w-100">
+                  onsubmit="event.preventDefault(); rkConfirm('Restore this upload from the archive?', this)">
+                <button type="submit" class="-outline-success rk-btn-sm w-full">
                     <i class="bi bi-arrow-counterclockwise"></i> Restore Upload
                 </button>
             </form>
@@ -118,36 +116,36 @@
 </div>
 
 {% if extraction_error %}
-<div class="alert alert-danger">
+<div class="rk-alert rk-alert-red">
     <strong>Extraction failed:</strong> {{ extraction_error }}<br>
     You can still enter the data manually below and confirm-save.
 </div>
 {% endif %}
 
 <!-- ── AI summary (optional) ──────────────────────────────────────── -->
-<div class="dash-card mb-3">
-    <div class="card-title-row">
+<div class="rk-card mb-3">
+    <div class="rk-section-head">
         <i class="bi bi-robot"></i>
         <h6>AI Summary</h6>
     </div>
     {% if report.ai_summary %}
         <p class="mb-0" style="white-space:pre-line">{{ report.ai_summary }}</p>
     {% elif not ai_available %}
-        <p class="text-muted mb-0 small">AI summary unavailable (GROQ_API_KEY not configured).</p>
+        <p class="text-slate-500 mb-0 text-sm">AI summary unavailable (GROQ_API_KEY not configured).</p>
     {% else %}
-        <p class="text-muted mb-0 small">No AI summary generated for this file.</p>
+        <p class="text-slate-500 mb-0 text-sm">No AI summary generated for this file.</p>
     {% endif %}
 </div>
 
 <!-- ── Raw extracted preview (text or table) ──────────────────────── -->
-<div class="dash-card mb-3">
-    <div class="card-title-row">
+<div class="rk-card mb-3">
+    <div class="rk-section-head">
         <i class="bi bi-file-text"></i>
         <h6>Extracted Preview</h6>
     </div>
     {% if columns_preview and rows_preview %}
-        <div class="table-responsive" style="max-height: 260px; overflow:auto;">
-            <table class="table table-sm table-bordered mb-0" style="font-size:12px">
+        <div class="overflow-x-auto" style="max-height: 260px; overflow:auto;">
+            <table class="rk-table mb-0" style="font-size:12px">
                 <thead style="background:#f9fafb;position:sticky;top:0">
                     <tr>{% for c in columns_preview %}<th>{{ c }}</th>{% endfor %}</tr>
                 </thead>
@@ -162,47 +160,47 @@
                 </tbody>
             </table>
         </div>
-        <div class="form-text">Showing first {{ rows_preview | length }} rows.</div>
+        <div class="rk-field-hint">Showing first {{ rows_preview | length }} rows.</div>
     {% elif raw_text_preview %}
         <pre style="white-space:pre-wrap;font-size:12px;max-height:260px;overflow:auto;background:#f9fafb;padding:10px;border-radius:6px">{{ raw_text_preview }}</pre>
     {% else %}
-        <p class="text-muted mb-0 small">No preview available.</p>
+        <p class="text-slate-500 mb-0 text-sm">No preview available.</p>
     {% endif %}
 </div>
 
 <!-- ── Editable structured fields → save draft / confirm ──────────── -->
 <form method="POST" action="/admin/uploads/{{ report.id }}/confirm">
             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
-<div class="dash-card mb-3">
-    <div class="card-title-row">
+<div class="rk-card mb-3">
+    <div class="rk-section-head">
         <i class="bi bi-pencil-square"></i>
         <h6>Structured Fields {% if editable %}— Edit Before Saving{% endif %}</h6>
     </div>
 
     {% if editable and report.file_type.value == 'pdf' %}
-    <div class="alert alert-warning py-2 small">
-        <i class="bi bi-magic me-1"></i>
+    <div class="rk-alert rk-alert-amber py-2 text-sm">
+        <i class="bi bi-magic mr-1"></i>
         PDF fields are best-effort suggestions and must be verified before saving.
     </div>
     {% endif %}
 
     {% if editable %}
-    <div class="row g-3 mb-3">
-        <div class="col-md-6">
-            <label class="form-label small fw-semibold mb-1">Display file name (metadata)</label>
-            <input type="text" name="file_name" class="form-control form-control-sm"
+    <div class="grid grid-cols-12 gap-3 mb-3">
+        <div class="col-span-6">
+            <label class="rk-label mb-1">Display file name (metadata)</label>
+            <input type="text" name="file_name" class="rk-input text-xs py-1.5"
                    value="{{ report.file_name }}">
         </div>
-        <div class="col-md-6">
-            <label class="form-label small fw-semibold mb-1">Reason for changes (optional)</label>
-            <input type="text" name="edit_reason" class="form-control form-control-sm"
+        <div class="col-span-6">
+            <label class="rk-label mb-1">Reason for changes (optional)</label>
+            <input type="text" name="edit_reason" class="rk-input text-xs py-1.5"
                    placeholder="e.g. corrected barangay name from source">
-            <div class="form-text">Recorded against each edit in the audit trail.</div>
+            <div class="rk-field-hint">Recorded against each edit in the audit trail.</div>
         </div>
     </div>
     {% endif %}
 
-    <p class="small text-muted">
+    <p class="text-sm text-slate-500">
         {% if editable %}
             Untick a row to skip it. Only ticked rows with valid barangay, disaster type, and date will be saved as <strong>Incident</strong> records.
         {% else %}
@@ -210,8 +208,8 @@
         {% endif %}
     </p>
 
-    <div class="table-responsive">
-    <table class="table table-bordered align-middle" style="font-size:12px">
+    <div class="overflow-x-auto">
+    <table class="rk-table align-middle" style="font-size:12px">
         <thead style="background:#f9fafb">
             <tr>
                 <th style="width:40px"></th>
@@ -234,12 +232,12 @@
                        {% if not editable %}disabled{% endif %}>
             </td>
             <td>
-                <input list="brgy-list" name="barangay" class="form-control form-control-sm"
+                <input list="brgy-list" name="barangay" class="rk-input text-xs py-1.5"
                        value="{{ f.barangay or '' }}"
                        {% if not editable %}readonly{% endif %}>
             </td>
             <td>
-                <select name="disaster_type" class="form-select form-select-sm"
+                <select name="disaster_type" class="rk-select text-xs py-1.5"
                         {% if not editable %}disabled{% endif %}>
                     {% for dt in disaster_types %}
                     <option value="{{ dt }}" {% if f.disaster_type == dt %}selected{% endif %}>
@@ -250,22 +248,22 @@
                 {% if not editable %}<input type="hidden" name="disaster_type" value="{{ f.disaster_type }}">{% endif %}
             </td>
             <td>
-                <input type="date" name="date_occurred" class="form-control form-control-sm"
+                <input type="date" name="date_occurred" class="rk-input text-xs py-1.5"
                        value="{{ f.date_occurred or '' }}"
                        {% if not editable %}readonly{% endif %}>
             </td>
-            <td><input type="number" min="0" name="affected_families" class="form-control form-control-sm" required
+            <td><input type="number" min="0" name="affected_families" class="rk-input text-xs py-1.5" required
                        value="{{ f.affected_families if f.affected_families is not none else '' }}" {% if not editable %}readonly{% endif %}></td>
-            <td><input type="number" min="0" name="affected_individuals" class="form-control form-control-sm" required
+            <td><input type="number" min="0" name="affected_individuals" class="rk-input text-xs py-1.5" required
                        value="{{ f.affected_individuals if f.affected_individuals is not none else '' }}" {% if not editable %}readonly{% endif %}></td>
-            <td><input type="number" min="0" name="casualties" class="form-control form-control-sm" required
+            <td><input type="number" min="0" name="casualties" class="rk-input text-xs py-1.5" required
                        value="{{ f.casualties if f.casualties is not none else '' }}" {% if not editable %}readonly{% endif %}></td>
             <td>
-                <textarea name="description" rows="2" class="form-control form-control-sm"
+                <textarea name="description" rows="2" class="rk-input text-xs py-1.5"
                           {% if not editable %}readonly{% endif %}>{{ f.description or '' }}</textarea>
             </td>
             <td>
-                <textarea name="resources_used" rows="2" class="form-control form-control-sm"
+                <textarea name="resources_used" rows="2" class="rk-input text-xs py-1.5"
                           {% if not editable %}readonly{% endif %}>{{ f.resources_used or '' }}</textarea>
             </td>
         </tr>
@@ -279,15 +277,15 @@
     </datalist>
 
     {% if editable %}
-    <div class="d-flex justify-content-between align-items-center mt-3">
-        <span class="text-muted small">Cancel keeps this upload as a draft.</span>
-        <div class="d-flex gap-2">
-            <a href="/admin/uploads" class="btn btn-outline-secondary">Cancel</a>
+    <div class="flex justify-between items-center mt-3">
+        <span class="text-slate-500 text-sm">Cancel keeps this upload as a draft.</span>
+        <div class="flex gap-2">
+            <a href="/admin/uploads" class="rk-btn-secondary">Cancel</a>
             <button type="submit" formaction="/admin/uploads/{{ report.id }}/save-draft"
-                    class="btn btn-outline-primary">
+                    class="rk-btn-secondary">
                 <i class="bi bi-save"></i> Save Draft
             </button>
-            <button type="submit" class="btn btn-rk">
+            <button type="submit" class="rk-btn-primary">
                 <i class="bi bi-check2-circle"></i> Confirm &amp; Save
             </button>
         </div>
@@ -297,7 +295,7 @@
 </form>
 
 {% if data.linked_incident_ids %}
-<div class="alert alert-success small">
+<div class="rk-alert rk-alert-green text-sm">
     <i class="bi bi-link-45deg"></i>
     Linked Incident IDs: {{ data.linked_incident_ids | join(', ') }}
 </div>
@@ -305,19 +303,18 @@
 
 <!-- ── Discard (drafts only) ──────────────────────────────────────── -->
 {% if editable %}
-<div class="dash-card border-danger-subtle">
-    <div class="d-flex justify-content-between align-items-center">
+<div class="rk-card border-danger-subtle">
+    <div class="flex justify-between items-center">
         <div>
-            <h6 class="mb-1 text-danger">Discard Unconfirmed Upload</h6>
-            <p class="small text-muted mb-0">
+            <h6 class="mb-1 text-red-600">Discard Unconfirmed Upload</h6>
+            <p class="text-sm text-slate-500 mb-0">
                 Permanently marks this draft as discarded. It will no longer appear with active uploads.
                 Confirmed uploads can never be discarded.
             </p>
         </div>
         <form method="POST" action="/admin/uploads/{{ report.id }}/discard"
-              data-confirm='Discard this unconfirmed upload? This cannot be undone.'>
-            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
-            <button type="submit" class="btn btn-outline-danger">
+              onsubmit="event.preventDefault(); rkConfirm('Discard this unconfirmed upload? This cannot be undone.', this)">
+            <button type="submit" class="rk-btn-danger">
                 <i class="bi bi-trash"></i> Discard Unconfirmed Upload
             </button>
         </form>

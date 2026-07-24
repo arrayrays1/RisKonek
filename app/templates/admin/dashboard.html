@@ -59,12 +59,12 @@
 
 {% block content %}
 <!-- Page header -->
-<div class="d-flex justify-content-between align-items-start page-header">
+<div class="flex justify-between items-start mb-5">
     <div>
         <h1>Analytics Overview Dashboard</h1>
         <p>City-wide disaster preparedness, readiness scores, and resource adequacy status</p>
     </div>
-    <div class="last-updated">
+    <div class="text-xs text-slate-500 text-right">
         Last updated<br>
         <strong id="currentDateTime"></strong>
     </div>
@@ -72,7 +72,7 @@
 
 <!-- Alert banner — only shows if there are active alerts -->
 {% if active_alerts > 0 %}
-<div class="alert-banner">
+<div class="rk-alert rk-alert-amber">
     <i class="bi bi-exclamation-triangle-fill" style="font-size:16px"></i>
     <span>
         <strong>{{ active_alerts }} active alert{{ 's' if active_alerts > 1 else '' }}:</strong>
@@ -86,65 +86,65 @@
 {% endif %}
 
 <!-- ── STAT CARDS ─────────────────────────────────────────────── -->
-<div class="row g-3 mb-4">
+<div class="grid grid-cols-12 gap-3 mb-4">
 
-    <div class="col-md-3">
-        <div class="stat-card">
-            <div class="d-flex justify-content-between align-items-start">
-                <div class="stat-label">Overall System Status</div>
-                <div class="stat-icon" style="background:#d1fae5;color:#047857">
+    <div class="col-span-3">
+        <div class="rk-stat-card">
+            <div class="flex justify-between items-start">
+                <div class="rk-stat-label">Overall System Status</div>
+                <div class="rk-stat-icon" style="background:#d1fae5;color:#047857">
                     <i class="bi bi-shield-check"></i>
                 </div>
             </div>
-            <div class="stat-value" style="color:#047857">Operational</div>
-            <div class="stat-change text-success">
+            <div class="rk-stat-value" style="color:#047857">Operational</div>
+            <div class="text-sm mt-1 text-emerald-700">
                 {{ total_barangays }} barangays monitored
             </div>
         </div>
     </div>
 
-    <div class="col-md-3">
-        <div class="stat-card">
-            <div class="d-flex justify-content-between align-items-start">
-                <div class="stat-label">Overall Readiness Score</div>
-                <div class="stat-icon" style="background:#e8f4fd;color:#2980b9">
+    <div class="col-span-3">
+        <div class="rk-stat-card">
+            <div class="flex justify-between items-start">
+                <div class="rk-stat-label">Overall Readiness Score</div>
+                <div class="rk-stat-icon" style="background:#e8f4fd;color:#2980b9">
                     <i class="bi bi-graph-up-arrow"></i>
                 </div>
             </div>
-            <div class="stat-value">{{ readiness_score }}%</div>
-            <div class="stat-change text-muted">
+            <div class="rk-stat-value">{{ readiness_score }}%</div>
+            <div class="text-sm mt-1 text-slate-500">
                 {{ serviceable_count }}/{{ total_equip }} equipment serviceable
             </div>
         </div>
     </div>
 
-    <div class="col-md-3">
-        <div class="stat-card">
-            <div class="d-flex justify-content-between align-items-start">
-                <div class="stat-label">Data Relevance Score</div>
-                <div class="stat-icon" style="background:#f3e8fd;color:#8e44ad">
+    <div class="col-span-3">
+        <div class="rk-stat-card">
+            <div class="flex justify-between items-start">
+                <div class="rk-stat-label">Data Relevance Score</div>
+                <div class="rk-stat-icon" style="background:#f3e8fd;color:#8e44ad">
                     <i class="bi bi-database-check"></i>
                 </div>
             </div>
-            <div class="stat-value">{{ data_relevance }}%</div>
-            <div class="stat-change text-muted">
+            <div class="rk-stat-value">{{ data_relevance }}%</div>
+            <div class="text-sm mt-1 text-slate-500">
                 Barangays updated within 6 months
             </div>
         </div>
     </div>
 
-    <div class="col-md-3">
-        <div class="stat-card">
-            <div class="d-flex justify-content-between align-items-start">
-                <div class="stat-label">Active Alerts Count</div>
-                <div class="stat-icon" style="background:#fde8e8;color:#c0392b">
+    <div class="col-span-3">
+        <div class="rk-stat-card">
+            <div class="flex justify-between items-start">
+                <div class="rk-stat-label">Active Alerts Count</div>
+                <div class="rk-stat-icon" style="background:#fde8e8;color:#c0392b">
                     <i class="bi bi-bell-fill"></i>
                 </div>
             </div>
-            <div class="stat-value" style="color:{{ '#c0392b' if active_alerts > 0 else '#047857' }}">
+            <div class="rk-stat-value" style="color:{{ '#c0392b' if active_alerts > 0 else '#047857' }}">
                 {{ active_alerts }}
             </div>
-            <div class="stat-change text-muted">
+            <div class="text-sm mt-1 text-slate-500">
                 Resource and expiry alerts
             </div>
         </div>
@@ -153,12 +153,12 @@
 </div>
 
 <!-- ── ROW 2: Insights feed + Mini map ────────────────────────── -->
-<div class="row g-3 mb-4">
+<div class="grid grid-cols-12 gap-3 mb-4">
 
-    <div class="col-md-7">
-        <div class="dash-card">
-            <div class="card-title-row">
-                <i class="bi bi-bell text-warning"></i>
+    <div class="col-span-7">
+        <div class="rk-card">
+            <div class="rk-section-head">
+                <i class="bi bi-bell text-amber-600"></i>
                 <h6>Insights & Latest Updates</h6>
             </div>
 
@@ -191,25 +191,25 @@
                 </div>
                 {% endfor %}
             {% else %}
-                <div class="text-center text-muted py-4" style="font-size:13px">
+                <div class="text-center text-slate-500 py-4" style="font-size:13px">
                     No recent activity yet. Actions taken in the system will appear here.
                 </div>
             {% endif %}
         </div>
     </div>
 
-    <div class="col-md-5">
-        <div class="dash-card">
-            <div class="card-title-row">
+    <div class="col-span-5">
+        <div class="rk-card">
+            <div class="rk-section-head">
                 <i class="bi bi-map-fill" style="color:var(--rk-green)"></i>
                 <h6>Barangay-Level Hazard and Priority Map</h6>
-                <a href="/admin/map" class="ms-auto"
+                <a href="/admin/map" class="ml-auto"
                    style="font-size:12px;color:var(--rk-green);text-decoration:none">
                     View Full Map <i class="bi bi-arrow-right"></i>
                 </a>
             </div>
             <div id="dashMap"></div>
-            <div class="d-flex gap-3 mt-2 flex-wrap" style="font-size:11px">
+            <div class="flex gap-3 mt-2 flex-wrap" style="font-size:11px">
                 <span><i class="bi bi-circle-fill" style="color:#c0392b"></i> Critical</span>
                 <span><i class="bi bi-circle-fill" style="color:#d35400"></i> High</span>
                 <span><i class="bi bi-circle-fill" style="color:#b7950b"></i> Moderate</span>
@@ -221,11 +221,11 @@
 </div>
 
 <!-- ── ROW 3: Charts ──────────────────────────────────────────── -->
-<div class="row g-3 mb-4">
+<div class="grid grid-cols-12 gap-3 mb-4">
 
-    <div class="col-md-6">
-        <div class="dash-card">
-            <div class="card-title-row">
+    <div class="col-span-6">
+        <div class="rk-card">
+            <div class="rk-section-head">
                 <i class="bi bi-bar-chart-fill" style="color:#2980b9"></i>
                 <h6>Disaster Incidents by Type</h6>
             </div>
@@ -233,9 +233,9 @@
         </div>
     </div>
 
-    <div class="col-md-6">
-        <div class="dash-card">
-            <div class="card-title-row">
+    <div class="col-span-6">
+        <div class="rk-card">
+            <div class="rk-section-head">
                 <i class="bi bi-graph-up" style="color:var(--rk-green)"></i>
                 <h6>Incidents Trend (Last 6 Years)</h6>
             </div>
@@ -246,16 +246,16 @@
 </div>
 
 <!-- ── ROW 4: Top 5 + Preparedness table ─────────────────────── -->
-<div class="row g-3 mb-4">
+<div class="grid grid-cols-12 gap-3 mb-4">
 
-    <div class="col-md-6">
-        <div class="dash-card">
-            <div class="card-title-row">
-                <i class="bi bi-exclamation-triangle-fill text-danger"></i>
+    <div class="col-span-6">
+        <div class="rk-card">
+            <div class="rk-section-head">
+                <i class="bi bi-exclamation-triangle-fill text-red-600"></i>
                 <h6>Priority Barangays (Frequently Affected)</h6>
             </div>
 
-            <div class="text-muted mb-2" style="font-size:11px">
+            <div class="text-slate-500 mb-2" style="font-size:11px">
                 <i class="bi bi-info-circle"></i>
                 This score is system-generated for planning support only and is
                 not an official hazard or risk classification.
@@ -263,12 +263,12 @@
 
             {% for brgy in top5 %}
             <div class="brgy-item">
-                <div class="d-flex align-items-center gap-2 mb-1">
+                <div class="flex items-center gap-2 mb-1">
                     <div class="brgy-rank">{{ loop.index }}</div>
                     <div class="flex-grow-1">
-                        <div class="d-flex justify-content-between align-items-center">
+                        <div class="flex justify-between items-center">
                             <div class="brgy-name">{{ brgy.name }}</div>
-                            <span class="risk-badge risk-{{ brgy.level }}">
+                            <span class="rk-risk risk-{{ brgy.level }}">
                                 {{ brgy.level.title() }}
                             </span>
                         </div>
@@ -278,7 +278,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="d-flex align-items-center gap-2">
+                <div class="flex items-center gap-2">
                     <div class="score-bar-track flex-grow-1">
                         <div class="score-bar-fill"
                              style="width:{{ brgy.score }}%;
@@ -299,14 +299,14 @@
         </div>
     </div>
 
-    <div class="col-md-6">
-        <div class="dash-card">
-            <div class="card-title-row">
+    <div class="col-span-6">
+        <div class="rk-card">
+            <div class="rk-section-head">
                 <i class="bi bi-shield-fill-check" style="color:var(--rk-green)"></i>
                 <h6>Preparedness Index Overview</h6>
             </div>
 
-            <table class="table prep-table">
+            <table class="rk-table rk-table prep-rk-table">
                 <thead>
                     <tr>
                         <th>Barangay</th>
@@ -320,7 +320,7 @@
                         <td>{{ brgy.name }}</td>
                         <td class="fw-medium">{{ brgy.score }}</td>
                         <td>
-                            <span class="risk-badge risk-{{ brgy.level }}">
+                            <span class="rk-risk risk-{{ brgy.level }}">
                                 {{ brgy.level.title() }}
                             </span>
                         </td>
@@ -330,7 +330,7 @@
             </table>
 
             <a href="/admin/barangays"
-               class="btn-soft w-100 justify-content-center mt-2" style="color:var(--rk-green)">
+               class="rk-btn-ghost w-full justify-center mt-2" style="color:var(--rk-green)">
                 View All Barangays <i class="bi bi-arrow-right"></i>
             </a>
         </div>

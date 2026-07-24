@@ -5,41 +5,41 @@
 {% set active_nav = 'serviceability' %}
 
 {% block content %}
-<div class="page-header">
+<div class="mb-5">
     <h1>{{ 'Edit Serviceability Report' if edit_mode else 'New Serviceability Report' }}</h1>
     <p>Record an equipment inspection, maintenance finding, or serviceability assessment.
        Save as a draft to keep editing, or submit it for admin review.</p>
 </div>
 
 {% if error %}
-<div class="alert alert-danger">{{ error }}</div>
+<div class="rk-alert rk-alert-red">{{ error }}</div>
 {% endif %}
 
-<div class="dash-card">
+<div class="rk-card">
     <form method="POST"
           action="{{ '/cfau/serviceability/' ~ target.id ~ '/edit' if edit_mode else '/cfau/serviceability/new' }}"
-          class="row g-3">
+          class="grid grid-cols-12 gap-3">
             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
 
-        <div class="col-md-8">
-            <label class="form-label small fw-semibold">Report Title *</label>
-            <input type="text" name="title" required class="form-control"
+        <div class="col-span-8">
+            <label class="rk-label">Report Title *</label>
+            <input type="text" name="title" required class="rk-input"
                    value="{{ target.title if target else '' }}"
                    placeholder="e.g. Routine inspection — Rescue Truck 02">
         </div>
 
-        <div class="col-md-4">
-            <label class="form-label small fw-semibold">Report Type *</label>
-            <select name="report_type" class="form-select">
+        <div class="col-span-4">
+            <label class="rk-label">Report Type *</label>
+            <select name="report_type" class="rk-select">
                 {% for v, label in report_types %}
                 <option value="{{ v }}" {% if target and target.report_type == v %}selected{% endif %}>{{ label }}</option>
                 {% endfor %}
             </select>
         </div>
 
-        <div class="col-md-6">
-            <label class="form-label small fw-semibold">Equipment *</label>
-            <select name="equipment_id" required class="form-select">
+        <div class="col-span-6">
+            <label class="rk-label">Equipment *</label>
+            <select name="equipment_id" required class="rk-select">
                 <option value="">— Select equipment —</option>
                 {% for e in equipment %}
                 <option value="{{ e.id }}"
@@ -50,9 +50,9 @@
             </select>
         </div>
 
-        <div class="col-md-3">
-            <label class="form-label small fw-semibold">Serviceability Finding *</label>
-            <select name="finding" class="form-select">
+        <div class="col-span-3">
+            <label class="rk-label">Serviceability Finding *</label>
+            <select name="finding" class="rk-select">
                 {% for v, label in findings %}
                 <option value="{{ v }}"
                     {% if target and target.status and target.status.value == v %}selected{% endif %}>{{ label }}</option>
@@ -60,9 +60,9 @@
             </select>
         </div>
 
-        <div class="col-md-3">
-            <label class="form-label small fw-semibold">Urgency</label>
-            <select name="urgency" class="form-select">
+        <div class="col-span-3">
+            <label class="rk-label">Urgency</label>
+            <select name="urgency" class="rk-select">
                 {% for v in urgencies %}
                 <option value="{{ v }}"
                     {% if (target and target.urgency and target.urgency.value == v) or (not target and v == 'moderate') %}selected{% endif %}>
@@ -72,19 +72,19 @@
             </select>
         </div>
 
-        <div class="col-12">
-            <label class="form-label small fw-semibold">Findings / Issue Description</label>
-            <textarea name="issue_description" rows="4" class="form-control"
+        <div class="col-span-12">
+            <label class="rk-label">Findings / Issue Description</label>
+            <textarea name="issue_description" rows="4" class="rk-input"
                       placeholder="Describe the condition found, parts affected, or work recommended…">{{ target.issue_description if target else '' }}</textarea>
         </div>
 
-        <div class="col-12 d-flex justify-content-end gap-2 pt-2">
-            <a href="/cfau/serviceability" class="btn btn-outline-secondary">Cancel</a>
-            <button type="submit" name="action" value="draft" class="btn btn-outline-primary">
+        <div class="col-span-12 flex justify-end gap-2 pt-2">
+            <a href="/cfau/serviceability" class="rk-btn-secondary">Cancel</a>
+            <button type="submit" name="action" value="draft" class="rk-btn-secondary">
                 <i class="bi bi-save"></i> {{ 'Save Draft' if not edit_mode else 'Save Changes' }}
             </button>
-            <button type="submit" name="action" value="submit" class="btn btn-rk"
-                    data-confirm='Submit this report for review? You will no longer be able to edit it.'>
+            <button type="submit" name="action" value="submit" class="rk-btn-primary"
+                    onclick="event.preventDefault(); rkConfirm('Submit this report for review? You will no longer be able to edit it.', this)">
                 <i class="bi bi-send"></i> Submit for Review
             </button>
         </div>

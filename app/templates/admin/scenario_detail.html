@@ -3,23 +3,23 @@
 {% block title %}{{ scenario.name }} — Saved Scenario — RisKonek{% endblock %}
 
 {% block content %}
-<div class="page-header d-flex justify-content-between align-items-start flex-wrap gap-2">
+<div class="mb-5 flex justify-between items-start flex-wrap gap-2">
     <div>
-        <h1><i class="bi bi-bookmark-check-fill me-2"></i>{{ scenario.name }}</h1>
+        <h1><i class="bi bi-bookmark-check-fill mr-2"></i>{{ scenario.name }}</h1>
         <p>Saved disaster-simulation scenario.</p>
     </div>
-    <div class="d-flex gap-2">
-        <a href="/admin/simulator/setup" class="btn btn-soft">
+    <div class="flex gap-2">
+        <a href="/admin/simulator/setup" class="rk-btn-secondary">
             <i class="bi bi-arrow-left"></i> Back to Simulator
         </a>
-        <a href="/admin/simulator/scenarios/{{ scenario.id }}/pdf" class="btn btn-soft">
+        <a href="/admin/simulator/scenarios/{{ scenario.id }}/pdf" class="rk-btn-secondary">
             <i class="bi bi-file-earmark-pdf"></i> Export PDF
         </a>
         <form method="POST" action="/admin/simulator/scenarios/{{ scenario.id }}/delete"
-              class="d-inline"
-              data-confirm="Delete saved scenario '{{ scenario.name }}'? This cannot be undone.">
+              class="inline"
+              onsubmit="event.preventDefault(); rkConfirm('Delete saved scenario \'{{ scenario.name }}\'? This cannot be undone.', this)">
             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
-            <button type="submit" class="btn btn-outline-danger">
+            <button type="submit" class="rk-btn-danger">
                 <i class="bi bi-trash"></i> Delete
             </button>
         </form>
@@ -27,15 +27,15 @@
 </div>
 
 {% if request.query_params.get('success') %}
-<div class="alert alert-success alert-dismissible fade show">
-    <i class="bi bi-check-circle-fill me-1"></i>
+<div class="rk-alert rk-alert-green">
+    <i class="bi bi-check-circle-fill mr-1"></i>
     {{ request.query_params.get('success') }}
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
 </div>
 {% endif %}
 
 <!-- ── Snapshot banner ─────────────────────────────────────────────────── -->
-<div class="alert alert-secondary d-flex align-items-start gap-2">
+<div class="rk-alert rk-alert-slate flex items-start gap-2">
     <i class="bi bi-clock-history" style="font-size:16px"></i>
     <span>
         <strong>Saved scenario — snapshot from {{ scenario.created_at | pht }}.</strong>

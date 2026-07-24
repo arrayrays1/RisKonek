@@ -51,86 +51,86 @@
 
 {% block content %}
 <!-- ── Header ─────────────────────────────────────────────────── -->
-<div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
-    <div class="d-flex align-items-start gap-3 flex-wrap">
-        <a href="/admin/barangays" class="btn-soft">
+<div class="flex justify-between items-start mb-3 flex-wrap gap-2">
+    <div class="flex items-start gap-3 flex-wrap">
+        <a href="/admin/barangays" class="rk-btn-ghost">
             <i class="bi bi-arrow-left"></i> Back to List
         </a>
         <div>
             <div class="profile-header">
                 <h1>{{ barangay.name }}</h1>
-                <span class="risk-badge risk-{{ risk_level }}">
+                <span class="rk-risk risk-{{ risk_level }}">
                     {{ risk_level.title() }} Planning Priority
                 </span>
             </div>
-            <p class="text-muted mb-0" style="font-size:13px">
+            <p class="text-slate-500 mb-0" style="font-size:13px">
                 Comprehensive barangay disaster profile and preparedness data
             </p>
         </div>
     </div>
-    <button class="btn btn-rk" disabled title="Available in Week 6 (Disaster Simulator)">
+    <button class="rk-btn-primary" disabled title="Available in Week 6 (Disaster Simulator)">
         <i class="bi bi-clipboard-check"></i> Use for Planning
     </button>
 </div>
 
 <!-- ── Headline cards ─────────────────────────────────────────── -->
-<div class="row g-3 mb-4">
+<div class="grid grid-cols-12 gap-3 mb-4">
 
-    <div class="col-md-3">
-        <div class="stat-card">
-            <div class="d-flex justify-content-between align-items-start">
-                <div class="stat-label">Total Population</div>
-                <div class="stat-icon" style="background:#e8f4fd;color:#2980b9">
+    <div class="col-span-3">
+        <div class="rk-stat-card">
+            <div class="flex justify-between items-start">
+                <div class="rk-stat-label">Total Population</div>
+                <div class="rk-stat-icon" style="background:#e8f4fd;color:#2980b9">
                     <i class="bi bi-people-fill"></i>
                 </div>
             </div>
-            <div class="stat-value">{{ "{:,}".format(total_population) }}</div>
-            <div class="stat-change text-muted">
+            <div class="rk-stat-value">{{ "{:,}".format(total_population) }}</div>
+            <div class="text-sm mt-1 text-slate-500">
                 {{ "{:,}".format(households) }} households
             </div>
         </div>
     </div>
 
-    <div class="col-md-3">
-        <div class="stat-card">
-            <div class="d-flex justify-content-between align-items-start">
-                <div class="stat-label">Vulnerable %</div>
-                <div class="stat-icon" style="background:#fef3e2;color:#d35400">
+    <div class="col-span-3">
+        <div class="rk-stat-card">
+            <div class="flex justify-between items-start">
+                <div class="rk-stat-label">Vulnerable %</div>
+                <div class="rk-stat-icon" style="background:#fef3e2;color:#d35400">
                     <i class="bi bi-exclamation-triangle-fill"></i>
                 </div>
             </div>
-            <div class="stat-value">{{ vulnerable_pct }}%</div>
-            <div class="stat-change text-muted">Elderly, PWDs, Children</div>
+            <div class="rk-stat-value">{{ vulnerable_pct }}%</div>
+            <div class="text-sm mt-1 text-slate-500">Elderly, PWDs, Children</div>
         </div>
     </div>
 
-    <div class="col-md-3">
-        <div class="stat-card">
-            <div class="d-flex justify-content-between align-items-start">
-                <div class="stat-label">Flood Risk Trend</div>
-                <div class="stat-icon" style="background:#fde8e8;color:#c0392b">
+    <div class="col-span-3">
+        <div class="rk-stat-card">
+            <div class="flex justify-between items-start">
+                <div class="rk-stat-label">Flood Risk Trend</div>
+                <div class="rk-stat-icon" style="background:#fde8e8;color:#c0392b">
                     <i class="bi bi-graph-up-arrow"></i>
                 </div>
             </div>
-            <div class="stat-value {{ 'trend-up' if flood_trend == 'Increasing' else 'trend-stable' }}">
+            <div class="rk-stat-value {{ 'trend-up' if flood_trend == 'Increasing' else 'trend-stable' }}">
                 {{ flood_trend }}
             </div>
-            <div class="stat-change text-muted">Last 12 months vs prior</div>
+            <div class="text-sm mt-1 text-slate-500">Last 12 months vs prior</div>
         </div>
     </div>
 
-    <div class="col-md-3">
-        <div class="stat-card">
-            <div class="d-flex justify-content-between align-items-start">
-                <div class="stat-label">Fire Risk Trend</div>
-                <div class="stat-icon" style="background:#fef9e7;color:#b7950b">
+    <div class="col-span-3">
+        <div class="rk-stat-card">
+            <div class="flex justify-between items-start">
+                <div class="rk-stat-label">Fire Risk Trend</div>
+                <div class="rk-stat-icon" style="background:#fef9e7;color:#b7950b">
                     <i class="bi bi-fire"></i>
                 </div>
             </div>
-            <div class="stat-value {{ 'trend-up' if fire_trend == 'Increasing' else 'trend-stable' }}">
+            <div class="rk-stat-value {{ 'trend-up' if fire_trend == 'Increasing' else 'trend-stable' }}">
                 {{ fire_trend }}
             </div>
-            <div class="stat-change text-muted">Last 12 months vs prior</div>
+            <div class="text-sm mt-1 text-slate-500">Last 12 months vs prior</div>
         </div>
     </div>
 
@@ -158,21 +158,21 @@
 <div class="tab-content">
 
     <!-- ── Key Infrastructure ─────────────────────────────────── -->
-    <div class="tab-pane fade show active" id="tab-infra">
-        <div class="dash-card">
-            <div class="card-title-row">
+    <div class="tab-pane active" id="tab-infra">
+        <div class="rk-card">
+            <div class="rk-section-head">
                 <i class="bi bi-building" style="color:var(--rk-green)"></i>
                 <h6>Key Infrastructure Facilities</h6>
             </div>
 
             {% if facility_rows %}
-            <div class="table-responsive">
-                <table class="table align-middle mb-0">
+            <div class="overflow-x-auto">
+                <table class="rk-table align-middle mb-0">
                     <thead>
                         <tr style="font-size:12px;color:var(--rk-muted);text-transform:uppercase;letter-spacing:0.04em">
                             <th>Facility Name</th>
                             <th>Type</th>
-                            <th class="text-end">Capacity</th>
+                            <th class="text-right">Capacity</th>
                             <th>Status</th>
                         </tr>
                     </thead>
@@ -181,9 +181,9 @@
                         <tr>
                             <td>{{ f.name }}</td>
                             <td>{{ f.type }}</td>
-                            <td class="text-end">{{ f.capacity }}</td>
+                            <td class="text-right">{{ f.capacity }}</td>
                             <td>
-                                <span class="status-pill {{ f.status_class }}">
+                                <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-slate {{ f.status_class }}">
                                     {{ f.status_label }}
                                 </span>
                             </td>
@@ -193,7 +193,7 @@
                 </table>
             </div>
             {% else %}
-            <div class="text-center text-muted py-4" style="font-size:13px">
+            <div class="text-center text-slate-500 py-4" style="font-size:13px">
                 No critical facilities recorded for this barangay yet.
             </div>
             {% endif %}
@@ -202,14 +202,14 @@
 
     <!-- ── Disaster Profile ───────────────────────────────────── -->
     <div class="tab-pane fade" id="tab-profile">
-        <div class="dash-card">
-            <div class="card-title-row">
+        <div class="rk-card">
+            <div class="rk-section-head">
                 <i class="bi bi-clock-history" style="color:#2980b9"></i>
                 <h6>Historical Disaster Incidents</h6>
             </div>
 
-            <div class="row g-3 mb-3">
-                <div class="col-md-4">
+            <div class="grid grid-cols-12 gap-3 mb-3">
+                <div class="col-span-4">
                     <div class="hist-card" style="background:#e8f4fd">
                         <div class="hist-label">Flood Incidents</div>
                         <div class="hist-value" style="color:#2980b9">
@@ -218,7 +218,7 @@
                         <div class="hist-sub">Last 5 years</div>
                     </div>
                 </div>
-                <div class="col-md-4">
+                <div class="col-span-4">
                     <div class="hist-card" style="background:#fef3e2">
                         <div class="hist-label">Fire Incidents</div>
                         <div class="hist-value" style="color:#d35400">
@@ -227,7 +227,7 @@
                         <div class="hist-sub">Last 5 years</div>
                     </div>
                 </div>
-                <div class="col-md-4">
+                <div class="col-span-4">
                     <div class="hist-card" style="background:#f3e8fd">
                         <div class="hist-label">Earthquake Related</div>
                         <div class="hist-value" style="color:#8e44ad">
@@ -242,36 +242,36 @@
                 <h6><i class="bi bi-shield-exclamation"></i> Known Hazard Types</h6>
                 {% if hazard_types %}
                     {% for h in hazard_types %}
-                    <span class="badge bg-light text-dark border me-1" style="font-size:12px">
+                    <span class="rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate rk-badge rk-badge-slate rk-badge rk-badge-slate-slate-slate-slate mr-1" style="font-size:12px">
                         {{ h.title() }}
                     </span>
                     {% endfor %}
                 {% else %}
-                    <span class="text-muted" style="font-size:13px">No hazards recorded.</span>
+                    <span class="text-slate-500" style="font-size:13px">No hazards recorded.</span>
                 {% endif %}
             </div>
 
             <div class="info-section mb-3">
                 <h6><i class="bi bi-person-vcard"></i> Officials &amp; Emergency Contacts</h6>
-                <div class="row g-2" style="font-size:13px">
-                    <div class="col-md-6">
-                        <div class="text-muted" style="font-size:12px">Barangay Captain</div>
+                <div class="grid grid-cols-12 gap-2" style="font-size:13px">
+                    <div class="col-span-6">
+                        <div class="text-slate-500" style="font-size:12px">Barangay Captain</div>
                         <div>{{ barangay.captain_name or '—' }}
-                            {% if barangay.captain_contact %}<span class="text-muted">· {{ barangay.captain_contact }}</span>{% endif %}
+                            {% if barangay.captain_contact %}<span class="text-slate-500">· {{ barangay.captain_contact }}</span>{% endif %}
                         </div>
                     </div>
-                    <div class="col-md-6">
-                        <div class="text-muted" style="font-size:12px">BDRRMO Chairperson</div>
+                    <div class="col-span-6">
+                        <div class="text-slate-500" style="font-size:12px">BDRRMO Chairperson</div>
                         <div>{{ barangay.chairperson_name or '—' }}
-                            {% if barangay.chairperson_contact %}<span class="text-muted">· {{ barangay.chairperson_contact }}</span>{% endif %}
+                            {% if barangay.chairperson_contact %}<span class="text-slate-500">· {{ barangay.chairperson_contact }}</span>{% endif %}
                         </div>
                     </div>
-                    <div class="col-12">
-                        <div class="text-muted" style="font-size:12px">Emergency Responders</div>
+                    <div class="col-span-12">
+                        <div class="text-slate-500" style="font-size:12px">Emergency Responders</div>
                         {% if barangay.emergency_contacts %}
                         <div style="white-space:pre-line">{{ barangay.emergency_contacts }}</div>
                         {% else %}
-                        <div class="text-muted">—</div>
+                        <div class="text-slate-500">—</div>
                         {% endif %}
                     </div>
                 </div>
@@ -280,15 +280,15 @@
             <div class="info-section">
                 <h6><i class="bi bi-journal-text"></i> Recent Incidents</h6>
                 {% if recent_incidents %}
-                <div class="table-responsive">
-                    <table class="table align-middle mb-0">
+                <div class="overflow-x-auto">
+                    <table class="rk-table align-middle mb-0">
                         <thead>
                             <tr style="font-size:12px;color:var(--rk-muted);text-transform:uppercase;letter-spacing:0.04em">
                                 <th>Date</th>
                                 <th>Type</th>
                                 <th>Severity</th>
-                                <th class="text-end">Affected Families</th>
-                                <th class="text-end">Casualties</th>
+                                <th class="text-right">Affected Families</th>
+                                <th class="text-right">Casualties</th>
                             </tr>
                         </thead>
                         <tbody style="font-size:13px">
@@ -297,15 +297,15 @@
                                 <td>{{ inc.date_occurred.strftime('%b %d, %Y') }}</td>
                                 <td>{{ inc.disaster_type.value.title() }}</td>
                                 <td>{{ inc.severity.value.title() }}</td>
-                                <td class="text-end">{{ "{:,}".format(inc.affected_families) }}</td>
-                                <td class="text-end">{{ inc.casualties }}</td>
+                                <td class="text-right">{{ "{:,}".format(inc.affected_families) }}</td>
+                                <td class="text-right">{{ inc.casualties }}</td>
                             </tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
                 {% else %}
-                <div class="text-muted py-3" style="font-size:13px">
+                <div class="text-slate-500 py-3" style="font-size:13px">
                     No incidents recorded in the last 5 years.
                 </div>
                 {% endif %}
@@ -315,28 +315,28 @@
 
     <!-- ── Vulnerable Groups ──────────────────────────────────── -->
     <div class="tab-pane fade" id="tab-vuln">
-        <div class="dash-card">
-            <div class="card-title-row">
+        <div class="rk-card">
+            <div class="rk-section-head">
                 <i class="bi bi-people" style="color:#d35400"></i>
                 <h6>Vulnerable Population Groups</h6>
             </div>
 
-            <div class="row g-3">
-                <div class="col-md-4">
+            <div class="grid grid-cols-12 gap-3">
+                <div class="col-span-4">
                     <div class="group-card">
                         <div class="group-label">Elderly (65+)</div>
                         <div class="group-value">{{ "{:,}".format(elderly) }}</div>
                         <div class="group-pct">{{ elderly_pct }}% of population</div>
                     </div>
                 </div>
-                <div class="col-md-4">
+                <div class="col-span-4">
                     <div class="group-card">
                         <div class="group-label">Persons with Disabilities</div>
                         <div class="group-value">{{ "{:,}".format(pwd) }}</div>
                         <div class="group-pct">{{ pwd_pct }}% of population</div>
                     </div>
                 </div>
-                <div class="col-md-4">
+                <div class="col-span-4">
                     <div class="group-card">
                         <div class="group-label">Children (0–12)</div>
                         <div class="group-value">{{ "{:,}".format(children) }}</div>
@@ -345,7 +345,7 @@
                 </div>
             </div>
 
-            <div class="text-muted mt-3" style="font-size:11px">
+            <div class="text-slate-500 mt-3" style="font-size:11px">
                 <i class="bi bi-info-circle"></i>
                 PWD / elderly / children counts are estimates from seed data —
                 replace with actual BDRRMO census figures when available.
@@ -356,30 +356,30 @@
 </div>
 
 <!-- ── Footer: planning priority breakdown ─────────────────────── -->
-<div class="dash-card mt-4">
-    <div class="card-title-row">
+<div class="rk-card mt-4">
+    <div class="rk-section-head">
         <i class="bi bi-speedometer2" style="color:var(--rk-green)"></i>
         <h6>Planning Priority Breakdown</h6>
     </div>
-    <div class="row g-3" style="font-size:13px">
-        <div class="col-md-3">
-            <div class="text-muted">Overall Score</div>
-            <div class="fw-bold" style="font-size:22px">{{ risk_score }}<span class="text-muted" style="font-size:13px"> / 100</span></div>
+    <div class="grid grid-cols-12 gap-3" style="font-size:13px">
+        <div class="col-span-3">
+            <div class="text-slate-500">Overall Score</div>
+            <div class="font-bold" style="font-size:22px">{{ risk_score }}<span class="text-slate-500" style="font-size:13px"> / 100</span></div>
         </div>
-        <div class="col-md-3">
-            <div class="text-muted">Hazard Exposure (40%)</div>
-            <div class="fw-semibold">{{ risk_breakdown['hazard_score'] }}</div>
+        <div class="col-span-3">
+            <div class="text-slate-500">Hazard Exposure (40%)</div>
+            <div class="font-semibold">{{ risk_breakdown['hazard_score'] }}</div>
         </div>
-        <div class="col-md-3">
-            <div class="text-muted">Incident History (40%)</div>
-            <div class="fw-semibold">{{ risk_breakdown['incident_score'] }}</div>
+        <div class="col-span-3">
+            <div class="text-slate-500">Incident History (40%)</div>
+            <div class="font-semibold">{{ risk_breakdown['incident_score'] }}</div>
         </div>
-        <div class="col-md-3">
-            <div class="text-muted">Population Size (20%)</div>
-            <div class="fw-semibold">{{ risk_breakdown['population_score'] }}</div>
+        <div class="col-span-3">
+            <div class="text-slate-500">Population Size (20%)</div>
+            <div class="font-semibold">{{ risk_breakdown['population_score'] }}</div>
         </div>
     </div>
-    <div class="text-muted mt-3" style="font-size:11px">
+    <div class="text-slate-500 mt-3" style="font-size:11px">
         <i class="bi bi-info-circle"></i>
         This score is system-generated for planning support only and is not an
         official hazard or risk classification. Official hazard and risk levels

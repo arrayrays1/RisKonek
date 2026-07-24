@@ -3,24 +3,24 @@
 {% block title %}Simulation Results — RisKonek{% endblock %}
 
 {% block content %}
-<div class="page-header d-flex justify-content-between align-items-start flex-wrap gap-2">
+<div class="mb-5 flex justify-between items-start flex-wrap gap-2">
     <div>
-        <h1><i class="bi bi-clipboard2-data-fill me-2"></i>Simulation Results</h1>
+        <h1><i class="bi bi-clipboard2-data-fill mr-2"></i>Simulation Results</h1>
         <p>Advisory planning estimate — review and validate with CDRRMO personnel
            before any operational use.</p>
     </div>
-    <div class="d-flex gap-2">
+    <div class="flex gap-2">
         {% if saved_scenario_id %}
-        <a href="/admin/simulator/scenarios/{{ saved_scenario_id }}" class="btn btn-soft">
+        <a href="/admin/simulator/scenarios/{{ saved_scenario_id }}" class="rk-btn-secondary">
             <i class="bi bi-bookmark-check-fill"></i> View Saved Scenario
         </a>
         {% else %}
-        <button type="button" class="btn btn-rk"
+        <button type="button" class="rk-btn-primary"
                 data-bs-toggle="modal" data-bs-target="#saveScenarioModal">
             <i class="bi bi-save"></i> Save Scenario
         </button>
         {% endif %}
-        <a href="/admin/simulator/setup" class="btn btn-soft">
+        <a href="/admin/simulator/setup" class="rk-btn-secondary">
             <i class="bi bi-arrow-repeat"></i> New Simulation
         </a>
     </div>
@@ -36,25 +36,25 @@
       <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
       <input type="hidden" name="run_id" value="{{ run_id }}">
       <div class="modal-header">
-        <h6 class="modal-title"><i class="bi bi-save me-1"></i>Save Scenario</h6>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        <h6 class="modal-title"><i class="bi bi-save mr-1"></i>Save Scenario</h6>
+        <button type="button" class="btn-close" aria-label="Close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-        <p class="small text-muted">
+        <p class="text-sm text-slate-500">
             This saves a <strong>frozen snapshot</strong> of the current results —
             the figures and thresholds as they are right now. Later data or
             threshold changes will not affect it.
         </p>
-        <label for="scenario_name" class="form-label small fw-semibold">Scenario name</label>
-        <input type="text" id="scenario_name" name="name" class="form-control"
+        <label for="scenario_name" class="rk-label">Scenario name</label>
+        <input type="text" id="scenario_name" name="name" class="rk-input"
                maxlength="150" required autocomplete="off"
                value="{{ default_scenario_name }}">
-        <div class="form-text">Auto-filled from the scenario details — edit if you like.</div>
+        <div class="rk-field-hint">Auto-filled from the scenario details — edit if you like.</div>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
-        <button type="submit" class="btn btn-rk btn-sm">
-            <i class="bi bi-save me-1"></i>Save Scenario
+        <button type="button" class="rk-btn-secondary rk-btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" class="rk-btn-primary rk-btn-sm">
+            <i class="bi bi-save mr-1"></i>Save Scenario
         </button>
       </div>
     </form>
