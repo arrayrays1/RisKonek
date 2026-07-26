@@ -6,16 +6,16 @@
 
 {% macro category_badge(cat) -%}
     {% set m = {
-        'Authentication': 'background:#e0f2fe;color:#0369a1',
-        'User Management': 'background:#dbeafe;color:#1d4ed8',
-        'Uploads': 'background:#d1fae5;color:#047857',
-        'Incident Reports': 'background:#fee2e2;color:#dc2626',
-        'Barangay Data': 'background:#fef3c7;color:#b45309',
-        'Resources': 'background:#fce7f3;color:#be185d',
-        'Vehicle & Equipment': 'background:#e2e8f0;color:#334155',
-        'System Actions': 'background:#f3f4f6;color:#6b7280'
+        'Authentication': 'rk-cat-auth',
+        'User Management': 'rk-cat-user',
+        'Uploads': 'rk-cat-upload',
+        'Incident Reports': 'rk-cat-incident',
+        'Barangay Data': 'rk-cat-brgy',
+        'Resources': 'rk-cat-resource',
+        'Vehicle & Equipment': 'rk-cat-equip',
+        'System Actions': 'rk-cat-system'
     } %}
-    <span class="status-pill" style="{{ m.get(cat, 'background:#f3f4f6;color:#6b7280') }}">{{ cat }}</span>
+    <span class="status-pill {{ m.get(cat, 'rk-cat-system') }}">{{ cat }}</span>
 {%- endmacro %}
 
 {% block content %}
@@ -92,8 +92,8 @@
 <div class="dash-card p-0">
     <div class="table-responsive">
         <table class="table table-hover mb-0 align-middle">
-            <thead style="background:#f9fafb">
-                <tr style="font-size:12px;color:var(--rk-muted);text-transform:uppercase;letter-spacing:0.04em">
+            <thead class="rk-bg-soft">
+                <tr class="rk-th-soft">
                     <th class="px-3 py-3">Time</th>
                     <th class="py-3">User</th>
                     <th class="py-3">Category</th>
@@ -109,7 +109,7 @@
                     <i class="bi bi-calendar3 me-1"></i>{{ day_label }}
                 </td></tr>
                 {% for it in items %}
-                <tr style="font-size:13px">
+                <tr class="rk-fs-13">
                     <td class="px-3 text-nowrap">{{ it.timestamp | pht }}</td>
                     <td>{{ it.username }}</td>
                     <td>{{ category_badge(it.category) }}</td>
@@ -117,8 +117,8 @@
                     <td class="small text-muted">
                         {{ it.target_table or '—' }}{% if it.target_id %} #{{ it.target_id }}{% endif %}
                     </td>
-                    <td class="small" style="max-width:340px">
-                        <span class="d-inline-block text-truncate" style="max-width:340px" title="{{ it.description }}">
+                    <td class="small rk-maxw-340">
+                        <span class="d-inline-block text-truncate rk-maxw-340" title="{{ it.description }}">
                             {{ it.description or '—' }}
                         </span>
                     </td>

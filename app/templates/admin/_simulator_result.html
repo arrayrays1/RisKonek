@@ -40,10 +40,10 @@
     <div class="row align-items-center">
         <div class="col-md-4 text-center border-end">
             <div class="stat-label">Overall Readiness</div>
-            <div class="{{ band.text }}" style="font-size: 30px; font-weight: 800;">
+            <div class="{{ band.text }} rk-fs-30 rk-fw-800">
                 {{ band.label }}
             </div>
-            <div class="text-muted" style="font-size: 12px;">
+            <div class="text-muted rk-fs-12">
                 Worst-status band across all resource classes
             </div>
         </div>
@@ -59,13 +59,12 @@
                 {% set gstatus = 'Adequate' if gcov >= 1.0 else ('Partial' if gcov >= 0.5 else 'Critical') %}
                 {% set gui = status_ui[gstatus] %}
                 <div class="mb-2">
-                    <div class="d-flex justify-content-between" style="font-size: 13px;">
+                    <div class="d-flex justify-content-between rk-fs-13">
                         <span><i class="bi {{ g.icon }} me-1"></i>{{ g.label }}</span>
                         <span class="fw-semibold">{{ gui.label }}</span>
                     </div>
-                    <div class="progress" style="height: 10px;">
-                        <div class="progress-bar {{ gui.bar }}" role="progressbar"
-                             style="width: {{ gpct }}%;"
+                    <div class="progress rk-h-10">
+                        <div class="progress-bar {{ gui.bar }} rk-w-p{{ gpct }}" role="progressbar"
                              aria-valuenow="{{ gpct }}" aria-valuemin="0" aria-valuemax="100"></div>
                     </div>
                 </div>
@@ -105,10 +104,10 @@
             <div class="card-title-row">
                 <h6><i class="bi bi-people-fill me-1"></i>Estimated Affected Population</h6>
             </div>
-            <div class="stat-value" style="font-size: 32px;">
+            <div class="stat-value rk-fs-32">
                 {{ "{:,}".format(result.estimated_affected) }}
             </div>
-            <div class="text-muted" style="font-size: 12px;">
+            <div class="text-muted rk-fs-12">
                 of {{ "{:,}".format(result.inputs.total_population) }} residents
             </div>
             <hr>
@@ -196,7 +195,7 @@
             </tbody>
         </table>
     </div>
-    <p class="text-muted mb-0" style="font-size: 12px;">
+    <p class="text-muted mb-0 rk-fs-12">
         <i class="bi bi-info-circle me-1"></i><strong>Standard</strong> figures follow
         Sphere / DSWD guidance; <strong>Assumption</strong> figures are adjustable CDRRMO
         planning targets, not standard-based requirements.
@@ -236,7 +235,7 @@
     {% if ai_briefing %}
         {# ai_briefing is markdown already converted to a SANITIZED HTML fragment
            in ai_layer.to_safe_html() (nh3 allowlist). Safe to mark |safe. #}
-        <div class="ai-briefing" style="font-size: 14px; line-height: 1.6;">{{ ai_briefing | safe }}</div>
+        <div class="ai-briefing rk-fs-14 rk-lh-16">{{ ai_briefing | safe }}</div>
     {% else %}
         <div class="alert-banner mb-0">
             <i class="bi bi-info-circle-fill"></i>

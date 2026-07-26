@@ -78,18 +78,20 @@ app.add_middleware(
 #   browser ignore 'unsafe-inline' for this directive anyway, so leaving it out
 #   is what actually closes the ZAP "script-src unsafe-inline" finding.
 #
-# style-src: 'unsafe-inline' is RETAINED (phase 1). The templates still rely on
-#   ~225 inline style="" attributes, which CSP nonces/hashes CANNOT cover (they
-#   apply only to <style>/<script> elements, never to style attributes). Adding
-#   a style nonce here would make the browser ignore 'unsafe-inline' and break
-#   every one of those attributes. Removing it is deferred to a dedicated CSS
-#   refactor pass — see SECURITY_CSP_STYLE_REPORT.md.
+# style-src: NO 'unsafe-inline'. The inline style="" attribute refactor is
+#   complete — all templates now use classes/utilities in /static/css/rk.css,
+#   and every remaining inline <style> block carries the same per-request nonce.
+#   Dynamic values (progress-bar widths, marker colours) are applied via CSSOM
+#   in rk-forms.js / Leaflet circleMarkers, which CSP does not gate. Per the CSP
+#   spec, the presence of the nonce makes the browser ignore 'unsafe-inline'
+#   anyway, so omitting it is what closes the ZAP "style-src unsafe-inline"
+#   finding. See SECURITY_CSP_STYLE_REPORT.md.
 #
 # {nonce} is substituted per request below.
 CSP_TEMPLATE = (
     "default-src 'self'; "
     "script-src 'self' 'nonce-{nonce}' https://cdn.jsdelivr.net https://unpkg.com; "
-    "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com; "
+    "style-src 'self' 'nonce-{nonce}' https://cdn.jsdelivr.net https://unpkg.com; "
     "img-src 'self' data: https://unpkg.com https://*.tile.openstreetmap.org; "
     "font-src 'self' https://cdn.jsdelivr.net; "
     "connect-src 'self'; "

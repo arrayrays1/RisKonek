@@ -28,7 +28,7 @@
         <div class="card-title-row">
             <h6><i class="bi bi-award me-1"></i>Cited Standards</h6>
         </div>
-        <p class="text-muted" style="font-size: 12px;">
+        <p class="text-muted rk-fs-12">
             Published-standard minimums. Editable upward only — never below the floor.
         </p>
         {% for f in sections.floored %}
@@ -65,11 +65,11 @@
         <div class="card-title-row">
             <h6><i class="bi bi-geo me-1"></i>Local Planning Targets</h6>
         </div>
-        <p class="text-muted" style="font-size: 12px;">
+        <p class="text-muted rk-fs-12">
             No available national or international per-capita standard exists. Any positive value is accepted (exposure
             fractions are capped at 0.60 by the engine).
         </p>
-        <p class="text-muted" style="font-size: 12px;">
+        <p class="text-muted rk-fs-12">
             <i class="bi bi-info-circle me-1"></i><strong>Exposure fraction</strong> —
             the share of a barangay's population assumed to be affected in a
             scenario, selected by that barangay's risk level.
@@ -127,7 +127,7 @@
         <div class="card-title-row">
             <h6><i class="bi bi-lock-fill me-1"></i>Locked Constants</h6>
         </div>
-        <p class="text-muted" style="font-size: 12px;">
+        <p class="text-muted rk-fs-12">
             Read-Only. DSWD Family Food Pack contents are defined by the DSWD's "Family Food Pack Specifications" (DSWD Memorandum Circular No. 1, Series of 2020).
         </p>
         {% for f in sections.locked %}
@@ -141,7 +141,7 @@
             <div class="col-md-4">
                 <input type="number" class="form-control" value="{{ f.value }}" disabled readonly>
             </div>
-            <div class="col-md-3 text-muted" style="font-size: 12px;">{{ f.unit }}</div>
+            <div class="col-md-3 text-muted rk-fs-12">{{ f.unit }}</div>
         </div>
         {% endfor %}
     </div>

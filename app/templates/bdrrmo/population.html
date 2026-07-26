@@ -53,7 +53,7 @@
     <div class="col-md-3">
         <div class="stat-card">
             <div class="stat-label">Elderly / PWD</div>
-            <div class="stat-value" style="font-size:20px">
+            <div class="stat-value rk-fs-20">
                 {% if latest %}{{ "{:,}".format(latest.elderly_count) }} / {{ "{:,}".format(latest.pwd_count) }}{% else %}—{% endif %}
             </div>
             <div class="stat-change text-muted">Latest record</div>
@@ -62,7 +62,7 @@
     <div class="col-md-3">
         <div class="stat-card">
             <div class="stat-label">Last Recorded</div>
-            <div class="stat-value" style="font-size:16px">
+            <div class="stat-value rk-fs-16">
                 {{ latest.recorded_at | pht if latest else "—" }}
             </div>
         </div>
@@ -72,7 +72,7 @@
 <!-- ── Logging form ───────────────────────────────────────────── -->
 <div class="dash-card mb-4">
     <div class="card-title-row">
-        <i class="bi bi-plus-circle" style="color:var(--rk-green)"></i>
+        <i class="bi bi-plus-circle rk-text-green"></i>
         <h6>Record New Population Data</h6>
     </div>
     <form method="POST" action="/bdrrmo/population" class="row g-3"
@@ -115,8 +115,8 @@
     <div class="p-3 border-bottom"><h6 class="mb-0">Population History</h6></div>
     <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
-            <thead style="background:#f9fafb">
-                <tr style="font-size:12px;color:var(--rk-muted);text-transform:uppercase;letter-spacing:0.04em">
+            <thead class="rk-bg-soft">
+                <tr class="rk-th-soft">
                     <th class="px-3 py-3">Recorded</th>
                     <th class="py-3 text-end">Population</th>
                     <th class="py-3 text-end">Households</th>
@@ -127,7 +127,7 @@
             </thead>
             <tbody>
                 {% for p in history %}
-                <tr style="font-size:13px">
+                <tr class="rk-fs-13">
                     <td class="px-3">{{ p.recorded_at | pht }}</td>
                     <td class="text-end">{{ "{:,}".format(p.total_population or 0) }}</td>
                     <td class="text-end">{{ "{:,}".format(p.total_households or 0) }}</td>

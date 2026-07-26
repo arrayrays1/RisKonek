@@ -62,8 +62,8 @@
     </div>
     <div class="table-responsive">
         <table class="table table-hover mb-0 align-middle">
-            <thead style="background:#f9fafb">
-                <tr style="font-size:12px;color:var(--rk-muted);text-transform:uppercase;letter-spacing:0.04em">
+            <thead class="rk-bg-soft">
+                <tr class="rk-th-soft">
                     <th class="px-3 py-3">File</th>
                     <th class="py-3">Type</th>
                     <th class="py-3">Uploaded By</th>
@@ -74,7 +74,7 @@
             </thead>
             <tbody>
                 {% for r in drafts %}
-                <tr style="font-size:13px">
+                <tr class="rk-fs-13">
                     <td class="px-3">
                         <div class="fw-semibold">{{ r.file_name }}</div>
                         <div class="text-muted small">ID #{{ r.id }}</div>
@@ -132,8 +132,8 @@
     </div>
     <div class="table-responsive">
         <table class="table table-hover mb-0 align-middle">
-            <thead style="background:#f9fafb">
-                <tr style="font-size:12px;color:var(--rk-muted);text-transform:uppercase;letter-spacing:0.04em">
+            <thead class="rk-bg-soft">
+                <tr class="rk-th-soft">
                     <th class="px-3 py-3">File</th>
                     <th class="py-3">Type</th>
                     <th class="py-3">Uploaded By</th>
@@ -144,7 +144,7 @@
             </thead>
             <tbody>
                 {% for r in active_reports %}
-                <tr style="font-size:13px">
+                <tr class="rk-fs-13">
                     <td class="px-3">
                         <div class="fw-semibold">{{ r.file_name }}</div>
                         <div class="text-muted small">ID #{{ r.id }}</div>
@@ -190,7 +190,7 @@
                     <i class="bi bi-archive me-1"></i> Archived &amp; Discarded
                 </td></tr>
                 {% for r in hidden_reports %}
-                <tr style="font-size:13px;opacity:0.85">
+                <tr class="rk-fs-13 rk-op-85">
                     <td class="px-3">
                         <div class="fw-semibold">{{ r.file_name }}</div>
                         <div class="text-muted small">ID #{{ r.id }}</div>

@@ -30,7 +30,7 @@
 
 {% if repair_reminder %}
 <div class="alert {{ 'alert-danger' if repair_reminder == 'overdue' else 'alert-warning' }} d-flex align-items-start gap-2">
-    <i class="bi bi-tools" style="font-size:16px"></i>
+    <i class="bi bi-tools rk-fs-16"></i>
     <div>
         {% if repair_reminder == 'overdue' %}
         <strong>Repair date has passed.</strong>
@@ -63,22 +63,22 @@
                     {% set u = r.urgency.value if r.urgency else 'moderate' %}
                     <div>
                     {% if u == 'critical' %}
-                        <span class="status-pill" style="background:#fde8e8;color:#c0392b;border:1px solid #f4c2bd">
+                        <span class="status-pill rk-pill-high">
                             <i class="bi bi-exclamation-triangle-fill"></i> Critical</span>
                     {% elif u == 'high' %}
-                        <span class="status-pill" style="background:#fdebd0;color:#b9770e;border:1px solid #f5cba7">
+                        <span class="status-pill rk-pill-med">
                             <i class="bi bi-exclamation-circle-fill"></i> High</span>
                     {% elif u == 'moderate' %}
                         <span class="status-pill status-maintenance">Moderate</span>
                     {% else %}
-                        <span class="status-pill" style="background:#eef0f2;color:#6c757d;border:1px solid #dee2e6">Low</span>
+                        <span class="status-pill rk-pill-low">Low</span>
                     {% endif %}
                     </div>
                 </div>
             </div>
             <hr>
             <div class="stat-label">Findings / Issue Description</div>
-            <p class="mb-0" style="white-space:pre-wrap">{{ r.issue_description or '—' }}</p>
+            <p class="mb-0 rk-pre-wrap">{{ r.issue_description or '—' }}</p>
         </div>
 
         <div class="dash-card mt-3">
@@ -98,7 +98,7 @@
     <div class="col-md-5">
         <div class="dash-card">
             <div class="card-title-row">
-                <i class="bi bi-clipboard2-check" style="color:var(--rk-green);font-size:16px"></i>
+                <i class="bi bi-clipboard2-check rk-text-green rk-fs-16"></i>
                 <h6>Review Action</h6>
             </div>
             {% if can_review %}
@@ -157,7 +157,7 @@
             </form>
             {% if r.admin_remarks %}
             <div class="stat-label mt-3">Existing Remarks</div>
-            <p class="mb-0" style="white-space:pre-wrap">{{ r.admin_remarks }}</p>
+            <p class="mb-0 rk-pre-wrap">{{ r.admin_remarks }}</p>
             {% endif %}
             {% else %}
             <p class="small text-muted mb-2">
@@ -165,7 +165,7 @@
             </p>
             {% if r.admin_remarks %}
             <div class="stat-label">Existing Remarks</div>
-            <p class="mb-0" style="white-space:pre-wrap">{{ r.admin_remarks }}</p>
+            <p class="mb-0 rk-pre-wrap">{{ r.admin_remarks }}</p>
             {% endif %}
             {% endif %}
 
@@ -177,14 +177,14 @@
                 Scheduled for {{ r.repair_scheduled_date.strftime('%B %d, %Y') }}</p>
             {% endif %}
             {% if r.repair_notes %}
-            <p class="mb-0 small" style="white-space:pre-wrap">{{ r.repair_notes }}</p>
+            <p class="mb-0 small rk-pre-wrap">{{ r.repair_notes }}</p>
             {% endif %}
             {% endif %}
 
             <!-- ── Live equipment status sync ─────────────────────── -->
             <hr class="my-3">
             <div class="card-title-row">
-                <i class="bi bi-arrow-left-right" style="color:var(--rk-green);font-size:16px"></i>
+                <i class="bi bi-arrow-left-right rk-text-green rk-fs-16"></i>
                 <h6>Live Equipment Status</h6>
                 {% if finding_applied %}
                 <span class="status-pill status-operational ms-2">

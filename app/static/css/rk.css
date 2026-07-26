@@ -1,0 +1,631 @@
+/* rk.css — RisKonek shared stylesheet.
+ *
+ * Extracted from the inline <style> block in admin/base.html so it can be
+ * served as a static asset (allowed by CSP `style-src 'self'`). Moving global
+ * styles here is step 1 of dropping `style-src 'unsafe-inline'` — see
+ * SECURITY_CSP_STYLE_REPORT.md. Rendering is unchanged; these are the exact
+ * rules that previously lived inline. */
+
+:root {
+    --rk-green: #10b981;
+    --rk-green-mid: #059669;
+    --rk-green-dark: #047857;
+    --rk-green-light: #d1fae5;
+    --rk-bg: #f4f6f9;
+    --rk-text: #1a1a2e;
+    --rk-muted: #6c757d;
+    --rk-radius: 14px;
+    --sidebar-w: 240px;
+    --sidebar-w-collapsed: 64px;
+}
+
+body {
+    background: var(--rk-bg);
+    font-family: 'Segoe UI', sans-serif;
+    color: var(--rk-text);
+}
+
+/* ── Sidebar (default = expanded) ──────────────────────────── */
+.sidebar {
+    width: var(--sidebar-w);
+    height: 100vh;           /* exact viewport height — no overflow */
+    background: linear-gradient(180deg, var(--rk-green-mid) 0%, var(--rk-green-dark) 100%);
+    position: fixed;
+    top: 0; left: 0;
+    display: flex; flex-direction: column;
+    z-index: 100;
+    transition: width 0.2s ease;
+    overflow: hidden;         /* clip horizontal; nav scrolls vertically */
+}
+
+.sidebar-brand {
+    padding: 14px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.15);
+    display: flex; align-items: center; gap: 10px;
+    min-height: 64px;
+    flex-shrink: 0;           /* never squish the header */
+}
+.sidebar-brand .brand-icon {
+    width: 38px; height: 38px; background: white;
+    border-radius: 11px; display: flex; align-items: center;
+    justify-content: center; font-weight: 800;
+    color: var(--rk-green-dark); font-size: 16px;
+    flex-shrink: 0;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+}
+
+/* Personnel roles (BDRRMO / CFAU / CDRRMO Staff) — red→orange sidebar
+   gradient per Figma, scoped so Admin keeps the original green look. */
+.sidebar.sidebar-personnel {
+    background: linear-gradient(180deg, #f54900 0%, #c10107 100%);
+}
+.sidebar.sidebar-personnel .brand-icon {
+    color: #c10107;
+}
+.sidebar-brand .brand-text { line-height: 1.2; flex: 1; min-width: 0; }
+.sidebar-brand .brand-name {
+    color: white; font-weight: 700; font-size: 15px;
+}
+.sidebar-brand .brand-sub {
+    color: rgba(255,255,255,0.65); font-size: 11px;
+}
+
+.sidebar-toggle {
+    background: transparent;
+    border: none;
+    color: rgba(255,255,255,0.85);
+    font-size: 20px;
+    cursor: pointer;
+    padding: 6px 8px;
+    border-radius: 6px;
+    flex-shrink: 0;
+    line-height: 1;
+}
+.sidebar-toggle:hover { background: rgba(255,255,255,0.15); color: white; }
+
+.sidebar-user {
+    padding: 12px 14px;
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.1);
+    margin: 12px;
+    border-radius: 12px;
+    display: flex; align-items: center; gap: 10px;
+    min-height: 56px;
+    flex-shrink: 0;           /* never squish the user card */
+}
+.sidebar-user .user-avatar {
+    width: 32px; height: 32px;
+    background: rgba(255,255,255,0.3);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; color: white; font-size: 13px;
+    flex-shrink: 0;
+}
+.sidebar-user .user-info { line-height: 1.25; }
+.sidebar-user .user-name { color: white; font-size: 13px; font-weight: 500; }
+.sidebar-user .user-role { color: rgba(255,255,255,0.6); font-size: 11px; }
+
+/* Nav scrolls; sidebar-footer stays pinned at bottom */
+.sidebar nav {
+    flex: 1;
+    padding: 8px 0;
+    overflow-y: auto;         /* scroll when nav items overflow */
+    overflow-x: hidden;
+}
+/* Custom scrollbar — thin + matches brand colour */
+.sidebar nav::-webkit-scrollbar { width: 4px; }
+.sidebar nav::-webkit-scrollbar-track { background: transparent; }
+.sidebar nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.25); border-radius: 4px; }
+
+/* Non-clickable grouping label — one small uppercase heading per group.
+   More space above (between groups) than the gap between items in a group. */
+.nav-section {
+    margin: 16px 0 8px;       /* group top spacing (16px) + label bottom (8px) */
+    padding: 0 16px;
+    color: rgba(255,255,255,0.6);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    user-select: none;
+}
+/* First group hugs the top instead of getting the full inter-group gap. */
+.sidebar nav .nav-section:first-child { margin-top: 8px; }
+
+.nav-item-link {
+    display: flex; align-items: center; gap: 12px;
+    min-height: 40px;         /* consistent ~40px row height */
+    padding: 8px 14px;
+    margin: 0 10px 4px;       /* 4px gap between items (bottom-only, no collapse) */
+    border-radius: 10px;
+    color: rgba(255,255,255,0.78);
+    text-decoration: none;
+    font-size: 14px;          /* px — consistent at all zoom levels */
+    font-weight: 400;         /* explicit — blocks Bootstrap .active bold override */
+    transition: background 0.15s, color 0.15s;
+    white-space: nowrap;
+}
+.nav-item-link:hover {
+    background: rgba(255,255,255,0.09);
+    color: white;
+}
+/* Subtle, rounded active state — clearly visible but not large or bright.
+   Height is unchanged from inactive rows (only bg/colour/weight differ). */
+.nav-item-link.active {
+    background: rgba(255,255,255,0.12);
+    color: white;
+    font-weight: 600;   /* prevent Bootstrap .active bold from inflating text size */
+}
+.nav-item-link.active.nav-accent-blue   { background: linear-gradient(135deg,#3b82f6,#2563eb); box-shadow: 0 2px 8px rgba(37,99,235,0.35); }
+.nav-item-link.active.nav-accent-pink   { background: linear-gradient(135deg,#ec4899,#db2777); box-shadow: 0 2px 8px rgba(219,39,119,0.35); }
+.nav-item-link.active.nav-accent-orange { background: linear-gradient(135deg,#f97316,#ea580c); box-shadow: 0 2px 8px rgba(234,88,12,0.35); }
+.nav-item-link.active.nav-accent-slate  { background: linear-gradient(135deg,#475569,#1e293b); box-shadow: 0 2px 8px rgba(30,41,59,0.35); }
+.nav-item-link.active.nav-accent-purple { background: linear-gradient(135deg,#a855f7,#7c3aed); box-shadow: 0 2px 8px rgba(124,58,237,0.35); }
+.nav-item-link.active.nav-accent-green  { background: linear-gradient(135deg,#10b981,#059669); box-shadow: 0 2px 8px rgba(5,150,105,0.35); }
+.nav-item-link .nav-icon {
+    font-size: 18px;
+    width: 22px;              /* fixed width keeps all icons/labels aligned */
+    text-align: center;
+    flex-shrink: 0;
+}
+
+/* Footer always visible — pinned at bottom, never part of scroll.
+   Subtle divider above the logout area, with balanced padding around it. */
+.sidebar-footer {
+    padding: 10px;
+    border-top: 1px solid rgba(255,255,255,0.18);
+    flex-shrink: 0;
+}
+/* Logout mirrors the nav-item metrics so its icon/label line up with the menu. */
+.sidebar-footer a {
+    color: rgba(255,255,255,0.78);
+    font-size: 14px;
+    text-decoration: none;
+    display: flex; align-items: center; gap: 12px;
+    min-height: 40px;
+    padding: 8px 14px;
+    border-radius: 10px;
+    transition: background 0.15s, color 0.15s;
+}
+.sidebar-footer a:hover { background: rgba(255,255,255,0.09); color: white; }
+
+/* ── Collapsed state — CLICK-ONLY (no hover expand) ───────────
+   Only the burger button toggles `rk-sidebar-collapsed` on <html>.
+   Hover-expand has been removed entirely; the rail is static.
+*/
+html.rk-sidebar-collapsed .sidebar {
+    width: var(--sidebar-w-collapsed);
+}
+html.rk-sidebar-collapsed .sidebar .sidebar-brand {
+    padding: 14px 0;
+    justify-content: center;
+}
+html.rk-sidebar-collapsed .sidebar .brand-icon,
+html.rk-sidebar-collapsed .sidebar .brand-text { display: none; }
+
+html.rk-sidebar-collapsed .sidebar .sidebar-toggle {
+    margin: 0 auto;
+}
+
+html.rk-sidebar-collapsed .sidebar .sidebar-user {
+    justify-content: center;
+    padding: 12px 0;
+    margin: 12px 8px;
+}
+html.rk-sidebar-collapsed .sidebar .user-info { display: none; }
+
+html.rk-sidebar-collapsed .sidebar .nav-section { display: none; }
+
+html.rk-sidebar-collapsed .sidebar .nav-item-link {
+    justify-content: center;
+    padding: 12px 0;
+    margin: 2px 6px;
+}
+html.rk-sidebar-collapsed .sidebar .nav-label { display: none; }
+
+html.rk-sidebar-collapsed .sidebar .sidebar-footer {
+    padding: 14px 0;
+}
+html.rk-sidebar-collapsed .sidebar .sidebar-footer a {
+    justify-content: center;
+    padding: 8px 0;
+}
+html.rk-sidebar-collapsed .sidebar .sidebar-footer .nav-label {
+    display: none;
+}
+
+/* ── Main content ──────────────────────────────────────────── */
+body {
+    font-size: 14px; /* px baseline — scales identically with sidebar under zoom */
+}
+.main-content {
+    margin-left: var(--sidebar-w);
+    padding: 24px;
+    transition: margin-left 0.2s ease;
+    min-height: 100vh;
+}
+html.rk-sidebar-collapsed .main-content {
+    margin-left: var(--sidebar-w-collapsed);
+}
+
+/* During the very first paint, suppress the width/margin
+   transitions so the saved state doesn't animate in. The class
+   is removed by JS after the first frame. */
+html.rk-no-anim .sidebar,
+html.rk-no-anim .main-content { transition: none !important; }
+
+/* ── Page header ───────────────────────────────────────────── */
+.page-header { margin-bottom: 20px; }
+.page-header h1 { font-size: 22px; font-weight: 700; color: var(--rk-text); margin: 0; }
+.page-header p { color: var(--rk-muted); font-size: 13px; margin: 3px 0 0; }
+.last-updated { font-size: 12px; color: var(--rk-muted); text-align: right; }
+
+/* ── Shared card styles ────────────────────────────────────── */
+.stat-card,
+.dash-card {
+    background: white;
+    border-radius: var(--rk-radius);
+    box-shadow: 0 1px 3px rgba(16,24,40,0.06), 0 1px 8px rgba(16,24,40,0.04);
+    border: 1px solid rgba(16,24,40,0.04);
+}
+.stat-card { padding: 18px 20px; height: 100%; }
+.dash-card { padding: 20px; height: 100%; }
+
+.stat-card .stat-label { font-size: 12px; color: var(--rk-muted); margin-bottom: 6px; }
+.stat-card .stat-value { font-size: clamp(15px, 2vw, 26px); font-weight: 700; color: var(--rk-text); margin: 0; word-break: break-word; }
+.stat-card .stat-change { font-size: 12px; margin-top: 4px; }
+.stat-card .stat-icon {
+    width: 38px; height: 38px; border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+}
+
+.dash-card .card-title-row {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 16px;
+}
+.dash-card .card-title-row h6 {
+    font-size: 14px; font-weight: 600; color: var(--rk-text); margin: 0;
+}
+
+/* ── Risk badges ───────────────────────────────────────────── */
+/* High/Critical are filled & bold so they stand out at a glance;
+   Moderate/Low stay neutral so attention isn't spread evenly —
+   this mirrors the emphasis used across the reference screens. */
+.risk-badge {
+    font-size: 11px; font-weight: 700;
+    padding: 4px 12px; border-radius: 20px;
+    display: inline-block;
+    letter-spacing: 0.01em;
+}
+.risk-critical { background: linear-gradient(135deg,#ef4444,#dc2626); color: #fff; }
+.risk-high     { background: linear-gradient(135deg,#f87171,#ef4444); color: #fff; }
+.risk-moderate { background: #f3f4f6; color: #6b7280; border: 1px solid #e5e7eb; font-weight: 600; }
+.risk-low      { background: #f3f4f6; color: #6b7280; border: 1px solid #e5e7eb; font-weight: 600; }
+
+/* ── Status pills ──────────────────────────────────────────── */
+.status-pill {
+    font-size: 11px; font-weight: 700;
+    padding: 4px 12px; border-radius: 20px;
+    display: inline-block;
+}
+.status-operational     { background: #d1fae5; color: #047857; }
+.status-maintenance     { background: #fef3c7; color: #b45309; }
+.status-unavailable     { background: #fee2e2; color: #dc2626; }
+
+/* ── Buttons ───────────────────────────────────────────────── */
+.btn-rk {
+    background: linear-gradient(135deg, var(--rk-green), var(--rk-green-dark));
+    color: white;
+    border: none;
+    border-radius: 9px;
+    font-weight: 500;
+    box-shadow: 0 1px 3px rgba(4,120,87,0.3);
+}
+.btn-rk:hover { background: linear-gradient(135deg, var(--rk-green-mid), var(--rk-green-dark)); color: white; }
+.btn-rk:disabled, .btn-rk.disabled {
+    background: #cbd5e1; box-shadow: none; opacity: 1; color: #fff;
+}
+
+/* Soft "ghost" pill button — used for secondary row actions like
+   "View Profile" so they read as calm, not competing with .btn-rk. */
+.btn-soft {
+    background: #f3f4f6; color: var(--rk-text);
+    border: 1px solid #e5e7eb; border-radius: 8px;
+    font-size: 12.5px; font-weight: 500;
+    padding: 6px 14px;
+    transition: background 0.15s;
+    display: inline-flex; align-items: center; gap: 4px;
+}
+.btn-soft:hover { background: #e5e7eb; color: var(--rk-text); }
+
+/* Rounded search bar used in list/filter toolbars */
+.search-bar-rk .input-group-text { background: white; border-right: 0; border-radius: 10px 0 0 10px; }
+.search-bar-rk input { border-left: 0; border-radius: 0 10px 10px 0; }
+.search-bar-rk input:focus { box-shadow: none; border-color: #ced4da; }
+
+/* Reusable alert / insight banner (amber notice strip) */
+.alert-banner {
+    background: #fff8e1; border-left: 4px solid #ffc107;
+    border-radius: 8px; padding: 10px 14px;
+    font-size: 13px; color: #856404; margin-bottom: 16px;
+    display: flex; align-items: center; gap: 8px;
+}
+
+/* ── Utility layer (CSP refactor) ──────────────────────────────
+   Small, reusable helpers that replace the repeated inline style=""
+   attributes across templates. Removing those attributes is what lets
+   main.py drop `style-src 'unsafe-inline'`. See SECURITY_CSP_STYLE_REPORT.md. */
+
+/* Font-size steps (px — matches the existing px-based type scale) */
+.rk-fs-10 { font-size: 10px; }
+.rk-fs-11 { font-size: 11px; }
+.rk-fs-12 { font-size: 12px; }
+.rk-fs-13 { font-size: 13px; }
+.rk-fs-14 { font-size: 14px; }
+.rk-fs-16 { font-size: 16px; }
+.rk-fs-18 { font-size: 18px; }
+.rk-fs-20 { font-size: 20px; }
+.rk-fs-22 { font-size: 22px; }
+.rk-fs-24 { font-size: 24px; }
+.rk-fs-26 { font-size: 26px; }
+.rk-fs-30 { font-size: 30px; }
+.rk-fs-32 { font-size: 32px; }
+
+/* Accent text colours used across dashboards/lists */
+.rk-text-green  { color: var(--rk-green); }
+.rk-text-ok     { color: #047857; }
+.rk-text-crit   { color: #c0392b; }
+.rk-text-high   { color: #d35400; }
+.rk-text-mod    { color: #b7950b; }
+.rk-text-info   { color: #2980b9; }
+.rk-text-purple { color: #8e44ad; }
+.rk-text-amber  { color: #b45309; }
+.rk-text-note   { color: #856404; }
+.rk-text-faint  { color: #666; }
+
+/* Soft surfaces */
+.rk-bg-soft { background: #f9fafb; }
+
+/* Sticky table header (soft) — used on scrolling review tables */
+.rk-th-sticky { background: #f9fafb; position: sticky; top: 0; }
+
+/* Soft uppercase table-header row (muted, letter-spaced) */
+.rk-th-soft {
+    font-size: 12px; color: var(--rk-muted);
+    text-transform: uppercase; letter-spacing: 0.04em;
+}
+
+/* Icon "tint" chips — background + colour pairs for .stat-icon / .feed-icon */
+.rk-tint-green  { background: #d1fae5; color: #047857; }
+.rk-tint-blue   { background: #e8f4fd; color: #2980b9; }
+.rk-tint-purple { background: #f3e8fd; color: #8e44ad; }
+.rk-tint-red    { background: #fde8e8; color: #c0392b; }
+.rk-tint-amber  { background: #fef9e7; color: #b7950b; }
+.rk-tint-orange { background: #fef3e2; color: #d35400; }
+
+/* White-space helpers */
+.rk-pre-wrap { white-space: pre-wrap; }
+.rk-pre-line { white-space: pre-line; }
+.rk-nowrap   { white-space: nowrap; }
+
+/* ── Dynamic (data-driven) helpers ─────────────────────────────
+   Discrete state is expressed via the level/fill classes below; continuous
+   bar widths use the static .rk-w-p<0..100> utilities (generated at the end of
+   this file). Both are pure CSS — no inline style="" attribute, no JS. */
+
+/* Discrete priority-level fills for score/priority bars */
+.rk-fill-critical { background: #c0392b; }
+.rk-fill-high     { background: #d35400; }
+.rk-fill-moderate { background: #f39c12; }
+.rk-fill-low      { background: #047857; }
+
+/* Discrete priority-level text colours (map popups, inline labels) */
+.rk-lvl-critical { color: #c0392b; }
+.rk-lvl-high     { color: #d35400; }
+.rk-lvl-moderate { color: #f39c12; }
+.rk-lvl-low      { color: #047857; }
+
+/* Audit-feed icon chips, keyed by action */
+.feed-created, .feed-activated { background: #d1fae5; color: #047857; }
+.feed-updated                  { background: #e8f4fd; color: #2980b9; }
+.feed-deleted                  { background: #fde8e8; color: #c0392b; }
+.feed-deactivated              { background: #fef3e2; color: #d35400; }
+.feed-login                    { background: #f3e8fd; color: #8e44ad; }
+.feed-default                  { background: #f4f6f9; color: #6c757d; }
+
+/* ── Sizing helpers (replace one-off inline widths/heights) ──── */
+.rk-w-34    { width: 34px; }
+.rk-w-40    { width: 40px; }
+.rk-w-90    { width: 90px; }
+.rk-mw-60   { min-width: 60px; }
+.rk-mw-120  { min-width: 120px; }
+.rk-mw-130  { min-width: 130px; }
+.rk-mw-140  { min-width: 140px; }
+.rk-mw-160  { min-width: 160px; }
+.rk-mw-220  { min-width: 220px; }
+.rk-maxw-340 { max-width: 340px; }
+.rk-maxw-720 { max-width: 720px; }
+.rk-h-6     { height: 6px; }
+.rk-h-10    { height: 10px; }
+.rk-h-auto  { height: auto; }
+
+/* Type helpers */
+.rk-fw-800  { font-weight: 800; }
+.rk-lh-16   { line-height: 1.6; }
+.rk-op-85   { opacity: 0.85; }
+
+/* Solid swatch backgrounds (legend dots, timeline dots, badges) */
+.rk-bg-green  { background: #047857; }
+.rk-bg-blue   { background: #2980b9; }
+.rk-bg-red    { background: #c0392b; }
+.rk-bg-purple { background: #8e44ad; }
+.rk-bg-orange { background: #d35400; }
+.rk-bg-yellow { background: #f1c40f; }
+.rk-bg-amber  { background: #b7950b; }
+.rk-bg-teal   { background: #1a6b47; }
+
+/* Soft surface tints */
+.rk-bg-info-soft   { background: #e8f4fd; }
+.rk-bg-orange-soft { background: #fef3e2; }
+.rk-bg-purple-soft { background: #f3e8fd; }
+.rk-bg-slate-soft  { background: #f8fafc; }
+
+/* Icon "tint" chip variants (exact colours preserved from templates) */
+.rk-tint-green-alt { background: #eafaf1; color: var(--rk-green); }
+.rk-tint-green-rk  { background: #d1fae5; color: var(--rk-green); }
+.rk-tint-blue-alt  { background: #e6f2fa; color: #226e9b; }
+
+/* Weather-forecast icon colours (simulator setup) */
+.rk-wx-rain  { color: #3b82f6; }
+.rk-wx-sun   { color: #f59e0b; }
+.rk-wx-cloud { color: #64748b; }
+
+/* Priority-row highlight (serviceability review) */
+.rk-row-priority { background: #fff5f5; }
+
+/* Audit category pills (keyed by category) */
+.rk-cat-auth     { background: #e0f2fe; color: #0369a1; }
+.rk-cat-user     { background: #dbeafe; color: #1d4ed8; }
+.rk-cat-upload   { background: #d1fae5; color: #047857; }
+.rk-cat-incident { background: #fee2e2; color: #dc2626; }
+.rk-cat-brgy     { background: #fef3c7; color: #b45309; }
+.rk-cat-resource { background: #fce7f3; color: #be185d; }
+.rk-cat-equip    { background: #e2e8f0; color: #334155; }
+.rk-cat-system   { background: #f3f4f6; color: #6b7280; }
+
+/* Severity status pills (serviceability priority) */
+.rk-pill-high { background: #fde8e8; color: #c0392b; border: 1px solid #f4c2bd; }
+.rk-pill-med  { background: #fdebd0; color: #b9770e; border: 1px solid #f5cba7; }
+.rk-pill-low  { background: #eef0f2; color: #6c757d; border: 1px solid #dee2e6; }
+
+/* Numbered rank circle (simulator priority list) */
+.rk-rank-num {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px; border-radius: 50%; flex: 0 0 auto;
+    background: var(--rk-green); color: #fff;
+    font-size: 12px; font-weight: 700;
+}
+
+/* Legend separator row */
+.rk-legend-sep { border-top: 1px solid #eee; padding-top: 6px; }
+
+/* Rounded control (e.g. filter selects) */
+.rk-radius-10 { border-radius: 10px; }
+
+/* Scrollable panels (raw-text / preview tables) */
+.rk-mh-260 { max-height: 260px; overflow: auto; }
+.rk-mh-380 { max-height: 380px; overflow: auto; }
+
+/* Raw extracted-text preview box */
+.rk-raw-preview {
+    white-space: pre-wrap; font-size: 12px;
+    background: #f9fafb; padding: 10px; border-radius: 6px;
+}
+
+/* ── Progress-fill widths (0–100%) ─────────────────────────────
+   Static width utilities for progress/score bars. Pure CSS so the fill
+   renders without JS — CSP-safe (no inline style attr) and reliable even
+   for server- or AJAX-rendered results. Use as rk-w-p<0..100>. */
+.rk-w-p0{width:0%}
+.rk-w-p1{width:1%}
+.rk-w-p2{width:2%}
+.rk-w-p3{width:3%}
+.rk-w-p4{width:4%}
+.rk-w-p5{width:5%}
+.rk-w-p6{width:6%}
+.rk-w-p7{width:7%}
+.rk-w-p8{width:8%}
+.rk-w-p9{width:9%}
+.rk-w-p10{width:10%}
+.rk-w-p11{width:11%}
+.rk-w-p12{width:12%}
+.rk-w-p13{width:13%}
+.rk-w-p14{width:14%}
+.rk-w-p15{width:15%}
+.rk-w-p16{width:16%}
+.rk-w-p17{width:17%}
+.rk-w-p18{width:18%}
+.rk-w-p19{width:19%}
+.rk-w-p20{width:20%}
+.rk-w-p21{width:21%}
+.rk-w-p22{width:22%}
+.rk-w-p23{width:23%}
+.rk-w-p24{width:24%}
+.rk-w-p25{width:25%}
+.rk-w-p26{width:26%}
+.rk-w-p27{width:27%}
+.rk-w-p28{width:28%}
+.rk-w-p29{width:29%}
+.rk-w-p30{width:30%}
+.rk-w-p31{width:31%}
+.rk-w-p32{width:32%}
+.rk-w-p33{width:33%}
+.rk-w-p34{width:34%}
+.rk-w-p35{width:35%}
+.rk-w-p36{width:36%}
+.rk-w-p37{width:37%}
+.rk-w-p38{width:38%}
+.rk-w-p39{width:39%}
+.rk-w-p40{width:40%}
+.rk-w-p41{width:41%}
+.rk-w-p42{width:42%}
+.rk-w-p43{width:43%}
+.rk-w-p44{width:44%}
+.rk-w-p45{width:45%}
+.rk-w-p46{width:46%}
+.rk-w-p47{width:47%}
+.rk-w-p48{width:48%}
+.rk-w-p49{width:49%}
+.rk-w-p50{width:50%}
+.rk-w-p51{width:51%}
+.rk-w-p52{width:52%}
+.rk-w-p53{width:53%}
+.rk-w-p54{width:54%}
+.rk-w-p55{width:55%}
+.rk-w-p56{width:56%}
+.rk-w-p57{width:57%}
+.rk-w-p58{width:58%}
+.rk-w-p59{width:59%}
+.rk-w-p60{width:60%}
+.rk-w-p61{width:61%}
+.rk-w-p62{width:62%}
+.rk-w-p63{width:63%}
+.rk-w-p64{width:64%}
+.rk-w-p65{width:65%}
+.rk-w-p66{width:66%}
+.rk-w-p67{width:67%}
+.rk-w-p68{width:68%}
+.rk-w-p69{width:69%}
+.rk-w-p70{width:70%}
+.rk-w-p71{width:71%}
+.rk-w-p72{width:72%}
+.rk-w-p73{width:73%}
+.rk-w-p74{width:74%}
+.rk-w-p75{width:75%}
+.rk-w-p76{width:76%}
+.rk-w-p77{width:77%}
+.rk-w-p78{width:78%}
+.rk-w-p79{width:79%}
+.rk-w-p80{width:80%}
+.rk-w-p81{width:81%}
+.rk-w-p82{width:82%}
+.rk-w-p83{width:83%}
+.rk-w-p84{width:84%}
+.rk-w-p85{width:85%}
+.rk-w-p86{width:86%}
+.rk-w-p87{width:87%}
+.rk-w-p88{width:88%}
+.rk-w-p89{width:89%}
+.rk-w-p90{width:90%}
+.rk-w-p91{width:91%}
+.rk-w-p92{width:92%}
+.rk-w-p93{width:93%}
+.rk-w-p94{width:94%}
+.rk-w-p95{width:95%}
+.rk-w-p96{width:96%}
+.rk-w-p97{width:97%}
+.rk-w-p98{width:98%}
+.rk-w-p99{width:99%}
+.rk-w-p100{width:100%}

@@ -50,7 +50,7 @@
 <!-- ── Add / Edit equipment ───────────────────────────────────── -->
 <div class="dash-card mb-4">
     <div class="card-title-row">
-        <i class="bi bi-{{ 'pencil-square' if editing else 'plus-circle' }}" style="color:var(--rk-green)"></i>
+        <i class="bi bi-{{ 'pencil-square' if editing else 'plus-circle' }} rk-text-green"></i>
         <h6>{{ 'Edit Equipment / Vehicle' if editing else 'Add Equipment / Vehicle' }}</h6>
     </div>
     <form method="POST"
@@ -140,8 +140,8 @@
 <div class="dash-card p-0">
     <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
-            <thead style="background:#f9fafb">
-                <tr style="font-size:12px;color:var(--rk-muted);text-transform:uppercase;letter-spacing:0.04em">
+            <thead class="rk-bg-soft">
+                <tr class="rk-th-soft">
                     <th class="px-3 py-3">Name</th>
                     <th class="py-3">Type</th>
                     <th class="py-3 text-end">Qty</th>
@@ -153,15 +153,15 @@
             <tbody>
                 {% for e in equipment %}
                 {% set sval = e.status.value %}
-                <tr style="font-size:13px">
+                <tr class="rk-fs-13">
                     <td class="px-3 fw-semibold">
                         {{ e.name }}
-                        {% if e.maintenance_notes %}<div class="text-muted" style="font-size:11px"><i class="bi bi-wrench me-1"></i>{{ e.maintenance_notes }}</div>{% endif %}
+                        {% if e.maintenance_notes %}<div class="text-muted rk-fs-11"><i class="bi bi-wrench me-1"></i>{{ e.maintenance_notes }}</div>{% endif %}
                     </td>
                     <td>
                         {{ e.equipment_type.value.replace('_', ' ').title() }}
                         {% if e.equipment_type.value in vehicle_types %}
-                        <span class="badge bg-light text-dark border ms-1" style="font-size:10px">Vehicle</span>
+                        <span class="badge bg-light text-dark border ms-1 rk-fs-10">Vehicle</span>
                         {% endif %}
                     </td>
                     <td class="text-end">{{ e.quantity if e.quantity is not none else 1 }}</td>
@@ -180,9 +180,9 @@
                         {% else %}
                         <form method="POST" action="/bdrrmo/equipment/{{ e.id }}/status" class="d-inline">
             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
-                            <div class="input-group input-group-sm d-inline-flex" style="width:auto;vertical-align:middle">
-                                <select name="status" class="form-select form-select-sm"
-                                        data-submit-on-change style="width:auto">
+                            <div class="input-group input-group-sm d-inline-flex w-auto align-middle">
+                                <select name="status" class="form-select form-select-sm w-auto"
+                                        data-submit-on-change>
                                     {% for s in equipment_statuses %}
                                     <option value="{{ s }}" {{ 'selected' if s == sval else '' }}>{{ status_labels[s] }}</option>
                                     {% endfor %}

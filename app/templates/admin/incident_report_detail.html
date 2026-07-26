@@ -29,7 +29,7 @@
             {% macro section(title, value) %}
             <div class="mb-3">
                 <div class="stat-label">{{ title }}</div>
-                <p class="mb-0" style="white-space:pre-wrap">{{ value or '—' }}</p>
+                <p class="mb-0 rk-pre-wrap">{{ value or '—' }}</p>
             </div>
             {% endmacro %}
             {{ section('Operations Summary', r.operations_summary) }}
@@ -43,7 +43,7 @@
     <div class="col-md-4">
         <div class="dash-card">
             <div class="card-title-row">
-                <i class="bi bi-clock-history" style="color:var(--rk-green);font-size:16px"></i>
+                <i class="bi bi-clock-history rk-text-green rk-fs-16"></i>
                 <h6>Status</h6>
             </div>
             <p><span class="badge bg-secondary">{{ workflow_label }}</span></p>
@@ -65,7 +65,7 @@
         <!-- ── Source Upload (provenance — Week 8.1 linkage) ───────── -->
         <div class="dash-card mt-3">
             <div class="card-title-row">
-                <i class="bi bi-file-earmark-arrow-up" style="color:var(--rk-green);font-size:16px"></i>
+                <i class="bi bi-file-earmark-arrow-up rk-text-green rk-fs-16"></i>
                 <h6>Source Upload</h6>
             </div>
             <p class="small mb-2">

@@ -28,7 +28,7 @@
 {# ── Threshold-difference warning ─────────────────────────────────────── #}
 {% if threshold_diffs %}
 <div class="alert alert-warning d-flex align-items-start gap-2">
-    <i class="bi bi-exclamation-triangle-fill" style="font-size:16px"></i>
+    <i class="bi bi-exclamation-triangle-fill rk-fs-16"></i>
     <div>
         <strong>These scenarios span different planning assumptions.</strong>
         The two runs used different planning thresholds, so some differences below
@@ -56,9 +56,9 @@
             </div>
             <div class="text-center my-2">
                 <div class="stat-label">Overall Readiness</div>
-                <div class="{{ band.text }}" style="font-size:26px; font-weight:800;">{{ band.label }}</div>
+                <div class="{{ band.text }} rk-fs-26 rk-fw-800">{{ band.label }}</div>
             </div>
-            <table class="table table-sm mb-0" style="font-size:13px;">
+            <table class="table table-sm mb-0 rk-fs-13">
                 <tr><td class="text-muted">Barangay</td><td class="fw-semibold">{{ s.barangay }}</td></tr>
                 <tr><td class="text-muted">Disaster Type</td><td class="fw-semibold text-capitalize">{{ s.disaster_type }}</td></tr>
                 <tr><td class="text-muted">Duration</td><td class="fw-semibold">{{ s.duration_label }}</td></tr>
@@ -83,9 +83,9 @@
                     <th rowspan="2" class="align-middle">Resource Class</th>
                     <th colspan="4" class="text-center border-start">A — {{ a.name | truncate(28) }}</th>
                     <th colspan="4" class="text-center border-start">B — {{ b.name | truncate(28) }}</th>
-                    <th rowspan="2" class="text-center align-middle border-start">Change<br><span class="text-muted" style="font-size:11px;">(shortfall)</span></th>
+                    <th rowspan="2" class="text-center align-middle border-start">Change<br><span class="text-muted rk-fs-11">(shortfall)</span></th>
                 </tr>
-                <tr style="font-size:12px;">
+                <tr class="rk-fs-12">
                     <th class="text-end border-start">Need</th><th class="text-end">Avail</th><th class="text-end">Gap</th><th>Status</th>
                     <th class="text-end border-start">Need</th><th class="text-end">Avail</th><th class="text-end">Gap</th><th>Status</th>
                 </tr>
@@ -94,7 +94,7 @@
                 {% for r in compare_rows %}
                 {% set sa = status_ui.get(r.status_a, status_ui['Critical']) %}
                 {% set sb = status_ui.get(r.status_b, status_ui['Critical']) %}
-                <tr style="font-size:13px;">
+                <tr class="rk-fs-13">
                     <td>{{ r.label }}<span class="text-muted"> ({{ r.unit }})</span></td>
                     <td class="text-end border-start">{{ "{:,}".format(r.a.need) }}</td>
                     <td class="text-end">{{ "{:,}".format(r.a.available) }}</td>
@@ -107,13 +107,13 @@
                     <td class="text-center border-start">
                         {% if r.direction == 'improved' %}
                             <span class="text-success fw-semibold"><i class="bi bi-arrow-down-circle-fill"></i> −{{ "{:,}".format(r.abs_delta) }}</span>
-                            <div class="text-success" style="font-size:11px;">improved</div>
+                            <div class="text-success rk-fs-11">improved</div>
                         {% elif r.direction == 'worsened' %}
                             <span class="text-danger fw-semibold"><i class="bi bi-arrow-up-circle-fill"></i> +{{ "{:,}".format(r.abs_delta) }}</span>
-                            <div class="text-danger" style="font-size:11px;">worsened</div>
+                            <div class="text-danger rk-fs-11">worsened</div>
                         {% else %}
                             <span class="text-muted"><i class="bi bi-dash-circle"></i> 0</span>
-                            <div class="text-muted" style="font-size:11px;">no change</div>
+                            <div class="text-muted rk-fs-11">no change</div>
                         {% endif %}
                     </td>
                 </tr>
@@ -121,7 +121,7 @@
             </tbody>
         </table>
     </div>
-    <p class="text-muted mb-0" style="font-size:12px;">
+    <p class="text-muted mb-0 rk-fs-12">
         <i class="bi bi-info-circle me-1"></i>“Change” is the difference in shortfall (gap)
         from A to B. A <span class="text-success fw-semibold">down arrow / improved</span>
         means the shortfall shrank; an <span class="text-danger fw-semibold">up arrow / worsened</span>

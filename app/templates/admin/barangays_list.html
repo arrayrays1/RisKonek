@@ -1,6 +1,6 @@
 {% extends "admin/base.html" %}
 
-{% block title %}Barangay Management — RisKonek{% endblock %}
+{% block title %}Barangay Field Data — RisKonek{% endblock %}
 
 {% set active_nav = 'barangays' %}
 
@@ -24,7 +24,7 @@
             </div>
         </div>
         <div class="col-md-3">
-            <select name="risk" class="form-select" style="border-radius:10px">
+            <select name="risk" class="form-select rk-radius-10">
                 <option value="">All Priority Levels</option>
                 {% for r in risk_levels %}
                 <option value="{{ r }}" {{ 'selected' if risk_filter == r else '' }}>
@@ -45,8 +45,8 @@
 <div class="dash-card p-0">
     <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
-            <thead style="background:#f9fafb">
-                <tr style="font-size:12px;color:var(--rk-muted);text-transform:uppercase;letter-spacing:0.04em">
+            <thead class="rk-bg-soft">
+                <tr class="rk-th-soft">
                     <th class="px-3 py-3">Barangay</th>
                     <th class="py-3 text-end">Population</th>
                     <th class="py-3 text-end">Vulnerable %</th>
@@ -56,9 +56,9 @@
             </thead>
             <tbody>
                 {% for r in rows %}
-                <tr style="font-size:13px">
+                <tr class="rk-fs-13">
                     <td class="px-3">
-                        <i class="bi bi-geo-alt-fill me-2" style="color:var(--rk-green)"></i>
+                        <i class="bi bi-geo-alt-fill me-2 rk-text-green"></i>
                         <span class="fw-semibold">{{ r.name }}</span>
                     </td>
                     <td class="text-end">{{ "{:,}".format(r.population) }}</td>
@@ -91,7 +91,7 @@
 </div>
 
 {% if total_count > 0 %}
-<div class="text-muted mt-3" style="font-size:12px">
+<div class="text-muted mt-3 rk-fs-12">
     Showing {{ total_count }} barangay{{ 's' if total_count != 1 else '' }}.
 </div>
 {% endif %}

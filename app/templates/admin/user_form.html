@@ -92,8 +92,7 @@
                     </select>
                 </div>
 
-                <div class="mb-3" id="barangayField"
-                     style="display: {{ 'block' if edit_mode and target_user.role.value == 'bdrrmo' else 'none' }}">
+                <div class="mb-3{% if not (edit_mode and target_user.role.value == 'bdrrmo') %} d-none{% endif %}" id="barangayField">
                     <label class="form-label fw-medium">Assigned Barangay</label>
                     <select name="barangay_id" class="form-select">
                         <option value="">-- Select barangay --</option>
@@ -134,7 +133,7 @@
     var roleSelect = document.getElementById('roleSelect');
     function toggleBarangayField() {
         var field = document.getElementById('barangayField');
-        field.style.display = (roleSelect.value === 'bdrrmo') ? 'block' : 'none';
+        field.classList.toggle('d-none', roleSelect.value !== 'bdrrmo');
     }
     roleSelect.addEventListener('change', toggleBarangayField);
     toggleBarangayField();  // reflect the initial/selected role on load

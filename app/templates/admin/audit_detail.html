@@ -5,7 +5,7 @@
 {% set active_nav = 'audit' %}
 
 {% block head_extra %}
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
     .kv { font-size: 13px; }
     .kv .k { color: var(--rk-muted); width: 160px; display: inline-block; }
     .kv .v { font-weight: 500; }

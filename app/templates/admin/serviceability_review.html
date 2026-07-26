@@ -20,15 +20,15 @@
 
 {% macro urgency_badge(v, label) -%}
     {% if v == 'critical' %}
-        <span class="status-pill" style="background:#fde8e8;color:#c0392b;border:1px solid #f4c2bd">
+        <span class="status-pill rk-pill-high">
             <i class="bi bi-exclamation-triangle-fill"></i> {{ label }}</span>
     {% elif v == 'high' %}
-        <span class="status-pill" style="background:#fdebd0;color:#b9770e;border:1px solid #f5cba7">
+        <span class="status-pill rk-pill-med">
             <i class="bi bi-exclamation-circle-fill"></i> {{ label }}</span>
     {% elif v == 'moderate' %}
         <span class="status-pill status-maintenance">{{ label }}</span>
     {% else %}
-        <span class="status-pill" style="background:#eef0f2;color:#6c757d;border:1px solid #dee2e6">{{ label }}</span>
+        <span class="status-pill rk-pill-low">{{ label }}</span>
     {% endif %}
 {%- endmacro %}
 
@@ -68,7 +68,7 @@
             <div class="stat-label">Needs Urgent Attention</div>
             <div class="stat-value {{ 'text-danger' if summary.priority else '' }}">{{ summary.priority }}</div>
         </div>
-        <div class="stat-icon" style="background:#fde8e8;color:#c0392b"><i class="bi bi-exclamation-triangle"></i></div>
+        <div class="stat-icon rk-tint-red"><i class="bi bi-exclamation-triangle"></i></div>
     </div></div>
     <div class="col-md-3"><div class="stat-card">
         <div class="stat-label">Awaiting Review</div><div class="stat-value">{{ summary.submitted }}</div>
@@ -110,8 +110,8 @@
 <div class="dash-card p-0">
     <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
-            <thead style="background:#f9fafb">
-                <tr style="font-size:12px;color:var(--rk-muted);text-transform:uppercase;letter-spacing:0.04em">
+            <thead class="rk-bg-soft">
+                <tr class="rk-th-soft">
                     <th class="px-3 py-3">Urgency</th>
                     <th class="py-3">Title</th>
                     <th class="py-3">Equipment</th>
@@ -124,8 +124,7 @@
             </thead>
             <tbody>
                 {% for r in rows %}
-                <tr style="font-size:13px;{% if r.is_priority %}background:#fff5f5{% endif %}"
-                    {% if r.is_priority %}class="border-start border-danger border-3"{% endif %}>
+                <tr class="rk-fs-13{% if r.is_priority %} rk-row-priority border-start border-danger border-3{% endif %}">
                     <td class="px-3">{{ urgency_badge(r.urgency, r.urgency_label) }}</td>
                     <td class="fw-semibold">{{ r.title }}</td>
                     <td>{{ r.equipment }}</td>

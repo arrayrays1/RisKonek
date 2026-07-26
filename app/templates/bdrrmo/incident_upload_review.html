@@ -65,7 +65,7 @@
         <h6>AI Summary</h6>
     </div>
     {% if ai_summary %}
-        <p class="mb-0" style="white-space:pre-line">{{ ai_summary }}</p>
+        <p class="mb-0 rk-pre-line">{{ ai_summary }}</p>
     {% elif not ai_available %}
         <p class="text-muted mb-0 small">AI summary unavailable (GROQ_API_KEY not configured).</p>
     {% else %}
@@ -80,9 +80,9 @@
         <h6>Extracted Preview</h6>
     </div>
     {% if columns_preview and rows_preview %}
-        <div class="table-responsive" style="max-height: 380px; overflow:auto;">
-            <table class="table table-sm table-bordered mb-0" style="font-size:12px">
-                <thead style="background:#f9fafb;position:sticky;top:0">
+        <div class="table-responsive rk-mh-380">
+            <table class="table table-sm table-bordered mb-0 rk-fs-12">
+                <thead class="rk-th-sticky">
                     <tr>{% for c in columns_preview %}<th>{{ c }}</th>{% endfor %}</tr>
                 </thead>
                 <tbody>
@@ -98,7 +98,7 @@
         </div>
         <div class="form-text">Showing first {{ rows_preview | length }} rows — the details below have been pre-filled from this content; review and correct before saving.</div>
     {% elif raw_text_preview %}
-        <pre style="white-space:pre-wrap;font-size:12px;max-height:380px;overflow:auto;background:#f9fafb;padding:10px;border-radius:6px">{{ raw_text_preview }}</pre>
+        <pre class="rk-raw-preview rk-mh-380">{{ raw_text_preview }}</pre>
         <div class="form-text">The details below have been pre-filled from this content; review and correct before saving.</div>
     {% else %}
         <p class="text-muted mb-0 small">No preview available.</p>
@@ -181,7 +181,7 @@
 
         <!-- ── Equipment & Vehicles Used (contribution, not the incident) ── -->
         <div class="col-12">
-            <div class="border rounded p-3" style="background:#f9fafb">
+            <div class="border rounded p-3 rk-bg-soft">
                 <div class="text-muted small fw-semibold mb-2">
                     <i class="bi bi-truck me-1"></i>Equipment &amp; Vehicles Used
                     <span class="fw-normal">— optional; recorded against this contribution, never the canonical incident</span>

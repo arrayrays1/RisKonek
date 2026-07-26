@@ -5,7 +5,7 @@
 {% set active_nav = 'uploads' %}
 
 {% block head_extra %}
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
     .timeline { position: relative; margin-left: 8px; padding-left: 28px; }
     .timeline::before {
         content: ""; position: absolute; left: 9px; top: 4px; bottom: 4px;
@@ -69,7 +69,7 @@
 <div class="dash-card mb-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
     <div>
         <div class="card-title-row mb-1">
-            <i class="bi bi-journal-text" style="color:var(--rk-green)"></i>
+            <i class="bi bi-journal-text rk-text-green"></i>
             <h6 class="mb-0">Produced Post-Incident Report</h6>
         </div>
         <p class="small text-muted mb-0">
@@ -97,8 +97,8 @@
         current values to distinguish <strong>extracted</strong> data from <strong>manual corrections</strong>.
     </p>
     <div class="table-responsive">
-        <table class="table table-sm table-bordered mb-0" style="font-size:12px">
-            <thead style="background:#f9fafb">
+        <table class="table table-sm table-bordered mb-0 rk-fs-12">
+            <thead class="rk-bg-soft">
                 <tr>{% for k in field_keys %}<th>{{ k | replace('_', ' ') | title }}</th>{% endfor %}</tr>
             </thead>
             <tbody>
@@ -114,26 +114,26 @@
 <div class="dash-card">
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
         <span class="small">
-            <span class="badge" style="background:#b7950b">Edit</span>
-            <span class="badge" style="background:#1a6b47">Confirm / Restore</span>
+            <span class="badge rk-bg-amber">Edit</span>
+            <span class="badge rk-bg-teal">Confirm / Restore</span>
             <span class="badge bg-secondary">Archive</span>
-            <span class="badge" style="background:#c0392b">Discard</span>
+            <span class="badge rk-bg-red">Discard</span>
         </span>
     </div>
     {% if events %}
     <div class="timeline">
         {% for e in events %}
         {% set et = e.event_type.value %}
-        {% if et == 'created' %}{% set icon = 'bi-cloud-upload' %}{% set bg = '#6c757d' %}
-        {% elif et == 'extracted' %}{% set icon = 'bi-file-earmark-text' %}{% set bg = '#0d6efd' %}
-        {% elif et == 'confirmed' %}{% set icon = 'bi-check2-circle' %}{% set bg = '#1a6b47' %}
-        {% elif et == 'edited' %}{% set icon = 'bi-pencil' %}{% set bg = '#b7950b' %}
-        {% elif et == 'archived' %}{% set icon = 'bi-archive' %}{% set bg = '#6c757d' %}
-        {% elif et == 'unarchived' %}{% set icon = 'bi-arrow-counterclockwise' %}{% set bg = '#1a6b47' %}
-        {% elif et == 'discarded' %}{% set icon = 'bi-trash' %}{% set bg = '#c0392b' %}
-        {% else %}{% set icon = 'bi-dot' %}{% set bg = '#6c757d' %}{% endif %}
+        {% if et == 'created' %}{% set icon = 'bi-cloud-upload' %}{% set dot = 'bg-secondary' %}
+        {% elif et == 'extracted' %}{% set icon = 'bi-file-earmark-text' %}{% set dot = 'bg-primary' %}
+        {% elif et == 'confirmed' %}{% set icon = 'bi-check2-circle' %}{% set dot = 'rk-bg-teal' %}
+        {% elif et == 'edited' %}{% set icon = 'bi-pencil' %}{% set dot = 'rk-bg-amber' %}
+        {% elif et == 'archived' %}{% set icon = 'bi-archive' %}{% set dot = 'bg-secondary' %}
+        {% elif et == 'unarchived' %}{% set icon = 'bi-arrow-counterclockwise' %}{% set dot = 'rk-bg-teal' %}
+        {% elif et == 'discarded' %}{% set icon = 'bi-trash' %}{% set dot = 'rk-bg-red' %}
+        {% else %}{% set icon = 'bi-dot' %}{% set dot = 'bg-secondary' %}{% endif %}
         <div class="tl-item">
-            <span class="tl-dot" style="background:{{ bg }}"><i class="bi {{ icon }}"></i></span>
+            <span class="tl-dot {{ dot }}"><i class="bi {{ icon }}"></i></span>
             <div class="d-flex justify-content-between align-items-start">
                 <div class="tl-title">
                     {% if et == 'edited' %}

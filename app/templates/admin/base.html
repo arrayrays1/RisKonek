@@ -25,339 +25,7 @@
           integrity="sha384-9ndCyUaIbzAi2FUVXJi0CjmCapSmO7SnpJef0486qhLnuZ2cdeRhO02iuK6FUUVM" crossorigin="anonymous">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css"
           integrity="sha384-tViUnnbYAV00FLIhhi3v/dWt3Jxw4gZQcNoSCxCIFNJVCx7/D55/wXsrNIRANwdD" crossorigin="anonymous">
-    <style>
-        :root {
-            --rk-green: #10b981;
-            --rk-green-mid: #059669;
-            --rk-green-dark: #047857;
-            --rk-green-light: #d1fae5;
-            --rk-bg: #f4f6f9;
-            --rk-text: #1a1a2e;
-            --rk-muted: #6c757d;
-            --rk-radius: 14px;
-            --sidebar-w: 240px;
-            --sidebar-w-collapsed: 64px;
-        }
-
-        body {
-            background: var(--rk-bg);
-            font-family: 'Segoe UI', sans-serif;
-            color: var(--rk-text);
-        }
-
-        /* ── Sidebar (default = expanded) ──────────────────────────── */
-        .sidebar {
-            width: var(--sidebar-w);
-            height: 100vh;           /* exact viewport height — no overflow */
-            background: linear-gradient(180deg, var(--rk-green-mid) 0%, var(--rk-green-dark) 100%);
-            position: fixed;
-            top: 0; left: 0;
-            display: flex; flex-direction: column;
-            z-index: 100;
-            transition: width 0.2s ease;
-            overflow: hidden;         /* clip horizontal; nav scrolls vertically */
-        }
-
-        .sidebar-brand {
-            padding: 14px 16px;
-            border-bottom: 1px solid rgba(255,255,255,0.15);
-            display: flex; align-items: center; gap: 10px;
-            min-height: 64px;
-            flex-shrink: 0;           /* never squish the header */
-        }
-        .sidebar-brand .brand-icon {
-            width: 38px; height: 38px; background: white;
-            border-radius: 11px; display: flex; align-items: center;
-            justify-content: center; font-weight: 800;
-            color: var(--rk-green-dark); font-size: 16px;
-            flex-shrink: 0;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.12);
-        }
-
-        /* Personnel roles (BDRRMO / CFAU / CDRRMO Staff) — red→orange sidebar
-           gradient per Figma, scoped so Admin keeps the original green look. */
-        .sidebar.sidebar-personnel {
-            background: linear-gradient(180deg, #f54900 0%, #c10107 100%);
-        }
-        .sidebar.sidebar-personnel .brand-icon {
-            color: #c10107;
-        }
-        .sidebar-brand .brand-text { line-height: 1.2; flex: 1; min-width: 0; }
-        .sidebar-brand .brand-name {
-            color: white; font-weight: 700; font-size: 15px;
-        }
-        .sidebar-brand .brand-sub {
-            color: rgba(255,255,255,0.65); font-size: 11px;
-        }
-
-        .sidebar-toggle {
-            background: transparent;
-            border: none;
-            color: rgba(255,255,255,0.85);
-            font-size: 20px;
-            cursor: pointer;
-            padding: 6px 8px;
-            border-radius: 6px;
-            flex-shrink: 0;
-            line-height: 1;
-        }
-        .sidebar-toggle:hover { background: rgba(255,255,255,0.15); color: white; }
-
-        .sidebar-user {
-            padding: 12px 14px;
-            background: rgba(255,255,255,0.12);
-            border: 1px solid rgba(255,255,255,0.1);
-            margin: 12px;
-            border-radius: 12px;
-            display: flex; align-items: center; gap: 10px;
-            min-height: 56px;
-            flex-shrink: 0;           /* never squish the user card */
-        }
-        .sidebar-user .user-avatar {
-            width: 32px; height: 32px;
-            background: rgba(255,255,255,0.3);
-            border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            font-weight: 700; color: white; font-size: 13px;
-            flex-shrink: 0;
-        }
-        .sidebar-user .user-info { line-height: 1.25; }
-        .sidebar-user .user-name { color: white; font-size: 13px; font-weight: 500; }
-        .sidebar-user .user-role { color: rgba(255,255,255,0.6); font-size: 11px; }
-
-        /* Nav scrolls; sidebar-footer stays pinned at bottom */
-        .sidebar nav {
-            flex: 1;
-            padding: 8px 0;
-            overflow-y: auto;         /* scroll when nav items overflow */
-            overflow-x: hidden;
-        }
-        /* Custom scrollbar — thin + matches brand colour */
-        .sidebar nav::-webkit-scrollbar { width: 4px; }
-        .sidebar nav::-webkit-scrollbar-track { background: transparent; }
-        .sidebar nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.25); border-radius: 4px; }
-
-        /* Non-clickable grouping label */
-        .nav-section {
-            padding: 14px 20px 4px;
-            color: rgba(255,255,255,0.45);
-            font-size: 10px;
-            font-weight: 700;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-            white-space: nowrap;
-            user-select: none;
-        }
-
-        .nav-item-link {
-            display: flex; align-items: center; gap: 12px;
-            padding: 10px 16px;
-            margin: 2px 10px;
-            border-radius: 10px;
-            color: rgba(255,255,255,0.75);
-            text-decoration: none;
-            font-size: 13px;          /* px — consistent at all zoom levels */
-            font-weight: 400;         /* explicit — blocks Bootstrap .active bold override */
-            transition: background 0.15s, color 0.15s;
-            white-space: nowrap;
-        }
-        .nav-item-link:hover,
-        .nav-item-link.active {
-            background: rgba(255,255,255,0.16);
-            color: white;
-            font-weight: 500;   /* prevent Bootstrap .active bold from inflating text size */
-        }
-        .nav-item-link.active.nav-accent-blue   { background: linear-gradient(135deg,#3b82f6,#2563eb); box-shadow: 0 2px 8px rgba(37,99,235,0.35); }
-        .nav-item-link.active.nav-accent-pink   { background: linear-gradient(135deg,#ec4899,#db2777); box-shadow: 0 2px 8px rgba(219,39,119,0.35); }
-        .nav-item-link.active.nav-accent-orange { background: linear-gradient(135deg,#f97316,#ea580c); box-shadow: 0 2px 8px rgba(234,88,12,0.35); }
-        .nav-item-link.active.nav-accent-slate  { background: linear-gradient(135deg,#475569,#1e293b); box-shadow: 0 2px 8px rgba(30,41,59,0.35); }
-        .nav-item-link.active.nav-accent-purple { background: linear-gradient(135deg,#a855f7,#7c3aed); box-shadow: 0 2px 8px rgba(124,58,237,0.35); }
-        .nav-item-link.active.nav-accent-green  { background: linear-gradient(135deg,#10b981,#059669); box-shadow: 0 2px 8px rgba(5,150,105,0.35); }
-        .nav-item-link .nav-icon {
-            font-size: 16px;
-            width: 20px;
-            text-align: center;
-            flex-shrink: 0;
-        }
-
-        /* Footer always visible — pinned at bottom, never part of scroll */
-        .sidebar-footer {
-            padding: 14px 20px;
-            border-top: 1px solid rgba(255,255,255,0.15);
-            flex-shrink: 0;
-        }
-        .sidebar-footer a {
-            color: rgba(255,255,255,0.7);
-            font-size: 13px;
-            text-decoration: none;
-            display: flex; align-items: center; gap: 10px;
-            padding: 8px 0;
-        }
-        .sidebar-footer a:hover { color: white; }
-
-        /* ── Collapsed state — CLICK-ONLY (no hover expand) ───────────
-           Only the burger button toggles `rk-sidebar-collapsed` on <html>.
-           Hover-expand has been removed entirely; the rail is static.
-        */
-        html.rk-sidebar-collapsed .sidebar {
-            width: var(--sidebar-w-collapsed);
-        }
-        html.rk-sidebar-collapsed .sidebar .sidebar-brand {
-            padding: 14px 0;
-            justify-content: center;
-        }
-        html.rk-sidebar-collapsed .sidebar .brand-icon,
-        html.rk-sidebar-collapsed .sidebar .brand-text { display: none; }
-
-        html.rk-sidebar-collapsed .sidebar .sidebar-toggle {
-            margin: 0 auto;
-        }
-
-        html.rk-sidebar-collapsed .sidebar .sidebar-user {
-            justify-content: center;
-            padding: 12px 0;
-            margin: 12px 8px;
-        }
-        html.rk-sidebar-collapsed .sidebar .user-info { display: none; }
-
-        html.rk-sidebar-collapsed .sidebar .nav-section { display: none; }
-
-        html.rk-sidebar-collapsed .sidebar .nav-item-link {
-            justify-content: center;
-            padding: 12px 0;
-            margin: 2px 6px;
-        }
-        html.rk-sidebar-collapsed .sidebar .nav-label { display: none; }
-
-        html.rk-sidebar-collapsed .sidebar .sidebar-footer {
-            padding: 14px 0;
-        }
-        html.rk-sidebar-collapsed .sidebar .sidebar-footer a {
-            justify-content: center;
-            padding: 8px 0;
-        }
-        html.rk-sidebar-collapsed .sidebar .sidebar-footer .nav-label {
-            display: none;
-        }
-
-        /* ── Main content ──────────────────────────────────────────── */
-        body {
-            font-size: 14px; /* px baseline — scales identically with sidebar under zoom */
-        }
-        .main-content {
-            margin-left: var(--sidebar-w);
-            padding: 24px;
-            transition: margin-left 0.2s ease;
-            min-height: 100vh;
-        }
-        html.rk-sidebar-collapsed .main-content {
-            margin-left: var(--sidebar-w-collapsed);
-        }
-
-        /* During the very first paint, suppress the width/margin
-           transitions so the saved state doesn't animate in. The class
-           is removed by JS after the first frame. */
-        html.rk-no-anim .sidebar,
-        html.rk-no-anim .main-content { transition: none !important; }
-
-        /* ── Page header ───────────────────────────────────────────── */
-        .page-header { margin-bottom: 20px; }
-        .page-header h1 { font-size: 22px; font-weight: 700; color: var(--rk-text); margin: 0; }
-        .page-header p { color: var(--rk-muted); font-size: 13px; margin: 3px 0 0; }
-        .last-updated { font-size: 12px; color: var(--rk-muted); text-align: right; }
-
-        /* ── Shared card styles ────────────────────────────────────── */
-        .stat-card,
-        .dash-card {
-            background: white;
-            border-radius: var(--rk-radius);
-            box-shadow: 0 1px 3px rgba(16,24,40,0.06), 0 1px 8px rgba(16,24,40,0.04);
-            border: 1px solid rgba(16,24,40,0.04);
-        }
-        .stat-card { padding: 18px 20px; height: 100%; }
-        .dash-card { padding: 20px; height: 100%; }
-
-        .stat-card .stat-label { font-size: 12px; color: var(--rk-muted); margin-bottom: 6px; }
-        .stat-card .stat-value { font-size: clamp(15px, 2vw, 26px); font-weight: 700; color: var(--rk-text); margin: 0; word-break: break-word; }
-        .stat-card .stat-change { font-size: 12px; margin-top: 4px; }
-        .stat-card .stat-icon {
-            width: 38px; height: 38px; border-radius: 12px;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 16px;
-        }
-
-        .dash-card .card-title-row {
-            display: flex; align-items: center; gap: 10px;
-            margin-bottom: 16px;
-        }
-        .dash-card .card-title-row h6 {
-            font-size: 14px; font-weight: 600; color: var(--rk-text); margin: 0;
-        }
-
-        /* ── Risk badges ───────────────────────────────────────────── */
-        /* High/Critical are filled & bold so they stand out at a glance;
-           Moderate/Low stay neutral so attention isn't spread evenly —
-           this mirrors the emphasis used across the reference screens. */
-        .risk-badge {
-            font-size: 11px; font-weight: 700;
-            padding: 4px 12px; border-radius: 20px;
-            display: inline-block;
-            letter-spacing: 0.01em;
-        }
-        .risk-critical { background: linear-gradient(135deg,#ef4444,#dc2626); color: #fff; }
-        .risk-high     { background: linear-gradient(135deg,#f87171,#ef4444); color: #fff; }
-        .risk-moderate { background: #f3f4f6; color: #6b7280; border: 1px solid #e5e7eb; font-weight: 600; }
-        .risk-low      { background: #f3f4f6; color: #6b7280; border: 1px solid #e5e7eb; font-weight: 600; }
-
-        /* ── Status pills ──────────────────────────────────────────── */
-        .status-pill {
-            font-size: 11px; font-weight: 700;
-            padding: 4px 12px; border-radius: 20px;
-            display: inline-block;
-        }
-        .status-operational     { background: #d1fae5; color: #047857; }
-        .status-maintenance     { background: #fef3c7; color: #b45309; }
-        .status-unavailable     { background: #fee2e2; color: #dc2626; }
-
-        /* ── Buttons ───────────────────────────────────────────────── */
-        .btn-rk {
-            background: linear-gradient(135deg, var(--rk-green), var(--rk-green-dark));
-            color: white;
-            border: none;
-            border-radius: 9px;
-            font-weight: 500;
-            box-shadow: 0 1px 3px rgba(4,120,87,0.3);
-        }
-        .btn-rk:hover { background: linear-gradient(135deg, var(--rk-green-mid), var(--rk-green-dark)); color: white; }
-        .btn-rk:disabled, .btn-rk.disabled {
-            background: #cbd5e1; box-shadow: none; opacity: 1; color: #fff;
-        }
-
-        /* Soft "ghost" pill button — used for secondary row actions like
-           "View Profile" so they read as calm, not competing with .btn-rk. */
-        .btn-soft {
-            background: #f3f4f6; color: var(--rk-text);
-            border: 1px solid #e5e7eb; border-radius: 8px;
-            font-size: 12.5px; font-weight: 500;
-            padding: 6px 14px;
-            transition: background 0.15s;
-            display: inline-flex; align-items: center; gap: 4px;
-        }
-        .btn-soft:hover { background: #e5e7eb; color: var(--rk-text); }
-
-        /* Rounded search bar used in list/filter toolbars */
-        .search-bar-rk .input-group-text { background: white; border-right: 0; border-radius: 10px 0 0 10px; }
-        .search-bar-rk input { border-left: 0; border-radius: 0 10px 10px 0; }
-        .search-bar-rk input:focus { box-shadow: none; border-color: #ced4da; }
-
-        /* Reusable alert / insight banner (amber notice strip) */
-        .alert-banner {
-            background: #fff8e1; border-left: 4px solid #ffc107;
-            border-radius: 8px; padding: 10px 14px;
-            font-size: 13px; color: #856404; margin-bottom: 16px;
-            display: flex; align-items: center; gap: 8px;
-        }
-    </style>
+    <link rel="stylesheet" href="/static/css/rk.css">
     {% block head_extra %}{% endblock %}
 </head>
 <body>
@@ -397,15 +65,46 @@
 
     {% set active = active_nav | default('') %}
     <nav>
+        {# ── Admin: grouped, data-driven navigation ──────────────────────
+           Each section renders in order; every item keeps its active-route
+           key and tooltip. To change the admin sidebar, edit this list — the
+           markup below is generic and never repeated per item. #}
         {% if is_admin %}
-        <a href="/admin/dashboard"
-           class="nav-item-link {{ 'active' if active == 'analytics' else '' }}">
-            <i class="bi bi-grid-1x2-fill nav-icon"></i><span class="nav-label">Analytics Overview</span>
+        {% set navigation_groups = [
+            {'label': 'Overview', 'items': [
+                {'href': '/admin/dashboard', 'icon': 'bi-grid-1x2-fill', 'text': 'Dashboard', 'key': 'analytics'}
+            ]},
+            {'label': 'Field Data & Mapping', 'items': [
+                {'href': '/admin/barangays', 'icon': 'bi-geo-alt-fill', 'text': 'Barangay Field Data', 'key': 'barangays'},
+                {'href': '/admin/map', 'icon': 'bi-map-fill', 'text': 'Facility Map', 'key': 'map'}
+            ]},
+            {'label': 'Resource Management', 'items': [
+                {'href': '/admin/resources', 'icon': 'bi-box-seam-fill', 'text': 'Resources', 'key': 'resources', 'title': 'Stockpile / resource goods owned by CDRRMO Logistics Staff (food packs, water, medicine, hygiene kits, blankets, and other relief goods)'},
+                {'href': '/admin/equipment', 'icon': 'bi-wrench-adjustable', 'text': 'Vehicle & Equipment', 'key': 'equipment', 'title': 'Shared module — accessible to CDRRMO Logistics Staff and CFAU / Operations Personnel (vehicles, generators, chainsaws, flashlights, rescue tools, boats, ambulances, and other operational equipment)'},
+                {'href': '/admin/serviceability', 'icon': 'bi-clipboard2-check', 'text': 'Serviceability', 'key': 'serviceability_review', 'title': 'Review and resolve CFAU equipment serviceability reports'}
+            ]},
+            {'label': 'Planning & Simulation', 'items': [
+                {'href': '/admin/simulator/setup', 'icon': 'bi-lightning-fill', 'text': 'Disaster Simulator', 'key': 'simulator'}
+            ]},
+            {'label': 'Incident Management', 'items': [
+                {'href': '/admin/uploads', 'icon': 'bi-cloud-upload-fill', 'text': 'Incident Uploads', 'key': 'uploads', 'title': 'Upload and convert disaster reports into incident records.'},
+                {'href': '/admin/incident-reports', 'icon': 'bi-journal-text', 'text': 'Post-Incident Reports', 'key': 'incident_reports_review', 'title': 'Document response actions and operational outcomes for incidents.'}
+            ]},
+            {'label': 'Administration', 'items': [
+                {'href': '/admin/users', 'icon': 'bi-people-fill', 'text': 'User Management', 'key': 'users'},
+                {'href': '/admin/audit', 'icon': 'bi-file-earmark-text-fill', 'text': 'Audit Trail', 'key': 'audit', 'title': 'System-wide audit trail of all logged actions'}
+            ]}
+        ] %}
+        {% for group in navigation_groups %}
+        <div class="nav-section">{{ group.label }}</div>
+        {% for item in group['items'] %}
+        <a href="{{ item.href }}"
+           class="nav-item-link {{ 'active' if active == item.key else '' }}"
+           {%- if item.title %} title="{{ item.title }}"{% endif %}>
+            <i class="bi {{ item.icon }} nav-icon"></i><span class="nav-label">{{ item.text }}</span>
         </a>
-        <a href="/admin/barangays"
-           class="nav-item-link nav-accent-blue {{ 'active' if active == 'barangays' else '' }}">
-            <i class="bi bi-geo-alt-fill nav-icon"></i><span class="nav-label">Barangay Field Data</span>
-        </a>
+        {% endfor %}
+        {% endfor %}
         {% endif %}
 
         {% if is_staff %}
@@ -449,7 +148,7 @@
         </a>
         {% endif %}
 
-        {% if is_admin or is_staff %}
+        {% if is_staff %}
         <a href="/admin/resources"
            class="nav-item-link nav-accent-pink {{ 'active' if active == 'resources' else '' }}"
            title="Stockpile / resource goods owned by CDRRMO Logistics Staff (food packs, water, medicine, hygiene kits, blankets, and other relief goods)">
@@ -457,7 +156,7 @@
         </a>
         {% endif %}
 
-        {% if is_admin or is_staff or is_cfau %}
+        {% if is_staff or is_cfau %}
         <a href="/admin/equipment"
            class="nav-item-link {{ 'active' if active == 'equipment' else '' }}"
            title="Shared module — accessible to CDRRMO Logistics Staff and CFAU / Operations Personnel (vehicles, generators, chainsaws, flashlights, rescue tools, boats, ambulances, and other operational equipment)">
@@ -478,44 +177,6 @@
         </a>
         {% endif %}
 
-        {% if is_admin %}
-        <a href="/admin/serviceability"
-           class="nav-item-link {{ 'active' if active == 'serviceability_review' else '' }}"
-           title="Review and resolve CFAU equipment serviceability reports">
-            <i class="bi bi-clipboard2-check nav-icon"></i><span class="nav-label">Serviceability Review</span>
-        </a>
-        {% endif %}
-
-        {% if is_admin %}
-        <a href="/admin/map"
-           class="nav-item-link nav-accent-orange {{ 'active' if active == 'map' else '' }}">
-            <i class="bi bi-map-fill nav-icon"></i><span class="nav-label">Hazard Reference Map</span>
-        </a>
-        <a href="/admin/simulator/setup"
-           class="nav-item-link {{ 'active' if active == 'simulator' else '' }}">
-            <i class="bi bi-lightning-fill nav-icon"></i><span class="nav-label">Disaster Simulator</span>
-        </a>
-        <div class="nav-section">Incident Management</div>
-        <a href="/admin/uploads"
-            class="nav-item-link {{ 'active' if active == 'uploads' else '' }}"
-            title="Upload and convert disaster reports into incident records.">
-                <i class="bi bi-cloud-upload-fill nav-icon"></i><span class="nav-label">Incident Data Uploads</span>
-        </a>
-        <a href="/admin/incident-reports"
-           class="nav-item-link {{ 'active' if active == 'incident_reports_review' else '' }}"
-           title="Document response actions and operational outcomes for incidents.">
-            <i class="bi bi-journal-text nav-icon"></i><span class="nav-label">Post-Incident Reports</span>
-        </a>
-        <a href="/admin/audit"
-           class="nav-item-link nav-accent-slate {{ 'active' if active == 'audit' else '' }}"
-           title="System-wide audit trail of all logged actions">
-            <i class="bi bi-file-earmark-text-fill nav-icon"></i><span class="nav-label">Audit Trail</span>
-        </a>
-        <a href="/admin/users"
-           class="nav-item-link {{ 'active' if active == 'users' else '' }}">
-            <i class="bi bi-people-fill nav-icon"></i><span class="nav-label">User Management</span>
-        </a>
-        {% endif %}
     </nav>
 
     <div class="sidebar-footer">

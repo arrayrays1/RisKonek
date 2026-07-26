@@ -41,16 +41,16 @@
             </div>
             <hr>
             <div class="stat-label">Findings / Issue Description</div>
-            <p class="mb-0" style="white-space:pre-wrap">{{ r.issue_description or '—' }}</p>
+            <p class="mb-0 rk-pre-wrap">{{ r.issue_description or '—' }}</p>
         </div>
 
         {% if r.admin_remarks %}
         <div class="dash-card mt-3">
             <div class="card-title-row">
-                <i class="bi bi-chat-left-text" style="color:var(--rk-green);font-size:16px"></i>
+                <i class="bi bi-chat-left-text rk-text-green rk-fs-16"></i>
                 <h6>Admin Remarks</h6>
             </div>
-            <p class="mb-0" style="white-space:pre-wrap">{{ r.admin_remarks }}</p>
+            <p class="mb-0 rk-pre-wrap">{{ r.admin_remarks }}</p>
         </div>
         {% endif %}
     </div>
@@ -58,7 +58,7 @@
     <div class="col-md-4">
         <div class="dash-card">
             <div class="card-title-row">
-                <i class="bi bi-clock-history" style="color:var(--rk-green);font-size:16px"></i>
+                <i class="bi bi-clock-history rk-text-green rk-fs-16"></i>
                 <h6>Status</h6>
             </div>
             <p><span class="badge bg-secondary">{{ workflow_label }}</span></p>

@@ -9,7 +9,7 @@
           integrity="sha384-9ndCyUaIbzAi2FUVXJi0CjmCapSmO7SnpJef0486qhLnuZ2cdeRhO02iuK6FUUVM" crossorigin="anonymous">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css"
           integrity="sha384-tViUnnbYAV00FLIhhi3v/dWt3Jxw4gZQcNoSCxCIFNJVCx7/D55/wXsrNIRANwdD" crossorigin="anonymous">
-    <style>
+    <style nonce="{{ request.state.csp_nonce }}">
         :root {
             --rk-green: #10b981;
             --rk-green-mid: #059669;
@@ -167,7 +167,7 @@
             <div class="subtext">Enter your credentials to access the system</div>
 
             {% if error %}
-            <div class="alert alert-danger alert-dismissible fade show py-2" role="alert" style="font-size:13px">
+            <div class="alert alert-danger alert-dismissible fade show py-2" role="alert rk-fs-13">
                 {{ error }}
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>

@@ -1,11 +1,11 @@
 {% extends "admin/base.html" %}
 
-{% block title %}Analytics Overview — RisKonek{% endblock %}
+{% block title %}Dashboard — RisKonek{% endblock %}
 
 {% block head_extra %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
       integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous"/>
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
     .brgy-item {
         padding: 12px 0;
         border-bottom: 1px solid #f0f0f0;
@@ -73,12 +73,12 @@
 <!-- Alert banner — only shows if there are active alerts -->
 {% if active_alerts > 0 %}
 <div class="alert-banner">
-    <i class="bi bi-exclamation-triangle-fill" style="font-size:16px"></i>
+    <i class="bi bi-exclamation-triangle-fill rk-fs-16"></i>
     <span>
         <strong>{{ active_alerts }} active alert{{ 's' if active_alerts > 1 else '' }}:</strong>
         {{ low_stock_count }} item{{ 's' if low_stock_count != 1 else '' }} below restock threshold,
         {{ expiring_count }} item{{ 's' if expiring_count != 1 else '' }} expiring within 30 days.
-        <a href="/admin/resources" class="fw-medium text-decoration-none" style="color:#856404">
+        <a href="/admin/resources" class="fw-medium text-decoration-none rk-text-note">
             View Resources <i class="bi bi-arrow-right"></i>
         </a>
     </span>
@@ -92,11 +92,11 @@
         <div class="stat-card">
             <div class="d-flex justify-content-between align-items-start">
                 <div class="stat-label">Overall System Status</div>
-                <div class="stat-icon" style="background:#d1fae5;color:#047857">
+                <div class="stat-icon rk-tint-green">
                     <i class="bi bi-shield-check"></i>
                 </div>
             </div>
-            <div class="stat-value" style="color:#047857">Operational</div>
+            <div class="stat-value rk-text-ok">Operational</div>
             <div class="stat-change text-success">
                 {{ total_barangays }} barangays monitored
             </div>
@@ -107,7 +107,7 @@
         <div class="stat-card">
             <div class="d-flex justify-content-between align-items-start">
                 <div class="stat-label">Overall Readiness Score</div>
-                <div class="stat-icon" style="background:#e8f4fd;color:#2980b9">
+                <div class="stat-icon rk-tint-blue">
                     <i class="bi bi-graph-up-arrow"></i>
                 </div>
             </div>
@@ -122,7 +122,7 @@
         <div class="stat-card">
             <div class="d-flex justify-content-between align-items-start">
                 <div class="stat-label">Data Relevance Score</div>
-                <div class="stat-icon" style="background:#f3e8fd;color:#8e44ad">
+                <div class="stat-icon rk-tint-purple">
                     <i class="bi bi-database-check"></i>
                 </div>
             </div>
@@ -137,11 +137,11 @@
         <div class="stat-card">
             <div class="d-flex justify-content-between align-items-start">
                 <div class="stat-label">Active Alerts Count</div>
-                <div class="stat-icon" style="background:#fde8e8;color:#c0392b">
+                <div class="stat-icon rk-tint-red">
                     <i class="bi bi-bell-fill"></i>
                 </div>
             </div>
-            <div class="stat-value" style="color:{{ '#c0392b' if active_alerts > 0 else '#047857' }}">
+            <div class="stat-value {{ 'rk-text-crit' if active_alerts > 0 else 'rk-text-ok' }}">
                 {{ active_alerts }}
             </div>
             <div class="stat-change text-muted">
@@ -164,15 +164,9 @@
 
             {% if recent_logs %}
                 {% for log in recent_logs %}
+                {% set fa = log.action if log.action in ['created','updated','deleted','deactivated','login'] else 'default' %}
                 <div class="feed-item">
-                    <div class="feed-icon"
-                         style="background:
-                         {% if log.action == 'created' %}#d1fae5;color:#047857
-                         {% elif log.action == 'updated' %}#e8f4fd;color:#2980b9
-                         {% elif log.action == 'deleted' %}#fde8e8;color:#c0392b
-                         {% elif log.action == 'deactivated' %}#fef3e2;color:#d35400
-                         {% elif log.action == 'login' %}#f3e8fd;color:#8e44ad
-                         {% else %}#f4f6f9;color:#6c757d{% endif %}">
+                    <div class="feed-icon feed-{{ fa }}">
                         {% if log.action == 'created' %}<i class="bi bi-check-circle-fill"></i>
                         {% elif log.action == 'updated' %}<i class="bi bi-pencil-fill"></i>
                         {% elif log.action == 'deleted' %}<i class="bi bi-trash-fill"></i>
@@ -191,7 +185,7 @@
                 </div>
                 {% endfor %}
             {% else %}
-                <div class="text-center text-muted py-4" style="font-size:13px">
+                <div class="text-center text-muted py-4 rk-fs-13">
                     No recent activity yet. Actions taken in the system will appear here.
                 </div>
             {% endif %}
@@ -201,19 +195,18 @@
     <div class="col-md-5">
         <div class="dash-card">
             <div class="card-title-row">
-                <i class="bi bi-map-fill" style="color:var(--rk-green)"></i>
+                <i class="bi bi-map-fill rk-text-green"></i>
                 <h6>Barangay-Level Hazard and Priority Map</h6>
-                <a href="/admin/map" class="ms-auto"
-                   style="font-size:12px;color:var(--rk-green);text-decoration:none">
+                <a href="/admin/map" class="ms-auto rk-fs-12 rk-text-green text-decoration-none">
                     View Full Map <i class="bi bi-arrow-right"></i>
                 </a>
             </div>
             <div id="dashMap"></div>
-            <div class="d-flex gap-3 mt-2 flex-wrap" style="font-size:11px">
-                <span><i class="bi bi-circle-fill" style="color:#c0392b"></i> Critical</span>
-                <span><i class="bi bi-circle-fill" style="color:#d35400"></i> High</span>
-                <span><i class="bi bi-circle-fill" style="color:#b7950b"></i> Moderate</span>
-                <span><i class="bi bi-circle-fill" style="color:#047857"></i> Low</span>
+            <div class="d-flex gap-3 mt-2 flex-wrap rk-fs-11">
+                <span><i class="bi bi-circle-fill rk-text-crit"></i> Critical</span>
+                <span><i class="bi bi-circle-fill rk-text-high"></i> High</span>
+                <span><i class="bi bi-circle-fill rk-text-mod"></i> Moderate</span>
+                <span><i class="bi bi-circle-fill rk-text-ok"></i> Low</span>
             </div>
         </div>
     </div>
@@ -226,7 +219,7 @@
     <div class="col-md-6">
         <div class="dash-card">
             <div class="card-title-row">
-                <i class="bi bi-bar-chart-fill" style="color:#2980b9"></i>
+                <i class="bi bi-bar-chart-fill rk-text-info"></i>
                 <h6>Disaster Incidents by Type</h6>
             </div>
             <canvas id="disasterChart" height="180"></canvas>
@@ -236,7 +229,7 @@
     <div class="col-md-6">
         <div class="dash-card">
             <div class="card-title-row">
-                <i class="bi bi-graph-up" style="color:var(--rk-green)"></i>
+                <i class="bi bi-graph-up rk-text-green"></i>
                 <h6>Incidents Trend (Last 6 Years)</h6>
             </div>
             <canvas id="trendChart" height="180"></canvas>
@@ -255,7 +248,7 @@
                 <h6>Priority Barangays (Frequently Affected)</h6>
             </div>
 
-            <div class="text-muted mb-2" style="font-size:11px">
+            <div class="text-muted mb-2 rk-fs-11">
                 <i class="bi bi-info-circle"></i>
                 This score is system-generated for planning support only and is
                 not an official hazard or risk classification.
@@ -280,17 +273,14 @@
                 </div>
                 <div class="d-flex align-items-center gap-2">
                     <div class="score-bar-track flex-grow-1">
-                        <div class="score-bar-fill"
-                             style="width:{{ brgy.score }}%;
-                             background:{% if brgy.level == 'critical' %}#c0392b{% elif brgy.level == 'high' %}#d35400{% elif brgy.level == 'moderate' %}#f39c12{% else %}#047857{% endif %}">
-                        </div>
+                        <div class="score-bar-fill rk-fill-{{ brgy.level }} rk-w-p{{ brgy.score | round | int }}"></div>
                     </div>
-                    <span style="font-size:12px;color:var(--rk-muted);white-space:nowrap">
+                    <span class="rk-fs-12 text-muted rk-nowrap">
                         Score: {{ brgy.score }}
                     </span>
                 </div>
                 <a href="/admin/barangays/{{ brgy.id }}"
-                   style="font-size:12px;color:var(--rk-green);text-decoration:none">
+                   class="rk-fs-12 rk-text-green text-decoration-none">
                     View Barangay Profile <i class="bi bi-arrow-right"></i>
                 </a>
             </div>
@@ -302,7 +292,7 @@
     <div class="col-md-6">
         <div class="dash-card">
             <div class="card-title-row">
-                <i class="bi bi-shield-fill-check" style="color:var(--rk-green)"></i>
+                <i class="bi bi-shield-fill-check rk-text-green"></i>
                 <h6>Preparedness Index Overview</h6>
             </div>
 
@@ -330,7 +320,7 @@
             </table>
 
             <a href="/admin/barangays"
-               class="btn-soft w-100 justify-content-center mt-2" style="color:var(--rk-green)">
+               class="btn-soft w-100 justify-content-center mt-2 rk-text-green">
                 View All Barangays <i class="bi bi-arrow-right"></i>
             </a>
         </div>
@@ -428,25 +418,21 @@ const markerColors = {
 const markers = {{ map_markers | safe }};
 markers.forEach(m => {
     const color = markerColors[m.level] || '#888';
-    const icon = L.divIcon({
-        className: '',
-        html: `<div style="
-            width:12px;height:12px;
-            background:${color};
-            border:2px solid white;
-            border-radius:50%;
-            box-shadow:0 1px 3px rgba(0,0,0,0.4)
-        "></div>`,
-        iconSize: [12, 12],
-        iconAnchor: [6, 6]
-    });
-    L.marker([m.lat, m.lng], { icon })
+    // circleMarker renders as SVG (fill/stroke via attributes, no inline
+    // style attribute) so it stays valid under a strict CSP style-src.
+    L.circleMarker([m.lat, m.lng], {
+        radius: 6,
+        color: '#fff',
+        weight: 2,
+        fillColor: color,
+        fillOpacity: 1
+    })
         .addTo(map)
         .bindPopup(`
             <strong>${m.name}</strong><br>
             Planning Priority Score: ${m.score}<br>
-            Priority: <span style="color:${color};font-weight:600">${m.level.charAt(0).toUpperCase() + m.level.slice(1)}</span><br>
-            <span style="font-size:10px;color:#666">System-generated for planning support only; not an official hazard or risk classification.</span>
+            Priority: <span class="rk-lvl-${m.level} fw-semibold">${m.level.charAt(0).toUpperCase() + m.level.slice(1)}</span><br>
+            <span class="rk-fs-10 rk-text-faint">System-generated for planning support only; not an official hazard or risk classification.</span>
         `);
 });
 </script>

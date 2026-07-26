@@ -5,7 +5,7 @@
 {% set active_nav = 'bdrrmo_profile' %}
 
 {% block head_extra %}
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
     .profile-header { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
     .profile-header h1 { margin: 0; }
     .trend-up { color: #c0392b; }
@@ -39,7 +39,7 @@
         <div class="stat-card">
             <div class="d-flex justify-content-between align-items-start">
                 <div class="stat-label">Total Population</div>
-                <div class="stat-icon" style="background:#e8f4fd;color:#2980b9"><i class="bi bi-people-fill"></i></div>
+                <div class="stat-icon rk-tint-blue"><i class="bi bi-people-fill"></i></div>
             </div>
             <div class="stat-value">{{ "{:,}".format(total_population) }}</div>
             <div class="stat-change text-muted">{{ "{:,}".format(households) }} households</div>
@@ -49,7 +49,7 @@
         <div class="stat-card">
             <div class="d-flex justify-content-between align-items-start">
                 <div class="stat-label">Vulnerable %</div>
-                <div class="stat-icon" style="background:#fef3e2;color:#d35400"><i class="bi bi-exclamation-triangle-fill"></i></div>
+                <div class="stat-icon rk-tint-orange"><i class="bi bi-exclamation-triangle-fill"></i></div>
             </div>
             <div class="stat-value">{{ vulnerable_pct }}%</div>
             <div class="stat-change text-muted">Elderly, PWDs, Children</div>
@@ -59,7 +59,7 @@
         <div class="stat-card">
             <div class="d-flex justify-content-between align-items-start">
                 <div class="stat-label">Flood Risk Trend</div>
-                <div class="stat-icon" style="background:#fde8e8;color:#c0392b"><i class="bi bi-graph-up-arrow"></i></div>
+                <div class="stat-icon rk-tint-red"><i class="bi bi-graph-up-arrow"></i></div>
             </div>
             <div class="stat-value {{ 'trend-up' if flood_trend == 'Increasing' else 'trend-stable' }}">{{ flood_trend }}</div>
             <div class="stat-change text-muted">Last 12 months vs prior</div>
@@ -69,7 +69,7 @@
         <div class="stat-card">
             <div class="d-flex justify-content-between align-items-start">
                 <div class="stat-label">Fire Risk Trend</div>
-                <div class="stat-icon" style="background:#fef9e7;color:#b7950b"><i class="bi bi-fire"></i></div>
+                <div class="stat-icon rk-tint-amber"><i class="bi bi-fire"></i></div>
             </div>
             <div class="stat-value {{ 'trend-up' if fire_trend == 'Increasing' else 'trend-stable' }}">{{ fire_trend }}</div>
             <div class="stat-change text-muted">Last 12 months vs prior</div>
@@ -80,7 +80,7 @@
 <!-- ── Vulnerable groups ──────────────────────────────────────── -->
 <div class="dash-card mb-4">
     <div class="card-title-row">
-        <i class="bi bi-people" style="color:#d35400"></i>
+        <i class="bi bi-people rk-text-high"></i>
         <h6>Vulnerable Population Groups</h6>
     </div>
     <div class="row g-3">
@@ -106,7 +106,7 @@
             </div>
         </div>
     </div>
-    <div class="text-muted mt-3" style="font-size:11px">
+    <div class="text-muted mt-3 rk-fs-11">
         <i class="bi bi-info-circle"></i>
         Counts come from the latest population record. Use
         <a href="/bdrrmo/population">Population Records</a> to log an updated census.
@@ -116,28 +116,28 @@
 <!-- ── Known hazards ──────────────────────────────────────────── -->
 <div class="dash-card mb-4">
     <div class="card-title-row">
-        <i class="bi bi-shield-exclamation" style="color:var(--rk-green)"></i>
+        <i class="bi bi-shield-exclamation rk-text-green"></i>
         <h6>Known Hazard Types</h6>
     </div>
     {% if hazard_types %}
         {% for h in hazard_types %}
-        <span class="badge bg-light text-dark border me-1" style="font-size:12px">{{ h.title() }}</span>
+        <span class="badge bg-light text-dark border me-1 rk-fs-12">{{ h.title() }}</span>
         {% endfor %}
     {% else %}
-        <span class="text-muted" style="font-size:13px">No hazards recorded.</span>
+        <span class="text-muted rk-fs-13">No hazards recorded.</span>
     {% endif %}
 </div>
 
 <!-- ── Planning priority breakdown ────────────────────────────── -->
 <div class="dash-card">
     <div class="card-title-row">
-        <i class="bi bi-speedometer2" style="color:var(--rk-green)"></i>
+        <i class="bi bi-speedometer2 rk-text-green"></i>
         <h6>Planning Priority Breakdown</h6>
     </div>
-    <div class="row g-3" style="font-size:13px">
+    <div class="row g-3 rk-fs-13">
         <div class="col-md-3">
             <div class="text-muted">Overall Score</div>
-            <div class="fw-bold" style="font-size:22px">{{ risk_score }}<span class="text-muted" style="font-size:13px"> / 100</span></div>
+            <div class="fw-bold rk-fs-22">{{ risk_score }}<span class="text-muted rk-fs-13"> / 100</span></div>
         </div>
         <div class="col-md-3">
             <div class="text-muted">Hazard Exposure (40%)</div>
@@ -152,7 +152,7 @@
             <div class="fw-semibold">{{ risk_breakdown['population_score'] }}</div>
         </div>
     </div>
-    <div class="text-muted mt-3" style="font-size:11px">
+    <div class="text-muted mt-3 rk-fs-11">
         <i class="bi bi-info-circle"></i>
         This score is system-generated for planning support only and is not an
         official hazard or risk classification. Official hazard and risk levels

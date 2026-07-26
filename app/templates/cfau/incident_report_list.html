@@ -75,8 +75,8 @@
 <div class="dash-card p-0">
     <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
-            <thead style="background:#f9fafb">
-                <tr style="font-size:12px;color:var(--rk-muted);text-transform:uppercase;letter-spacing:0.04em">
+            <thead class="rk-bg-soft">
+                <tr class="rk-th-soft">
                     <th class="px-3 py-3">Disaster Type</th>
                     <th class="py-3">Barangay</th>
                     <th class="py-3">Date Occurred</th>
@@ -88,7 +88,7 @@
             </thead>
             <tbody>
                 {% for r in rows %}
-                <tr style="font-size:13px">
+                <tr class="rk-fs-13">
                     <td class="px-3 fw-semibold">{{ r.disaster_type }}</td>
                     <td>{{ r.barangay }}</td>
                     <td class="text-muted">{{ r.date_occurred.strftime('%Y-%m-%d') if r.date_occurred else '—' }}</td>

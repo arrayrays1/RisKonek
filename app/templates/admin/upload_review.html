@@ -131,7 +131,7 @@
         <h6>AI Summary</h6>
     </div>
     {% if report.ai_summary %}
-        <p class="mb-0" style="white-space:pre-line">{{ report.ai_summary }}</p>
+        <p class="mb-0 rk-pre-line">{{ report.ai_summary }}</p>
     {% elif not ai_available %}
         <p class="text-muted mb-0 small">AI summary unavailable (GROQ_API_KEY not configured).</p>
     {% else %}
@@ -146,9 +146,9 @@
         <h6>Extracted Preview</h6>
     </div>
     {% if columns_preview and rows_preview %}
-        <div class="table-responsive" style="max-height: 260px; overflow:auto;">
-            <table class="table table-sm table-bordered mb-0" style="font-size:12px">
-                <thead style="background:#f9fafb;position:sticky;top:0">
+        <div class="table-responsive rk-mh-260">
+            <table class="table table-sm table-bordered mb-0 rk-fs-12">
+                <thead class="rk-th-sticky">
                     <tr>{% for c in columns_preview %}<th>{{ c }}</th>{% endfor %}</tr>
                 </thead>
                 <tbody>
@@ -164,7 +164,7 @@
         </div>
         <div class="form-text">Showing first {{ rows_preview | length }} rows.</div>
     {% elif raw_text_preview %}
-        <pre style="white-space:pre-wrap;font-size:12px;max-height:260px;overflow:auto;background:#f9fafb;padding:10px;border-radius:6px">{{ raw_text_preview }}</pre>
+        <pre class="rk-raw-preview rk-mh-260">{{ raw_text_preview }}</pre>
     {% else %}
         <p class="text-muted mb-0 small">No preview available.</p>
     {% endif %}
@@ -211,18 +211,18 @@
     </p>
 
     <div class="table-responsive">
-    <table class="table table-bordered align-middle" style="font-size:12px">
-        <thead style="background:#f9fafb">
+    <table class="table table-bordered align-middle rk-fs-12">
+        <thead class="rk-bg-soft">
             <tr>
-                <th style="width:40px"></th>
-                <th style="min-width:140px">Barangay</th>
-                <th style="min-width:120px">Disaster Type</th>
-                <th style="min-width:130px">Date Occurred</th>
-                <th style="width:90px">Families</th>
-                <th style="width:90px">Individuals</th>
-                <th style="width:90px">Casualties</th>
-                <th style="min-width:220px">Description</th>
-                <th style="min-width:160px">Resources Used</th>
+                <th class="rk-w-40"></th>
+                <th class="rk-mw-140">Barangay</th>
+                <th class="rk-mw-120">Disaster Type</th>
+                <th class="rk-mw-130">Date Occurred</th>
+                <th class="rk-w-90">Families</th>
+                <th class="rk-w-90">Individuals</th>
+                <th class="rk-w-90">Casualties</th>
+                <th class="rk-mw-220">Description</th>
+                <th class="rk-mw-160">Resources Used</th>
             </tr>
         </thead>
         <tbody>

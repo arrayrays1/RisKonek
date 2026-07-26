@@ -50,7 +50,7 @@
                 <div class="stat-label">Total Active Items</div>
                 <div class="stat-value">{{ summary.total }}</div>
             </div>
-            <div class="stat-icon" style="background:#d1fae5;color:var(--rk-green)">
+            <div class="stat-icon rk-tint-green-rk">
                 <i class="bi bi-box-seam"></i>
             </div>
         </div>
@@ -61,7 +61,7 @@
                 <div class="stat-label">Low Stock</div>
                 <div class="stat-value">{{ summary.low_stock }}</div>
             </div>
-            <div class="stat-icon" style="background:#fef9e7;color:#b7950b">
+            <div class="stat-icon rk-tint-amber">
                 <i class="bi bi-exclamation-triangle"></i>
             </div>
         </div>
@@ -72,7 +72,7 @@
                 <div class="stat-label">Near Expiry (≤ 30d)</div>
                 <div class="stat-value">{{ summary.near_expiry }}</div>
             </div>
-            <div class="stat-icon" style="background:#fef9e7;color:#b7950b">
+            <div class="stat-icon rk-tint-amber">
                 <i class="bi bi-clock-history"></i>
             </div>
         </div>
@@ -83,7 +83,7 @@
                 <div class="stat-label">Expired</div>
                 <div class="stat-value">{{ summary.expired }}</div>
             </div>
-            <div class="stat-icon" style="background:#fde8e8;color:#c0392b">
+            <div class="stat-icon rk-tint-red">
                 <i class="bi bi-x-octagon"></i>
             </div>
         </div>
@@ -93,7 +93,7 @@
 {% set alert_total = summary.low_stock + summary.near_expiry + summary.expired %}
 {% if alert_total > 0 %}
 <div class="alert-banner">
-    <i class="bi bi-exclamation-triangle-fill" style="font-size:16px"></i>
+    <i class="bi bi-exclamation-triangle-fill rk-fs-16"></i>
     <span>
         <strong>{{ alert_total }} item{{ 's' if alert_total != 1 else '' }} need{{ '' if alert_total != 1 else 's' }} attention:</strong>
         {{ summary.low_stock }} low stock, {{ summary.near_expiry }} near expiry, {{ summary.expired }} expired.
@@ -147,8 +147,8 @@
 <div class="dash-card p-0">
     <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
-            <thead style="background:#f9fafb">
-                <tr style="font-size:12px;color:var(--rk-muted);text-transform:uppercase;letter-spacing:0.04em">
+            <thead class="rk-bg-soft">
+                <tr class="rk-th-soft">
                     <th class="px-3 py-3">Item</th>
                     <th class="py-3">Category</th>
                     <th class="py-3 text-end">Qty</th>
@@ -162,7 +162,7 @@
             </thead>
             <tbody>
                 {% for r in rows %}
-                <tr style="font-size:13px">
+                <tr class="rk-fs-13">
                     <td class="px-3">
                         <div class="fw-semibold">{{ r.name }}</div>
                         <div class="text-muted small">
@@ -178,7 +178,7 @@
                     <td>{{ alert_pill(r.alert) }}</td>
                     <td class="text-end px-3">
                         {% if not r.is_archived %}
-                        <button type="button" class="btn-soft" style="color:#047857"
+                        <button type="button" class="btn-soft rk-text-ok"
                                 data-bs-toggle="modal" data-bs-target="#stockModal-{{ r.id }}">
                             <i class="bi bi-plus-slash-minus"></i> Stock
                         </button>
@@ -189,14 +189,14 @@
                         <form method="POST" action="/admin/resources/{{ r.id }}/archive" class="d-inline"
                               data-confirm='Archive {{ r.name }}?'>
             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
-                            <button type="submit" class="btn-soft" style="color:#b45309" title="Archive">
+                            <button type="submit" class="btn-soft rk-text-amber" title="Archive">
                                 <i class="bi bi-archive"></i>
                             </button>
                         </form>
                         {% else %}
                         <form method="POST" action="/admin/resources/{{ r.id }}/archive" class="d-inline">
             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
-                            <button type="submit" class="btn-soft" style="color:#047857">
+                            <button type="submit" class="btn-soft rk-text-ok">
                                 <i class="bi bi-arrow-counterclockwise"></i> Restore
                             </button>
                         </form>

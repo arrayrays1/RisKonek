@@ -1,11 +1,11 @@
 {% extends "admin/base.html" %}
 
-{% block title %}Hazard Reference & Facility Map — RisKonek{% endblock %}
+{% block title %}Critical Facilities Map — RisKonek{% endblock %}
 
 {% block head_extra %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
       integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous"/>
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
     .map-wrap {
         display: grid;
         grid-template-columns: 280px 1fr;
@@ -131,7 +131,7 @@
 {% block content %}
 <div class="page-header d-flex justify-content-between align-items-end">
     <div>
-        <h1><i class="bi bi-map-fill me-2"></i>Hazard Reference &amp; Facility Map</h1>
+        <h1><i class="bi bi-map-fill me-2"></i>Critical Facilities Map</h1>
         <p>Critical facilities of San Pedro, Laguna — sourced from the CDRRMO master list.</p>
     </div>
     <div class="last-updated">San Pedro, Laguna</div>
@@ -236,27 +236,27 @@
         <div class="map-overlay">
             <div class="legend-title">Legend</div>
             <div class="legend-row">
-                <span class="legend-dot" style="background:#047857"></span>
+                <span class="legend-dot rk-bg-green"></span>
                 <span>Evacuation Center</span>
             </div>
             <div class="legend-row">
-                <span class="legend-dot" style="background:#2980b9"></span>
+                <span class="legend-dot rk-bg-blue"></span>
                 <span>School</span>
             </div>
             <div class="legend-row">
-                <span class="legend-dot" style="background:#c0392b"></span>
+                <span class="legend-dot rk-bg-red"></span>
                 <span>Hospital</span>
             </div>
             <div class="legend-row">
-                <span class="legend-dot" style="background:#8e44ad"></span>
+                <span class="legend-dot rk-bg-purple"></span>
                 <span>Health Clinic</span>
             </div>
             <div class="legend-row">
-                <span class="legend-dot" style="background:#d35400"></span>
+                <span class="legend-dot rk-bg-orange"></span>
                 <span>Staging Area</span>
             </div>
-            <div class="legend-row mt-2" style="border-top:1px solid #eee; padding-top:6px;">
-                <span class="legend-dot" style="background:#f1c40f"></span>
+            <div class="legend-row mt-2 rk-legend-sep">
+                <span class="legend-dot rk-bg-yellow"></span>
                 <span>Approximate location (fallback)</span>
             </div>
         </div>
@@ -287,20 +287,20 @@ const TYPE_COLORS = {
     staging_area:      '#d35400',
 };
 
-function markerIcon(facility) {
+function markerStyle(facility) {
     const color = facility.is_approximate_location
         ? '#f1c40f'
         : (TYPE_COLORS[facility.facility_type] || '#888');
-    const ring = facility.is_city_level ? '3px solid #1a4fb0' : '2px solid white';
-    return L.divIcon({
-        className: '',
-        html: `<div style="
-            width:14px;height:14px;background:${color};
-            border:${ring};border-radius:50%;
-            box-shadow:0 1px 3px rgba(0,0,0,0.4)"></div>`,
-        iconSize: [14, 14],
-        iconAnchor: [7, 7],
-    });
+    // circleMarker renders as SVG (fill/stroke set via attributes, not an
+    // inline style attribute), so it stays valid under a strict CSP
+    // style-src that no longer allows 'unsafe-inline'.
+    return {
+        radius: 7,
+        color: facility.is_city_level ? '#1a4fb0' : '#ffffff',
+        weight: facility.is_city_level ? 3 : 2,
+        fillColor: color,
+        fillOpacity: 1,
+    };
 }
 
 // Escape any DB-sourced string before it is interpolated into the popup's
@@ -393,7 +393,7 @@ function applyFilters() {
             if (!ok) return;
         }
 
-        L.marker([f.lat, f.lng], { icon: markerIcon(f) })
+        L.circleMarker([f.lat, f.lng], markerStyle(f))
             .addTo(markerLayer)
             .bindPopup(popupHtml(f), { maxWidth: 320 });
 

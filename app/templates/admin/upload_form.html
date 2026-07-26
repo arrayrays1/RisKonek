@@ -16,7 +16,7 @@
 </div>
 {% endif %}
 
-<div class="dash-card" style="max-width: 720px;">
+<div class="dash-card rk-maxw-720">
     <form method="POST" action="/admin/uploads/new" enctype="multipart/form-data">
             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
         <div class="mb-3">

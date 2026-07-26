@@ -5,7 +5,7 @@
 {% set active_nav = 'barangays' %}
 
 {% block head_extra %}
-<style>
+<style nonce="{{ request.state.csp_nonce }}">
     .profile-header {
         display: flex; align-items: center; gap: 14px;
         flex-wrap: wrap;
@@ -63,7 +63,7 @@
                     {{ risk_level.title() }} Planning Priority
                 </span>
             </div>
-            <p class="text-muted mb-0" style="font-size:13px">
+            <p class="text-muted mb-0 rk-fs-13">
                 Comprehensive barangay disaster profile and preparedness data
             </p>
         </div>
@@ -80,7 +80,7 @@
         <div class="stat-card">
             <div class="d-flex justify-content-between align-items-start">
                 <div class="stat-label">Total Population</div>
-                <div class="stat-icon" style="background:#e8f4fd;color:#2980b9">
+                <div class="stat-icon rk-tint-blue">
                     <i class="bi bi-people-fill"></i>
                 </div>
             </div>
@@ -95,7 +95,7 @@
         <div class="stat-card">
             <div class="d-flex justify-content-between align-items-start">
                 <div class="stat-label">Vulnerable %</div>
-                <div class="stat-icon" style="background:#fef3e2;color:#d35400">
+                <div class="stat-icon rk-tint-orange">
                     <i class="bi bi-exclamation-triangle-fill"></i>
                 </div>
             </div>
@@ -108,7 +108,7 @@
         <div class="stat-card">
             <div class="d-flex justify-content-between align-items-start">
                 <div class="stat-label">Flood Risk Trend</div>
-                <div class="stat-icon" style="background:#fde8e8;color:#c0392b">
+                <div class="stat-icon rk-tint-red">
                     <i class="bi bi-graph-up-arrow"></i>
                 </div>
             </div>
@@ -123,7 +123,7 @@
         <div class="stat-card">
             <div class="d-flex justify-content-between align-items-start">
                 <div class="stat-label">Fire Risk Trend</div>
-                <div class="stat-icon" style="background:#fef9e7;color:#b7950b">
+                <div class="stat-icon rk-tint-amber">
                     <i class="bi bi-fire"></i>
                 </div>
             </div>
@@ -161,7 +161,7 @@
     <div class="tab-pane fade show active" id="tab-infra">
         <div class="dash-card">
             <div class="card-title-row">
-                <i class="bi bi-building" style="color:var(--rk-green)"></i>
+                <i class="bi bi-building rk-text-green"></i>
                 <h6>Key Infrastructure Facilities</h6>
             </div>
 
@@ -169,14 +169,14 @@
             <div class="table-responsive">
                 <table class="table align-middle mb-0">
                     <thead>
-                        <tr style="font-size:12px;color:var(--rk-muted);text-transform:uppercase;letter-spacing:0.04em">
+                        <tr class="rk-th-soft">
                             <th>Facility Name</th>
                             <th>Type</th>
                             <th class="text-end">Capacity</th>
                             <th>Status</th>
                         </tr>
                     </thead>
-                    <tbody style="font-size:13px">
+                    <tbody class="rk-fs-13">
                         {% for f in facility_rows %}
                         <tr>
                             <td>{{ f.name }}</td>
@@ -193,7 +193,7 @@
                 </table>
             </div>
             {% else %}
-            <div class="text-center text-muted py-4" style="font-size:13px">
+            <div class="text-center text-muted py-4 rk-fs-13">
                 No critical facilities recorded for this barangay yet.
             </div>
             {% endif %}
@@ -204,33 +204,33 @@
     <div class="tab-pane fade" id="tab-profile">
         <div class="dash-card">
             <div class="card-title-row">
-                <i class="bi bi-clock-history" style="color:#2980b9"></i>
+                <i class="bi bi-clock-history rk-text-info"></i>
                 <h6>Historical Disaster Incidents</h6>
             </div>
 
             <div class="row g-3 mb-3">
                 <div class="col-md-4">
-                    <div class="hist-card" style="background:#e8f4fd">
+                    <div class="hist-card rk-bg-info-soft">
                         <div class="hist-label">Flood Incidents</div>
-                        <div class="hist-value" style="color:#2980b9">
+                        <div class="hist-value rk-text-info">
                             {{ incident_counts['flood'] }}
                         </div>
                         <div class="hist-sub">Last 5 years</div>
                     </div>
                 </div>
                 <div class="col-md-4">
-                    <div class="hist-card" style="background:#fef3e2">
+                    <div class="hist-card rk-bg-orange-soft">
                         <div class="hist-label">Fire Incidents</div>
-                        <div class="hist-value" style="color:#d35400">
+                        <div class="hist-value rk-text-high">
                             {{ incident_counts['fire'] }}
                         </div>
                         <div class="hist-sub">Last 5 years</div>
                     </div>
                 </div>
                 <div class="col-md-4">
-                    <div class="hist-card" style="background:#f3e8fd">
+                    <div class="hist-card rk-bg-purple-soft">
                         <div class="hist-label">Earthquake Related</div>
-                        <div class="hist-value" style="color:#8e44ad">
+                        <div class="hist-value rk-text-purple">
                             {{ incident_counts['earthquake'] }}
                         </div>
                         <div class="hist-sub">Last 5 years</div>
@@ -242,34 +242,34 @@
                 <h6><i class="bi bi-shield-exclamation"></i> Known Hazard Types</h6>
                 {% if hazard_types %}
                     {% for h in hazard_types %}
-                    <span class="badge bg-light text-dark border me-1" style="font-size:12px">
+                    <span class="badge bg-light text-dark border me-1 rk-fs-12">
                         {{ h.title() }}
                     </span>
                     {% endfor %}
                 {% else %}
-                    <span class="text-muted" style="font-size:13px">No hazards recorded.</span>
+                    <span class="text-muted rk-fs-13">No hazards recorded.</span>
                 {% endif %}
             </div>
 
             <div class="info-section mb-3">
                 <h6><i class="bi bi-person-vcard"></i> Officials &amp; Emergency Contacts</h6>
-                <div class="row g-2" style="font-size:13px">
+                <div class="row g-2 rk-fs-13">
                     <div class="col-md-6">
-                        <div class="text-muted" style="font-size:12px">Barangay Captain</div>
+                        <div class="text-muted rk-fs-12">Barangay Captain</div>
                         <div>{{ barangay.captain_name or '—' }}
                             {% if barangay.captain_contact %}<span class="text-muted">· {{ barangay.captain_contact }}</span>{% endif %}
                         </div>
                     </div>
                     <div class="col-md-6">
-                        <div class="text-muted" style="font-size:12px">BDRRMO Chairperson</div>
+                        <div class="text-muted rk-fs-12">BDRRMO Chairperson</div>
                         <div>{{ barangay.chairperson_name or '—' }}
                             {% if barangay.chairperson_contact %}<span class="text-muted">· {{ barangay.chairperson_contact }}</span>{% endif %}
                         </div>
                     </div>
                     <div class="col-12">
-                        <div class="text-muted" style="font-size:12px">Emergency Responders</div>
+                        <div class="text-muted rk-fs-12">Emergency Responders</div>
                         {% if barangay.emergency_contacts %}
-                        <div style="white-space:pre-line">{{ barangay.emergency_contacts }}</div>
+                        <div class="rk-pre-line">{{ barangay.emergency_contacts }}</div>
                         {% else %}
                         <div class="text-muted">—</div>
                         {% endif %}
@@ -283,7 +283,7 @@
                 <div class="table-responsive">
                     <table class="table align-middle mb-0">
                         <thead>
-                            <tr style="font-size:12px;color:var(--rk-muted);text-transform:uppercase;letter-spacing:0.04em">
+                            <tr class="rk-th-soft">
                                 <th>Date</th>
                                 <th>Type</th>
                                 <th>Severity</th>
@@ -291,7 +291,7 @@
                                 <th class="text-end">Casualties</th>
                             </tr>
                         </thead>
-                        <tbody style="font-size:13px">
+                        <tbody class="rk-fs-13">
                             {% for inc in recent_incidents %}
                             <tr>
                                 <td>{{ inc.date_occurred.strftime('%b %d, %Y') }}</td>
@@ -305,7 +305,7 @@
                     </table>
                 </div>
                 {% else %}
-                <div class="text-muted py-3" style="font-size:13px">
+                <div class="text-muted py-3 rk-fs-13">
                     No incidents recorded in the last 5 years.
                 </div>
                 {% endif %}
@@ -317,7 +317,7 @@
     <div class="tab-pane fade" id="tab-vuln">
         <div class="dash-card">
             <div class="card-title-row">
-                <i class="bi bi-people" style="color:#d35400"></i>
+                <i class="bi bi-people rk-text-high"></i>
                 <h6>Vulnerable Population Groups</h6>
             </div>
 
@@ -345,7 +345,7 @@
                 </div>
             </div>
 
-            <div class="text-muted mt-3" style="font-size:11px">
+            <div class="text-muted mt-3 rk-fs-11">
                 <i class="bi bi-info-circle"></i>
                 PWD / elderly / children counts are estimates from seed data —
                 replace with actual BDRRMO census figures when available.
@@ -358,13 +358,13 @@
 <!-- ── Footer: planning priority breakdown ─────────────────────── -->
 <div class="dash-card mt-4">
     <div class="card-title-row">
-        <i class="bi bi-speedometer2" style="color:var(--rk-green)"></i>
+        <i class="bi bi-speedometer2 rk-text-green"></i>
         <h6>Planning Priority Breakdown</h6>
     </div>
-    <div class="row g-3" style="font-size:13px">
+    <div class="row g-3 rk-fs-13">
         <div class="col-md-3">
             <div class="text-muted">Overall Score</div>
-            <div class="fw-bold" style="font-size:22px">{{ risk_score }}<span class="text-muted" style="font-size:13px"> / 100</span></div>
+            <div class="fw-bold rk-fs-22">{{ risk_score }}<span class="text-muted rk-fs-13"> / 100</span></div>
         </div>
         <div class="col-md-3">
             <div class="text-muted">Hazard Exposure (40%)</div>
@@ -379,7 +379,7 @@
             <div class="fw-semibold">{{ risk_breakdown['population_score'] }}</div>
         </div>
     </div>
-    <div class="text-muted mt-3" style="font-size:11px">
+    <div class="text-muted mt-3 rk-fs-11">
         <i class="bi bi-info-circle"></i>
         This score is system-generated for planning support only and is not an
         official hazard or risk classification. Official hazard and risk levels

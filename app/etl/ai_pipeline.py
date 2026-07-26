@@ -1,7 +1,7 @@
 """Optional AI summary via Groq (Llama 3).
 
 Gracefully no-ops if GROQ_API_KEY is not set or is the placeholder value
-from the .env template. The Week 6 upload flow must work without AI.
+from the .env template.
 """
 
 import os

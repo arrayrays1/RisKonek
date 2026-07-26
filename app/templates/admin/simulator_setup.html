@@ -121,24 +121,24 @@
        compact instead of stretching. #}
     <div class="col-lg-7 d-flex flex-column">
         {# ── Weather Outlook — compact 7-day horizontal strip ───────────── #}
-        <div class="dash-card mb-4" style="height:auto;">
+        <div class="dash-card mb-4 rk-h-auto">
             {% if weather and weather.days %}
                 <div class="d-flex flex-nowrap gap-2 overflow-auto">
                     {% for d in weather.days %}
-                    {% set icol = '#3b82f6' if ('rain' in d.icon or 'drizzle' in d.icon or 'lightning' in d.icon)
-                                  else ('#f59e0b' if 'sun' in d.icon else '#64748b') %}
-                    <div class="text-center flex-fill py-2 px-1 rounded"
-                         style="min-width:60px; background:#f8fafc;" title="{{ d.label }}">
-                        <div class="fw-semibold" style="font-size:12px;">{{ d.day }}</div>
-                        <div class="my-1"><i class="bi {{ d.icon }}" style="font-size:20px; color:{{ icol }};"></i></div>
-                        <div style="font-size:12px; white-space:nowrap;">
+                    {% set iwx = 'rk-wx-rain' if ('rain' in d.icon or 'drizzle' in d.icon or 'lightning' in d.icon)
+                                  else ('rk-wx-sun' if 'sun' in d.icon else 'rk-wx-cloud') %}
+                    <div class="text-center flex-fill py-2 px-1 rounded rk-mw-60 rk-bg-slate-soft"
+                         title="{{ d.label }}">
+                        <div class="fw-semibold rk-fs-12">{{ d.day }}</div>
+                        <div class="my-1"><i class="bi {{ d.icon }} rk-fs-20 {{ iwx }}"></i></div>
+                        <div class="rk-fs-12 rk-nowrap">
                             <span class="fw-semibold">{{ d.tmax }}°</span>
                             <span class="text-muted">{{ d.tmin }}°</span>
                         </div>
                     </div>
                     {% endfor %}
                 </div>
-                <p class="text-muted mb-0 mt-2" style="font-size:11px;">
+                <p class="text-muted mb-0 mt-2 rk-fs-11">
                     Forecast data from Open-Meteo. For official warnings, refer to PAGASA.
                 </p>
             {% else %}
@@ -154,7 +154,7 @@
         {# Shown ONE at a time with prev/next navigation so the card stays
            compact — no long list, no awkward empty space. flex-grow-1 lets it
            fill the remaining column height so its bottom aligns with the left. #}
-        <div class="dash-card flex-grow-1" style="height:auto;">
+        <div class="dash-card flex-grow-1 rk-h-auto">
             <div class="card-title-row">
                 <h6 class="mb-0"><i class="bi bi-exclamation-triangle-fill me-1 text-danger"></i>Priority Barangays (Frequently Affected)</h6>
                 {% if priority_rows | length > 1 %}
@@ -162,7 +162,7 @@
                     <button type="button" class="btn-soft" data-pb-nav data-dir="prev" aria-label="Previous barangay">
                         <i class="bi bi-chevron-left"></i>
                     </button>
-                    <span class="text-muted" style="font-size:12px; white-space:nowrap;">
+                    <span class="text-muted rk-fs-12 rk-nowrap">
                         <span id="pb-current">1</span> / {{ priority_rows | length }}
                     </span>
                     <button type="button" class="btn-soft" data-pb-nav data-dir="next" aria-label="Next barangay">
@@ -171,7 +171,7 @@
                 </div>
                 {% endif %}
             </div>
-            <p class="text-muted" style="font-size:12px;">
+            <p class="text-muted rk-fs-12">
                 <i class="bi bi-info-circle me-1"></i>This score is system-generated
                 for planning support only and is not an official hazard or risk
                 classification.
@@ -179,30 +179,26 @@
             {% if priority_rows %}
             <div id="priority-carousel">
                 {% for p in priority_rows %}
-                <div class="pb-item" data-index="{{ loop.index0 }}"{% if not loop.first %} style="display:none;"{% endif %}>
+                <div class="pb-item{% if not loop.first %} d-none{% endif %}" data-index="{{ loop.index0 }}">
                     <div class="d-flex align-items-start gap-2">
-                        <span style="display:inline-flex; align-items:center; justify-content:center;
-                                     width:22px; height:22px; border-radius:50%; flex:0 0 auto;
-                                     background:var(--rk-green,#0f7b3d); color:#fff;
-                                     font-size:12px; font-weight:700;">{{ loop.index }}</span>
+                        <span class="rk-rank-num">{{ loop.index }}</span>
                         <div class="flex-grow-1">
                             <div class="d-flex justify-content-between align-items-center">
                                 <span class="fw-semibold">{{ p.name }}</span>
                                 <span class="risk-badge risk-{{ p.level }}">{{ p.level.title() }}</span>
                             </div>
-                            <div class="text-muted" style="font-size:12px;">
+                            <div class="text-muted rk-fs-12">
                                 Hazards: {{ p.hazards }} · Population: {{ "{:,}".format(p.population) }}
                             </div>
-                            <div class="progress mt-2" style="height:6px;">
-                                <div class="progress-bar {{ p.bar_class }}" role="progressbar"
-                                     style="width: {{ p.score }}%;"
+                            <div class="progress mt-2 rk-h-6">
+                                <div class="progress-bar {{ p.bar_class }} rk-w-p{{ p.score | round | int }}" role="progressbar"
                                      aria-valuenow="{{ p.score }}" aria-valuemin="0" aria-valuemax="100"></div>
                             </div>
                             <div class="d-flex justify-content-between align-items-center mt-1">
-                                <a href="/admin/barangays/{{ p.id }}" style="font-size:12px;">
+                                <a href="/admin/barangays/{{ p.id }} rk-fs-12">
                                     View Barangay Profile →
                                 </a>
-                                <span class="text-muted" style="font-size:12px;">Score: {{ p.score }}</span>
+                                <span class="text-muted rk-fs-12">Score: {{ p.score }}</span>
                             </div>
                         </div>
                     </div>
@@ -210,7 +206,7 @@
                 {% endfor %}
             </div>
             {% else %}
-            <p class="text-muted mb-0" style="font-size:13px;">
+            <p class="text-muted mb-0 rk-fs-13">
                 No priority barangays configured.
             </p>
             {% endif %}
@@ -229,7 +225,7 @@
         <h6><i class="bi bi-bookmark-check me-1"></i>Saved Scenarios</h6>
         <div class="ms-auto d-flex align-items-center gap-2">
             {% if total_saved %}
-            <span class="text-muted" style="font-size:12px;">
+            <span class="text-muted rk-fs-12">
                 {{ saved_rows | length }} of {{ total_saved }} shown
             </span>
             {% endif %}
@@ -243,14 +239,14 @@
     </div>
 
     {% if saved_rows %}
-    <p class="text-muted mb-2" style="font-size:12px;">
+    <p class="text-muted mb-2 rk-fs-12">
         Tick two scenarios, then choose <strong>Compare</strong> to view them side by side.
     </p>
     <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
             <thead>
-                <tr style="font-size:12px;color:var(--rk-muted);text-transform:uppercase;letter-spacing:0.04em">
-                    <th style="width:34px;"></th>
+                <tr class="rk-th-soft">
+                    <th class="rk-w-34"></th>
                     <th>Name</th>
                     <th>Barangay</th>
                     <th>Disaster Type</th>
@@ -264,7 +260,7 @@
             <tbody>
                 {% for s in saved_rows %}
                 {% set rb = readiness_badge.get(s.readiness, readiness_badge['Critical']) %}
-                <tr style="font-size:13px">
+                <tr class="rk-fs-13">
                     <td>
                         <input type="checkbox" class="form-check-input cmp-check"
                                value="{{ s.id }}" aria-label="Select {{ s.name }} to compare">
@@ -284,7 +280,7 @@
                               class="d-inline"
                               data-confirm="Delete saved scenario '{{ s.name }}'? This cannot be undone.">
                             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
-                            <button type="submit" class="btn-soft" style="color:#c0392b" title="Delete">
+                            <button type="submit" class="btn-soft rk-text-crit" title="Delete">
                                 <i class="bi bi-trash"></i>
                             </button>
                         </form>
@@ -311,7 +307,7 @@
 
     {% else %}
     <div class="text-center text-muted py-4">
-        <i class="bi bi-inbox" style="font-size:24px;"></i>
+        <i class="bi bi-inbox rk-fs-24"></i>
         <p class="mb-0 mt-2">
             No saved scenarios yet — run an analysis and click
             <strong>Save Scenario</strong> to keep it here.
@@ -337,7 +333,7 @@
     function show(i) {
         current = (i + items.length) % items.length;   // wrap around
         items.forEach(function (el, idx) {
-            el.style.display = idx === current ? '' : 'none';
+            el.classList.toggle('d-none', idx !== current);
         });
         if (counter) counter.textContent = current + 1;
     }
