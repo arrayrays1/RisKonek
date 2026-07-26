@@ -1,0 +1,55 @@
+{# ── Shared pagination bar ──────────────────────────────────────────────
+   Reusable across every list table. Renders the range summary, a page-size
+   selector (10 / 25 / 50 / 100 / All) and Previous / Next controls, all as
+   plain links that preserve the current filters.
+
+   Usage:
+     {% from "shared/_pagination.html" import pager %}
+     {{ pager(page_obj, "/admin/resources", base_query) }}
+
+   - page_obj : a pagination.Page instance
+   - path     : the list endpoint (no query string)
+   - base_query : urlencoded active filters, WITHOUT page / per_page
+#}
+{% macro _url(path, base_query, extra) -%}
+{{ path }}?{% if base_query %}{{ base_query }}&{% endif %}{{ extra }}
+{%- endmacro %}
+
+{% macro pager(page_obj, path, base_query) %}
+{% if page_obj.total %}
+<nav class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3">
+    <span class="text-muted small">
+        Showing {{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ page_obj.total }}
+    </span>
+
+    <div class="d-flex align-items-center gap-2">
+        {# ── Page-size selector ── #}
+        <div class="btn-group btn-group-sm" role="group" aria-label="Rows per page">
+            {% for size in page_obj.choices %}
+            <a href="{{ _url(path, base_query, 'per_page=' ~ size ~ '&page=1') }}"
+               class="btn btn-outline-secondary {{ 'active' if page_obj.size_value == size|string else '' }}">{{ size }}</a>
+            {% endfor %}
+            <a href="{{ _url(path, base_query, 'per_page=all&page=1') }}"
+               class="btn btn-outline-secondary {{ 'active' if page_obj.size_value == 'all' else '' }}">All</a>
+        </div>
+
+        {# ── Prev / Next (hidden when viewing all / single page) ── #}
+        {% if page_obj.total_pages > 1 %}
+        <ul class="pagination pagination-sm mb-0">
+            <li class="page-item {{ 'disabled' if not page_obj.has_prev else '' }}">
+                <a class="page-link"
+                   href="{{ _url(path, base_query, 'per_page=' ~ page_obj.size_value ~ '&page=' ~ (page_obj.page - 1)) }}">Previous</a>
+            </li>
+            <li class="page-item disabled">
+                <span class="page-link">{{ page_obj.page }} / {{ page_obj.total_pages }}</span>
+            </li>
+            <li class="page-item {{ 'disabled' if not page_obj.has_next else '' }}">
+                <a class="page-link"
+                   href="{{ _url(path, base_query, 'per_page=' ~ page_obj.size_value ~ '&page=' ~ (page_obj.page + 1)) }}">Next</a>
+            </li>
+        </ul>
+        {% endif %}
+    </div>
+</nav>
+{% endif %}
+{% endmacro %}

@@ -20,7 +20,7 @@
 <div class="dash-card">
     <form method="POST"
           action="{{ '/admin/resources/' ~ target.id ~ '/edit' if edit_mode else '/admin/resources/new' }}"
-          class="row g-3">
+          class="row g-3" data-validate>
             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
 
         <div class="col-md-8">
@@ -32,7 +32,7 @@
 
         <div class="col-md-4">
             <label class="form-label small fw-semibold">Category *</label>
-            <select name="category" required class="form-select">
+            <select name="category" id="categorySelect" required class="form-select">
                 {% for c in categories %}
                 <option value="{{ c }}"
                   {% if target and target.category.value == c %}selected{% endif %}>
@@ -40,6 +40,18 @@
                 </option>
                 {% endfor %}
             </select>
+        </div>
+
+        <div class="col-md-4" id="foodTypeWrap">
+            <label class="form-label small fw-semibold">Food Classification</label>
+            <select name="food_type" class="form-select">
+                <option value="">— Unclassified —</option>
+                {% for v, label in food_types %}
+                <option value="{{ v }}"
+                  {% if target and target.food_type == v %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+            <div class="form-text small">Applies to the Food category only.</div>
         </div>
 
         {% if not edit_mode %}
@@ -96,4 +108,21 @@
         </div>
     </form>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script nonce="{{ request.state.csp_nonce }}">
+// Show the Food Classification field only when the Food category is selected.
+// CSP-safe (nonce'd, no inline handlers).
+(function () {
+    var cat = document.getElementById('categorySelect');
+    var wrap = document.getElementById('foodTypeWrap');
+    if (!cat || !wrap) return;
+    function sync() {
+        wrap.style.display = (cat.value === 'food') ? '' : 'none';
+    }
+    cat.addEventListener('change', sync);
+    sync();
+})();
+</script>
 {% endblock %}

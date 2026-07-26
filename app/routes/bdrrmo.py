@@ -4,6 +4,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from datetime import datetime, date, timezone, timedelta
 from urllib.parse import quote_plus
+from typing import Optional
 import os
 from app.database import get_db
 from app.models import (
@@ -13,6 +14,9 @@ from app.models import (
     add_upload_history, BarangayEquipment, EquipmentType,
 )
 from app.auth import require_role, require_barangay_access
+from app.utils.pagination import (
+    paginate, parse_per_page, parse_page, build_base_query,
+)
 # Reuse Week 4 barangay-profile helpers so the BDRRMO profile renders the
 # exact same population / incident / facility / planning-priority data.
 from app.routes.admin import barangay_profile_context, _vulnerable_percent
@@ -27,6 +31,20 @@ from app.etl.extract_pdf import extract_pdf
 from app.etl.extract_excel import extract_excel, extract_csv
 from app.etl.structure import structure_text, structure_rows
 from app.etl.ai_pipeline import summarize as ai_summarize, is_available as ai_available
+from app.services.geocoding import (
+    search_locations, reverse_geocode_san_pedro, nearby_landmarks,
+    is_within_san_pedro, get_san_pedro_bounds, get_san_pedro_boundary,
+)
+from app.services.contact_directory import build_directory_context
+from app.services.facility_details import (
+    parse_coord as _parse_coord,
+    find_duplicate_facility as _find_duplicate,
+    validate_name as _validate_facility_name,
+    validate_address as _validate_facility_address,
+    validate_facility_details,
+    FACILITY_CLASSIFICATIONS,
+    EO_MOA_MOU_STATUSES,
+)
 
 router = APIRouter(prefix="/bdrrmo")
 templates = Jinja2Templates(directory="app/templates")
@@ -74,6 +92,53 @@ def _resolve_scope(request: Request, db: Session):
 
 
 # ══════════════════════════════════════════════════════════════════════
+# FACILITY LOCATION PICKER — search / reverse-geocode / nearby landmarks
+# (server-side proxy to Nominatim/Overpass; see app/services/geocoding.py)
+# ══════════════════════════════════════════════════════════════════════
+
+@router.get("/api/location-search")
+def api_location_search(request: Request, db: Session = Depends(get_db), q: Optional[str] = None):
+    user, _ = _resolve_scope(request, db)
+    if isinstance(user, RedirectResponse):
+        return user
+    return search_locations(db, q or "")
+
+
+@router.get("/api/reverse-geocode")
+def api_reverse_geocode(
+    request: Request, db: Session = Depends(get_db),
+    lat: Optional[str] = None, lng: Optional[str] = None,
+):
+    user, _ = _resolve_scope(request, db)
+    if isinstance(user, RedirectResponse):
+        return user
+    try:
+        lat_f, lng_f = float(lat), float(lng)
+    except (TypeError, ValueError):
+        return {"available": True, "display_name": None}
+    return reverse_geocode_san_pedro(lat_f, lng_f)
+
+
+@router.get("/api/nearby-landmarks")
+def api_nearby_landmarks(
+    request: Request, db: Session = Depends(get_db),
+    lat: Optional[str] = None, lng: Optional[str] = None, radius: Optional[str] = None,
+):
+    user, _ = _resolve_scope(request, db)
+    if isinstance(user, RedirectResponse):
+        return user
+    try:
+        lat_f, lng_f = float(lat), float(lng)
+    except (TypeError, ValueError):
+        return {"available": True, "results": []}
+    try:
+        radius_i = int(radius) if radius else 400
+    except (TypeError, ValueError):
+        radius_i = 400
+    return nearby_landmarks(lat_f, lng_f, radius_i)
+
+
+# ══════════════════════════════════════════════════════════════════════
 # LANDING — the BDRRMO portal opens on the Barangay Profile (which doubles
 # as the dashboard). The old /dashboard URL redirects here for any stale
 # links/bookmarks.
@@ -114,16 +179,34 @@ def profile(request: Request, db: Session = Depends(get_db)):
 # ══════════════════════════════════════════════════════════════════════
 
 @router.get("/incidents", response_class=HTMLResponse)
-def incidents(request: Request, db: Session = Depends(get_db)):
+def incidents(
+    request: Request,
+    db: Session = Depends(get_db),
+    q: Optional[str] = None,
+    disaster_type: Optional[str] = None,
+    severity: Optional[str] = None,
+    page: Optional[str] = None,
+    per_page: Optional[str] = None,
+):
     user, barangay = _resolve_scope(request, db)
     if isinstance(user, RedirectResponse):
         return user
 
     rows = []
     if barangay:
-        rows = db.query(Incident).filter(
-            Incident.barangay_id == barangay.id
-        ).order_by(Incident.date_occurred.desc()).all()
+        query = db.query(Incident).filter(Incident.barangay_id == barangay.id)
+        if q:
+            query = query.filter(Incident.description.ilike(f"%{q.strip()}%"))
+        if disaster_type and disaster_type in {d.value for d in DisasterType}:
+            query = query.filter(Incident.disaster_type == DisasterType(disaster_type))
+        if severity and severity in {s.value for s in Severity}:
+            query = query.filter(Incident.severity == Severity(severity))
+        rows = query.order_by(Incident.date_occurred.desc()).all()
+
+    page_obj = paginate(rows, parse_page(page), parse_per_page(per_page))
+    base_query = build_base_query({
+        "q": q or "", "disaster_type": disaster_type or "", "severity": severity or "",
+    })
 
     return templates.TemplateResponse(
         request=request,
@@ -132,9 +215,14 @@ def incidents(request: Request, db: Session = Depends(get_db)):
             "user": user,
             "active_nav": "bdrrmo_incidents",
             "barangay": barangay,
-            "incidents": rows,
+            "incidents": page_obj.items,
+            "page_obj": page_obj,
+            "base_query": base_query,
             "disaster_types": [d.value for d in DisasterType],
             "severities": [s.value for s in Severity],
+            "f_q": q or "",
+            "f_disaster_type": disaster_type or "",
+            "f_severity": severity or "",
             "success": request.query_params.get("success"),
             "error": request.query_params.get("error"),
         },
@@ -678,10 +766,38 @@ async def incident_upload_convert(
 # CRITICAL FACILITIES (barangay-scoped, add / update / manage)
 # ══════════════════════════════════════════════════════════════════════
 
-# Coordinate proximity (in degrees) under which two facilities are treated
-# as the same point. ~0.0002° ≈ 22 m — tight enough to catch a re-pin of
-# the same building, loose enough not to flag genuinely separate ones.
-_DUP_COORD_TOLERANCE = 0.0002
+
+def _facility_map_json(f: Facility) -> dict:
+    """Shape one Facility for the Leaflet popup on the BDRRMO map — the
+    same field set admin/map.html's /admin/api/facilities-map-data exposes,
+    minus the barangay name (redundant here — the whole map is one
+    barangay) and the admin-only city-level/approximate-location badges."""
+    return {
+        "id": f.id,
+        "name": f.name,
+        "facility_type": f.facility_type.value if f.facility_type else None,
+        "facility_type_label": (
+            f.facility_type.value.replace("_", " ").title() if f.facility_type else None
+        ),
+        "lat": f.latitude,
+        "lng": f.longitude,
+        "address": f.address,
+        "operational_status": f.operational_status.value if f.operational_status else None,
+        "status": f.status,
+        "floor_area_sqm": f.floor_area_sqm,
+        "capacity_families": f.capacity_families,
+        "capacity_individuals": f.capacity_individuals,
+        "ereid_capacity_families": f.ereid_capacity_families,
+        "ereid_capacity_individuals": f.ereid_capacity_individuals,
+        "supports_tropical_cyclone": bool(f.supports_tropical_cyclone),
+        "supports_flooding": bool(f.supports_flooding),
+        "supports_landslide": bool(f.supports_landslide),
+        "supports_fire": bool(f.supports_fire),
+        "vulnerability_risk": f.vulnerability_risk,
+        "eo_moa_mou": f.eo_moa_mou,
+        "eo_moa_mou_status": f.eo_moa_mou_status,
+        "eo_moa_mou_reference": f.eo_moa_mou_reference,
+    }
 
 
 @router.get("/facilities", response_class=HTMLResponse)
@@ -693,6 +809,7 @@ def facilities(request: Request, db: Session = Depends(get_db)):
     show_archived = request.query_params.get("archived") == "1"
     rows = []
     archived_count = 0
+    active_facilities = []
     if barangay:
         archived_count = db.query(Facility).filter(
             Facility.barangay_id == barangay.id,
@@ -702,6 +819,25 @@ def facilities(request: Request, db: Session = Depends(get_db)):
             Facility.barangay_id == barangay.id,
             Facility.is_archived == show_archived,
         ).order_by(Facility.facility_type, Facility.name).all()
+        # The map always shows active facilities, regardless of which tab
+        # (Active/Archived) the table below is on.
+        active_facilities = rows if not show_archived else db.query(Facility).filter(
+            Facility.barangay_id == barangay.id,
+            Facility.is_archived == False,
+        ).order_by(Facility.facility_type, Facility.name).all()
+
+    summary = {
+        "total": len(active_facilities),
+        "evacuation_centers": sum(
+            1 for f in active_facilities
+            if f.facility_type == FacilityType.evacuation_center
+        ),
+        "available": sum(
+            1 for f in active_facilities
+            if f.operational_status == FacilityStatus.available
+        ),
+        "archived": archived_count,
+    }
 
     return templates.TemplateResponse(
         request=request,
@@ -711,8 +847,14 @@ def facilities(request: Request, db: Session = Depends(get_db)):
             "active_nav": "bdrrmo_facilities",
             "barangay": barangay,
             "facilities": rows,
+            "map_facilities": [_facility_map_json(f) for f in active_facilities],
+            "sp_bounds": get_san_pedro_bounds(),
+            "sp_boundary": get_san_pedro_boundary(),
+            "summary": summary,
             "facility_types": [t.value for t in FacilityType],
             "facility_statuses": [s.value for s in FacilityStatus],
+            "facility_classifications": FACILITY_CLASSIFICATIONS,
+            "eo_moa_mou_statuses": EO_MOA_MOU_STATUSES,
             "show_archived": show_archived,
             "archived_count": archived_count,
             "edit_id": request.query_params.get("edit"),
@@ -720,41 +862,6 @@ def facilities(request: Request, db: Session = Depends(get_db)):
             "error": request.query_params.get("error"),
         },
     )
-
-
-def _parse_coord(value, lo, hi):
-    """Coerce a coordinate string to float within [lo, hi]; None if invalid."""
-    try:
-        f = float(value)
-    except (TypeError, ValueError):
-        return None
-    return f if lo <= f <= hi else None
-
-
-def _find_duplicate(db, barangay_id, name, lat, lon, exclude_id=None):
-    """Return an existing facility in the same barangay that looks like a
-    duplicate of the given one, or None.
-
-    A duplicate is either the same (case-insensitive, trimmed) name, or a
-    point within _DUP_COORD_TOLERANCE degrees of the same coordinates.
-    Archived facilities are ignored so a restore isn't blocked. The
-    facility being edited (exclude_id) is excluded from the comparison.
-    """
-    q = db.query(Facility).filter(
-        Facility.barangay_id == barangay_id,
-        Facility.is_archived == False,
-    )
-    if exclude_id is not None:
-        q = q.filter(Facility.id != exclude_id)
-
-    norm = (name or "").strip().lower()
-    for f in q.all():
-        if norm and (f.name or "").strip().lower() == norm:
-            return f
-        if (abs((f.latitude or 0) - lat) <= _DUP_COORD_TOLERANCE
-                and abs((f.longitude or 0) - lon) <= _DUP_COORD_TOLERANCE):
-            return f
-    return None
 
 
 def _sync_active(facility):
@@ -773,6 +880,20 @@ def facility_create(
     longitude: str = Form(...),
     address: str = Form(""),
     operational_status: str = Form("available"),
+    classification: str = Form(""),
+    floor_area_sqm: str = Form(""),
+    capacity_families: str = Form(""),
+    capacity_individuals: str = Form(""),
+    ereid_capacity_families: str = Form(""),
+    ereid_capacity_individuals: str = Form(""),
+    supports_tropical_cyclone: Optional[str] = Form(None),
+    supports_flooding: Optional[str] = Form(None),
+    supports_landslide: Optional[str] = Form(None),
+    supports_fire: Optional[str] = Form(None),
+    hazard_reference_master_list: str = Form(""),
+    eo_moa_mou_status: str = Form(""),
+    eo_moa_mou_reference: str = Form(""),
+    notes: str = Form(""),
 ):
     """TR-BDR-03/04 — add a critical facility point within own barangay,
     rejecting duplicates of an existing facility."""
@@ -784,20 +905,58 @@ def facility_create(
             url="/bdrrmo/facilities?error=No+barangay+is+assigned+to+your+account",
             status_code=302,
         )
+    name_clean, name_err = _validate_facility_name(name)
+    if name_err:
+        return RedirectResponse(
+            url="/bdrrmo/facilities?error=" + quote_plus(name_err), status_code=302
+        )
     if facility_type not in {t.value for t in FacilityType}:
         return RedirectResponse(
             url="/bdrrmo/facilities?error=Invalid+facility+type", status_code=302
         )
     if operational_status not in {s.value for s in FacilityStatus}:
         operational_status = FacilityStatus.available.value
+    address_clean, address_err = _validate_facility_address(address)
+    if address_err:
+        return RedirectResponse(
+            url="/bdrrmo/facilities?error=" + quote_plus(address_err), status_code=302
+        )
     lat = _parse_coord(latitude, -90, 90)
     lon = _parse_coord(longitude, -180, 180)
     if lat is None or lon is None:
         return RedirectResponse(
             url="/bdrrmo/facilities?error=Invalid+coordinates", status_code=302
         )
+    if not is_within_san_pedro(lat, lon):
+        return RedirectResponse(
+            url="/bdrrmo/facilities?error=" + quote_plus(
+                "Location must be within San Pedro City, Laguna."
+            ),
+            status_code=302,
+        )
 
-    dup = _find_duplicate(db, barangay.id, name, lat, lon)
+    details, details_err = validate_facility_details({
+        "classification": classification,
+        "floor_area_sqm": floor_area_sqm,
+        "capacity_families": capacity_families,
+        "capacity_individuals": capacity_individuals,
+        "ereid_capacity_families": ereid_capacity_families,
+        "ereid_capacity_individuals": ereid_capacity_individuals,
+        "supports_tropical_cyclone": supports_tropical_cyclone,
+        "supports_flooding": supports_flooding,
+        "supports_landslide": supports_landslide,
+        "supports_fire": supports_fire,
+        "hazard_reference_master_list": hazard_reference_master_list,
+        "eo_moa_mou_status": eo_moa_mou_status,
+        "eo_moa_mou_reference": eo_moa_mou_reference,
+        "notes": notes,
+    })
+    if details_err:
+        return RedirectResponse(
+            url="/bdrrmo/facilities?error=" + quote_plus(details_err), status_code=302
+        )
+
+    dup = _find_duplicate(db, barangay.id, name_clean, lat, lon)
     if dup:
         return RedirectResponse(
             url="/bdrrmo/facilities?error=" + quote_plus(
@@ -809,13 +968,14 @@ def facility_create(
 
     facility = Facility(
         barangay_id=barangay.id,                 # scoped to own barangay
-        name=name.strip(),
+        name=name_clean,
         facility_type=FacilityType(facility_type),
         latitude=lat,
         longitude=lon,
-        address=(address or "").strip() or None,
+        address=address_clean,
         operational_status=FacilityStatus(operational_status),
         is_archived=False,
+        **details,
     )
     _sync_active(facility)
     db.add(facility)
@@ -852,6 +1012,20 @@ def facility_edit(
     longitude: str = Form(...),
     address: str = Form(""),
     operational_status: str = Form("available"),
+    classification: str = Form(""),
+    floor_area_sqm: str = Form(""),
+    capacity_families: str = Form(""),
+    capacity_individuals: str = Form(""),
+    ereid_capacity_families: str = Form(""),
+    ereid_capacity_individuals: str = Form(""),
+    supports_tropical_cyclone: Optional[str] = Form(None),
+    supports_flooding: Optional[str] = Form(None),
+    supports_landslide: Optional[str] = Form(None),
+    supports_fire: Optional[str] = Form(None),
+    hazard_reference_master_list: str = Form(""),
+    eo_moa_mou_status: str = Form(""),
+    eo_moa_mou_reference: str = Form(""),
+    notes: str = Form(""),
 ):
     """TR-BDR-03/04 — update an existing facility within own barangay."""
     user, barangay = _resolve_scope(request, db)
@@ -867,20 +1041,61 @@ def facility_edit(
         return RedirectResponse(
             url="/bdrrmo/facilities?error=Facility+not+found", status_code=302
         )
+    name_clean, name_err = _validate_facility_name(name)
+    if name_err:
+        return RedirectResponse(
+            url=f"/bdrrmo/facilities?edit={facility.id}&error=" + quote_plus(name_err),
+            status_code=302,
+        )
     if facility_type not in {t.value for t in FacilityType}:
         return RedirectResponse(
             url="/bdrrmo/facilities?error=Invalid+facility+type", status_code=302
         )
     if operational_status not in {s.value for s in FacilityStatus}:
         operational_status = FacilityStatus.available.value
+    address_clean, address_err = _validate_facility_address(address)
+    if address_err:
+        return RedirectResponse(
+            url=f"/bdrrmo/facilities?edit={facility.id}&error=" + quote_plus(address_err),
+            status_code=302,
+        )
     lat = _parse_coord(latitude, -90, 90)
     lon = _parse_coord(longitude, -180, 180)
     if lat is None or lon is None:
         return RedirectResponse(
             url="/bdrrmo/facilities?error=Invalid+coordinates", status_code=302
         )
+    if not is_within_san_pedro(lat, lon):
+        return RedirectResponse(
+            url=f"/bdrrmo/facilities?edit={facility.id}&error=" + quote_plus(
+                "Location must be within San Pedro City, Laguna."
+            ),
+            status_code=302,
+        )
 
-    dup = _find_duplicate(db, barangay.id, name, lat, lon, exclude_id=facility.id)
+    details, details_err = validate_facility_details({
+        "classification": classification,
+        "floor_area_sqm": floor_area_sqm,
+        "capacity_families": capacity_families,
+        "capacity_individuals": capacity_individuals,
+        "ereid_capacity_families": ereid_capacity_families,
+        "ereid_capacity_individuals": ereid_capacity_individuals,
+        "supports_tropical_cyclone": supports_tropical_cyclone,
+        "supports_flooding": supports_flooding,
+        "supports_landslide": supports_landslide,
+        "supports_fire": supports_fire,
+        "hazard_reference_master_list": hazard_reference_master_list,
+        "eo_moa_mou_status": eo_moa_mou_status,
+        "eo_moa_mou_reference": eo_moa_mou_reference,
+        "notes": notes,
+    })
+    if details_err:
+        return RedirectResponse(
+            url=f"/bdrrmo/facilities?edit={facility.id}&error=" + quote_plus(details_err),
+            status_code=302,
+        )
+
+    dup = _find_duplicate(db, barangay.id, name_clean, lat, lon, exclude_id=facility.id)
     if dup:
         return RedirectResponse(
             url=f"/bdrrmo/facilities?edit={facility.id}&error=" + quote_plus(
@@ -889,12 +1104,14 @@ def facility_edit(
             status_code=302,
         )
 
-    facility.name = name.strip()
+    facility.name = name_clean
     facility.facility_type = FacilityType(facility_type)
     facility.latitude = lat
     facility.longitude = lon
-    facility.address = (address or "").strip() or None
+    facility.address = address_clean
     facility.operational_status = FacilityStatus(operational_status)
+    for key, value in details.items():
+        setattr(facility, key, value)
     _sync_active(facility)
     db.commit()
 
@@ -1245,7 +1462,12 @@ def equipment_archive(
 # ══════════════════════════════════════════════════════════════════════
 
 @router.get("/population", response_class=HTMLResponse)
-def population(request: Request, db: Session = Depends(get_db)):
+def population(
+    request: Request,
+    db: Session = Depends(get_db),
+    page: Optional[str] = None,
+    per_page: Optional[str] = None,
+):
     user, barangay = _resolve_scope(request, db)
     if isinstance(user, RedirectResponse):
         return user
@@ -1258,6 +1480,8 @@ def population(request: Request, db: Session = Depends(get_db)):
         ).order_by(Population.recorded_at.desc()).all()
         latest = history[0] if history else None
 
+    page_obj = paginate(history, parse_page(page), parse_per_page(per_page))
+
     return templates.TemplateResponse(
         request=request,
         name="bdrrmo/population.html",
@@ -1266,7 +1490,9 @@ def population(request: Request, db: Session = Depends(get_db)):
             "active_nav": "bdrrmo_population",
             "barangay": barangay,
             "latest": latest,
-            "history": history,
+            "history": page_obj.items,
+            "page_obj": page_obj,
+            "base_query": "",
             "vulnerable_pct": _vulnerable_percent(latest),
             "success": request.query_params.get("success"),
             "error": request.query_params.get("error"),
@@ -1326,6 +1552,35 @@ def population_create(
 
     return RedirectResponse(
         url="/bdrrmo/population?success=Population+record+saved", status_code=302
+    )
+
+
+# ══════════════════════════════════════════════════════════════════════
+# CONTACT DIRECTORY — read-only, all barangays, grouped per barangay
+# (shared across roles; see app/services/contact_directory.py). Distinct
+# from /contacts below, which edits only this user's own barangay.
+# ══════════════════════════════════════════════════════════════════════
+
+@router.get("/directory", response_class=HTMLResponse)
+def contact_directory(
+    request: Request,
+    db: Session = Depends(get_db),
+    q: Optional[str] = None,
+    brgy: Optional[str] = None,
+    page: Optional[str] = None,
+    per_page: Optional[str] = None,
+):
+    user = require_role(request, ["bdrrmo"])
+    if isinstance(user, RedirectResponse):
+        return user
+
+    context = build_directory_context(
+        db, q=q, brgy=brgy, page=page, per_page=per_page,
+        directory_url="/bdrrmo/directory", active_nav="bdrrmo_directory",
+    )
+    context["user"] = user
+    return templates.TemplateResponse(
+        request=request, name="shared/contact_directory.html", context=context,
     )
 
 

@@ -1,4 +1,5 @@
 {% extends "admin/base.html" %}
+{% from "shared/_pagination.html" import pager %}
 
 {% block title %}Vehicle & Equipment — RisKonek{% endblock %}
 
@@ -198,6 +199,8 @@
         </table>
     </div>
 </div>
+
+{{ pager(page_obj, "/admin/equipment", base_query) }}
 
 <!-- ── Status change modals ───────────────────────────────────── -->
 {% for e in rows %}

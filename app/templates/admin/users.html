@@ -1,8 +1,15 @@
 {% extends "admin/base.html" %}
+{% from "shared/_pagination.html" import pager %}
 
 {% block title %}User Management — RisKonek{% endblock %}
 
 {% set active_nav = 'users' %}
+{% set role_labels = {
+    'admin': 'CDRRMO Admin',
+    'cfau_oic': 'CFAU / Operations Personnel',
+    'bdrrmo': 'BDRRMO / Barangay Focal',
+    'cdrrmo_staff': 'CDRRMO Logistics Staff'
+} %}
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-start page-header">
@@ -30,6 +37,39 @@
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
 </div>
 {% endif %}
+
+<!-- ── Filters (auto-apply) ───────────────────────────────────── -->
+<div class="dash-card mb-3">
+    <form method="GET" action="/admin/users" class="row g-2 align-items-end js-live-filter">
+        <div class="col-md-5">
+            <label class="form-label small fw-semibold mb-1">Search</label>
+            <input type="text" name="q" value="{{ f_q }}" class="form-control form-control-sm"
+                   placeholder="Search username or email…" autocomplete="off">
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small fw-semibold mb-1">Role</label>
+            <select name="role" class="form-select form-select-sm">
+                <option value="">All roles</option>
+                {% for r in roles %}
+                <option value="{{ r }}" {% if f_role == r %}selected{% endif %}>{{ role_labels.get(r, r) }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small fw-semibold mb-1">Status</label>
+            <select name="status" class="form-select form-select-sm">
+                <option value="">Any</option>
+                <option value="active"   {% if f_status == 'active'   %}selected{% endif %}>Active</option>
+                <option value="inactive" {% if f_status == 'inactive' %}selected{% endif %}>Inactive</option>
+            </select>
+        </div>
+        <div class="col-md-1 d-grid">
+            <a href="/admin/users" class="btn btn-outline-secondary btn-sm" title="Reset filters">
+                <i class="bi bi-x-circle"></i>
+            </a>
+        </div>
+    </form>
+</div>
 
 <div class="dash-card p-0">
     <div class="table-responsive">
@@ -99,7 +139,10 @@
                 {% else %}
                 <tr>
                     <td colspan="7" class="text-center text-muted py-4">
-                        No users found. Create one using the button above.
+                        No users match your filters.
+                        {% if f_q or f_role or f_status %}
+                        <a href="/admin/users" class="ms-2">Clear filters</a>
+                        {% endif %}
                     </td>
                 </tr>
                 {% endfor %}
@@ -107,4 +150,6 @@
         </table>
     </div>
 </div>
+
+{{ pager(page_obj, "/admin/users", base_query) }}
 {% endblock %}

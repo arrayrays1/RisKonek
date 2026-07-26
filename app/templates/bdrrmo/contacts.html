@@ -36,7 +36,7 @@
         <i class="bi bi-person-vcard rk-text-green"></i>
         <h6>Officials &amp; Emergency Responders</h6>
     </div>
-    <form method="POST" action="/bdrrmo/contacts" class="row g-3">
+    <form method="POST" action="/bdrrmo/contacts" class="row g-3" data-validate>
             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
         <div class="col-md-6">
             <label class="form-label small fw-semibold mb-1">Barangay Captain</label>
@@ -46,7 +46,7 @@
         <div class="col-md-6">
             <label class="form-label small fw-semibold mb-1">Captain Contact</label>
             <input type="text" name="captain_contact" maxlength="20" class="form-control form-control-sm"
-                   value="{{ barangay.captain_contact or '' }}">
+                   data-rule="phone-ph" value="{{ barangay.captain_contact or '' }}">
         </div>
         <div class="col-md-6">
             <label class="form-label small fw-semibold mb-1">BDRRMO Chairperson</label>
@@ -56,7 +56,7 @@
         <div class="col-md-6">
             <label class="form-label small fw-semibold mb-1">Chairperson Contact</label>
             <input type="text" name="chairperson_contact" maxlength="20" class="form-control form-control-sm"
-                   value="{{ barangay.chairperson_contact or '' }}">
+                   data-rule="phone-ph" value="{{ barangay.chairperson_contact or '' }}">
         </div>
         <div class="col-12">
             <label class="form-label small fw-semibold mb-1">Emergency Responders</label>

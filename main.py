@@ -114,6 +114,13 @@ async def security_headers(request: Request, call_next):
     request.state.csp_nonce = nonce
 
     response = await call_next(request)
+    # Static assets (CSS/JS) are served with an ETag/Last-Modified but no
+    # Cache-Control, so browsers fall back to heuristic caching — a stale
+    # cached copy can silently outlive an edit for hours. `no-cache` forces
+    # revalidation (a cheap 304 when unchanged) on every load instead of
+    # trusting a guess, so a CSS/JS change always takes effect immediately.
+    if request.url.path.startswith("/static/"):
+        response.headers["Cache-Control"] = "no-cache"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"

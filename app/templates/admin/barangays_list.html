@@ -1,4 +1,5 @@
 {% extends "admin/base.html" %}
+{% from "shared/_pagination.html" import pager %}
 
 {% block title %}Barangay Field Data — RisKonek{% endblock %}
 
@@ -90,9 +91,5 @@
     </div>
 </div>
 
-{% if total_count > 0 %}
-<div class="text-muted mt-3 rk-fs-12">
-    Showing {{ total_count }} barangay{{ 's' if total_count != 1 else '' }}.
-</div>
-{% endif %}
+{{ pager(page_obj, "/admin/barangays", base_query) }}
 {% endblock %}

@@ -120,12 +120,23 @@ def _capacity_lower_bound(raw):
 
 
 @router.get("/setup", response_class=HTMLResponse)
-def simulator_setup(request: Request, db: Session = Depends(get_db)):
+def simulator_setup(
+    request: Request,
+    db: Session = Depends(get_db),
+    barangay_id: Optional[str] = None,
+):
     user = require_role(request, ["admin"])
     if isinstance(user, RedirectResponse):
         return user
 
     barangays = db.query(Barangay).order_by(Barangay.name).all()
+
+    # Optional pre-selection when arriving from a barangay profile
+    # ("Use for Planning"). Coerce safely — blank/garbage never selects.
+    preselect_id = int(barangay_id) if (barangay_id or "").strip().isdigit() else None
+    preselect_barangay = next(
+        (b for b in barangays if b.id == preselect_id), None
+    ) if preselect_id else None
 
     # ── Saved-scenario history (newest first) shown below the setup form ───
     # Compact by default: 10 most recent, with a "View all" toggle so the form
@@ -195,6 +206,8 @@ def simulator_setup(request: Request, db: Session = Depends(get_db)):
             "disaster_types": list(DisasterType),
             "duration_options": DURATION_OPTIONS,
             "default_duration": "3_days",
+            "preselect_barangay_id": preselect_barangay.id if preselect_barangay else None,
+            "preselect_barangay_name": preselect_barangay.name if preselect_barangay else None,
             "saved_rows": saved_rows,
             "total_saved": total_saved,
             "show_all": show_all,

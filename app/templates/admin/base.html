@@ -76,6 +76,7 @@
             ]},
             {'label': 'Field Data & Mapping', 'items': [
                 {'href': '/admin/barangays', 'icon': 'bi-geo-alt-fill', 'text': 'Barangay Field Data', 'key': 'barangays'},
+                {'href': '/admin/contacts', 'icon': 'bi-person-vcard', 'text': 'Contact Directory', 'key': 'contacts', 'title': 'Barangay officials and emergency responder contacts (read-only)'},
                 {'href': '/admin/map', 'icon': 'bi-map-fill', 'text': 'Facility Map', 'key': 'map'}
             ]},
             {'label': 'Resource Management', 'items': [
@@ -92,6 +93,7 @@
             ]},
             {'label': 'Administration', 'items': [
                 {'href': '/admin/users', 'icon': 'bi-people-fill', 'text': 'User Management', 'key': 'users'},
+                {'href': '/admin/login-history', 'icon': 'bi-shield-lock-fill', 'text': 'Login History', 'key': 'login_history', 'title': 'Authentication events — logins, logouts, failed attempts, lockouts'},
                 {'href': '/admin/audit', 'icon': 'bi-file-earmark-text-fill', 'text': 'Audit Trail', 'key': 'audit', 'title': 'System-wide audit trail of all logged actions'}
             ]}
         ] %}
@@ -112,11 +114,21 @@
            class="nav-item-link nav-accent-green {{ 'active' if active == 'staff_dashboard' else '' }}">
             <i class="bi bi-grid-1x2-fill nav-icon"></i><span class="nav-label">Dashboard</span>
         </a>
+        <a href="/staff/contacts"
+           class="nav-item-link nav-accent-pink {{ 'active' if active == 'contacts' else '' }}"
+           title="Barangay officials and emergency responder contacts (read-only)">
+            <i class="bi bi-person-vcard nav-icon"></i><span class="nav-label">Contact Directory</span>
+        </a>
         {% endif %}
         {% if is_cfau %}
         <a href="/cfau/dashboard"
            class="nav-item-link nav-accent-green {{ 'active' if active == 'cfau_dashboard' else '' }}">
             <i class="bi bi-grid-1x2-fill nav-icon"></i><span class="nav-label">Dashboard</span>
+        </a>
+        <a href="/cfau/contacts"
+           class="nav-item-link nav-accent-pink {{ 'active' if active == 'contacts' else '' }}"
+           title="Barangay officials and emergency responder contacts (read-only)">
+            <i class="bi bi-person-vcard nav-icon"></i><span class="nav-label">Contact Directory</span>
         </a>
         {% endif %}
 
@@ -145,6 +157,11 @@
            class="nav-item-link nav-accent-pink {{ 'active' if active == 'bdrrmo_contacts' else '' }}"
            title="Manage officials and emergency responder contacts">
             <i class="bi bi-person-vcard nav-icon"></i><span class="nav-label">Contact Details</span>
+        </a>
+        <a href="/bdrrmo/directory"
+           class="nav-item-link nav-accent-pink {{ 'active' if active == 'bdrrmo_directory' else '' }}"
+           title="Barangay officials and emergency responder contacts across San Pedro (read-only)">
+            <i class="bi bi-journal-bookmark-fill nav-icon"></i><span class="nav-label">Contact Directory</span>
         </a>
         {% endif %}
 

@@ -2,16 +2,29 @@
 
 {% block title %}Critical Facilities — RisKonek{% endblock %}
 
+{% block head_extra %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous"/>
+{% endblock %}
+
 {% set active_nav = 'bdrrmo_facilities' %}
 
 {% block content %}
 {% set status_labels = {'available': 'Available', 'under_maintenance': 'Under Maintenance', 'unavailable': 'Unavailable'} %}
 {% set status_classes = {'available': 'status-operational', 'under_maintenance': 'status-maintenance', 'unavailable': 'status-unavailable'} %}
 
-<div class="page-header">
-    <h1>Critical Facilities</h1>
-    <p>Manage evacuation centers and critical facility points in
-       {% if barangay %}Barangay {{ barangay.name }}{% else %}your barangay{% endif %}.</p>
+<div class="d-flex justify-content-between align-items-start page-header flex-wrap gap-2">
+    <div>
+        <h1>Critical Facilities</h1>
+        <p>Manage evacuation centers and critical facilities in
+           {% if barangay %}Barangay {{ barangay.name }}{% else %}your barangay{% endif %}.</p>
+    </div>
+    {% if barangay %}
+    <button type="button" class="btn btn-rk" data-bs-toggle="modal" data-bs-target="#facilityModal"
+            id="addFacilityBtn">
+        <i class="bi bi-plus-lg"></i> <span class="d-none d-sm-inline">Add Facility</span>
+    </button>
+    {% endif %}
 </div>
 
 {% if success %}
@@ -34,7 +47,7 @@
 </div>
 {% else %}
 
-{# Resolve the facility being edited (if any) so the form can pre-fill.
+{# Resolve the facility being edited (if any) so the modal can pre-fill.
    Use a namespace: a plain {% set %} inside a {% for %} loop does not survive
    the loop in Jinja2, so the result is copied back to `editing` at top level. #}
 {% set ns = namespace(editing=none) %}
@@ -44,74 +57,156 @@
     {% endfor %}
 {% endif %}
 {% set editing = ns.editing %}
+{% set action_add = "/bdrrmo/facilities" %}
+{% set action_edit_prefix = "/bdrrmo/facilities" %}
+{% set show_barangay_select = false %}
 
-{% if not show_archived %}
-<!-- ── Add / Edit facility (TR-BDR-03/04) ─────────────────────── -->
-<div class="dash-card mb-4">
-    <div class="card-title-row">
-        <i class="bi bi-{{ 'pencil-square' if editing else 'plus-circle' }} rk-text-green"></i>
-        <h6>{{ 'Edit Facility' if editing else 'Add Critical Facility' }}</h6>
+<!-- ── Summary cards ──────────────────────────────────────────── -->
+<div class="row g-3 mb-3">
+    <div class="col-6 col-md-3">
+        <div class="stat-card d-flex justify-content-between align-items-center">
+            <div>
+                <div class="stat-label">Total Facilities</div>
+                <div class="stat-value">{{ summary.total }}</div>
+            </div>
+            <div class="stat-icon rk-tint-green-rk"><i class="bi bi-building"></i></div>
+        </div>
     </div>
-    <form method="POST"
-          action="/bdrrmo/facilities{{ '/' ~ editing.id ~ '/edit' if editing else '' }}"
-          class="row g-3">
-            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
-        <div class="col-md-6">
-            <label class="form-label small fw-semibold mb-1">Facility Name</label>
-            <input type="text" name="name" maxlength="150" class="form-control form-control-sm"
-                   value="{{ editing.name if editing else '' }}" required>
+    <div class="col-6 col-md-3">
+        <div class="stat-card d-flex justify-content-between align-items-center">
+            <div>
+                <div class="stat-label">Evacuation Centers</div>
+                <div class="stat-value">{{ summary.evacuation_centers }}</div>
+            </div>
+            <div class="stat-icon rk-tint-green-alt"><i class="bi bi-house-heart"></i></div>
         </div>
-        <div class="col-md-3">
-            <label class="form-label small fw-semibold mb-1">Type</label>
-            <select name="facility_type" class="form-select form-select-sm" required>
-                {% for t in facility_types %}
-                <option value="{{ t }}"
-                    {{ 'selected' if editing and editing.facility_type.value == t else '' }}>
-                    {{ t.replace('_', ' ').title() }}
-                </option>
-                {% endfor %}
-            </select>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="stat-card d-flex justify-content-between align-items-center">
+            <div>
+                <div class="stat-label">Available</div>
+                <div class="stat-value">{{ summary.available }}</div>
+            </div>
+            <div class="stat-icon rk-tint-green-alt"><i class="bi bi-check2-circle"></i></div>
         </div>
-        <div class="col-md-3">
-            <label class="form-label small fw-semibold mb-1">Status</label>
-            <select name="operational_status" class="form-select form-select-sm">
-                {% for s in facility_statuses %}
-                <option value="{{ s }}"
-                    {{ 'selected' if (editing and editing.operational_status.value == s) or (not editing and s == 'available') else '' }}>
-                    {{ status_labels[s] }}
-                </option>
-                {% endfor %}
-            </select>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="stat-card d-flex justify-content-between align-items-center">
+            <div>
+                <div class="stat-label">Archived</div>
+                <div class="stat-value">{{ summary.archived }}</div>
+            </div>
+            <div class="stat-icon rk-tint-amber"><i class="bi bi-archive"></i></div>
         </div>
-        <div class="col-md-4">
-            <label class="form-label small fw-semibold mb-1">Latitude</label>
-            <input type="number" step="any" name="latitude" class="form-control form-control-sm"
-                   value="{{ editing.latitude if editing else '' }}" placeholder="14.3500" required>
-        </div>
-        <div class="col-md-4">
-            <label class="form-label small fw-semibold mb-1">Longitude</label>
-            <input type="number" step="any" name="longitude" class="form-control form-control-sm"
-                   value="{{ editing.longitude if editing else '' }}" placeholder="121.0500" required>
-        </div>
-        <div class="col-md-4">
-            <label class="form-label small fw-semibold mb-1">Address <span class="text-muted">(optional)</span></label>
-            <input type="text" name="address" maxlength="255" class="form-control form-control-sm"
-                   value="{{ editing.address or '' if editing else '' }}">
-        </div>
-        <div class="col-12">
-            <button type="submit" class="btn btn-rk btn-sm">
-                <i class="bi bi-save"></i> {{ 'Save Changes' if editing else 'Add Facility' }}
-            </button>
-            {% if editing %}
-            <a href="/bdrrmo/facilities" class="btn btn-outline-secondary btn-sm">Cancel</a>
-            {% endif %}
-            <span class="text-muted small ms-2">
-                Duplicate names or near-identical coordinates in your barangay are blocked.
-            </span>
-        </div>
-    </form>
+    </div>
 </div>
-{% endif %}
+
+<!-- ── Filters + Map ──────────────────────────────────────────── -->
+<div class="map-wrap mb-3">
+    <aside class="filter-panel">
+        <div class="filter-section">
+            <h6>Search</h6>
+            <input type="search" id="filterSearch" class="form-control form-control-sm"
+                   placeholder="Facility name…">
+        </div>
+
+        <div class="filter-section">
+            <h6>Facility Type</h6>
+            {% for t in facility_types %}
+            <div class="form-check">
+                <input class="form-check-input filter-type" type="checkbox"
+                       id="ft-{{ t }}" value="{{ t }}" checked>
+                <label class="form-check-label" for="ft-{{ t }}">
+                    {{ t.replace('_', ' ').title() }}
+                </label>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="filter-section">
+            <h6>Status</h6>
+            {% for s in facility_statuses %}
+            <div class="form-check">
+                <input class="form-check-input filter-status" type="checkbox"
+                       id="st-{{ s }}" value="{{ s }}" checked>
+                <label class="form-check-label" for="st-{{ s }}">{{ status_labels[s] }}</label>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="filter-section">
+            <h6>Hazard Support</h6>
+            <div class="form-check">
+                <input class="form-check-input filter-hazard" type="checkbox" id="hz-tc" value="supports_tropical_cyclone">
+                <label class="form-check-label" for="hz-tc">Tropical Cyclone</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input filter-hazard" type="checkbox" id="hz-fl" value="supports_flooding">
+                <label class="form-check-label" for="hz-fl">Flooding</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input filter-hazard" type="checkbox" id="hz-ls" value="supports_landslide">
+                <label class="form-check-label" for="hz-ls">Landslide</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input filter-hazard" type="checkbox" id="hz-fr" value="supports_fire">
+                <label class="form-check-label" for="hz-fr">Fire</label>
+            </div>
+            <small class="text-muted">Unchecked = no hazard restriction.</small>
+        </div>
+
+        <button type="button" id="resetFilters" class="btn-soft w-100 mt-2 justify-content-center">
+            <i class="bi bi-arrow-counterclockwise me-1"></i>Reset filters
+        </button>
+    </aside>
+
+    <div class="map-area">
+        <div id="bdrrmoFacilityMap"></div>
+        <div class="map-overlay">
+            <div class="legend-title">Legend</div>
+            <div class="legend-row"><span class="legend-dot rk-bg-green"></span><span>Evacuation Center</span></div>
+            <div class="legend-row"><span class="legend-dot rk-bg-blue"></span><span>School</span></div>
+            <div class="legend-row"><span class="legend-dot rk-bg-red"></span><span>Hospital</span></div>
+            <div class="legend-row"><span class="legend-dot rk-bg-purple"></span><span>Health Clinic</span></div>
+            <div class="legend-row"><span class="legend-dot rk-bg-orange"></span><span>Staging Area</span></div>
+        </div>
+        <!-- Shown only while picking a location from the Add/Edit modal -->
+        <div class="map-picker-bar d-none" id="mapPickerBar">
+            <div class="picker-search-row">
+                <label class="visually-hidden" for="pickerSearchInput">Search location</label>
+                <div class="picker-search-input-wrap">
+                    <input type="text" id="pickerSearchInput" class="form-control form-control-sm"
+                           role="combobox" aria-expanded="false" aria-controls="pickerSearchResults"
+                           aria-autocomplete="list" autocomplete="off"
+                           placeholder="Search establishments, streets, landmarks, or addresses in San Pedro">
+                    <span class="picker-search-spinner spinner-border spinner-border-sm d-none" id="pickerSearchSpinner" aria-hidden="true"></span>
+                </div>
+                <ul class="picker-search-results d-none" id="pickerSearchResults" role="listbox"></ul>
+                <div class="visually-hidden" id="pickerSearchStatus" role="status" aria-live="polite"></div>
+            </div>
+            <div class="form-check form-switch picker-landmarks-toggle">
+                <input class="form-check-input" type="checkbox" id="pickerShowLandmarks" checked>
+                <label class="form-check-label rk-fs-11" for="pickerShowLandmarks">Show nearby landmarks</label>
+            </div>
+            <div class="picker-boundary-warning d-none" id="pickerBoundaryWarning" role="alert">
+                Please select a location within San Pedro City, Laguna.
+            </div>
+            <div class="picker-info-row">
+                <i class="bi bi-geo-alt-fill rk-text-green"></i>
+                <div>
+                    <div>Search anywhere within San Pedro City, or click directly on the map. Drag the pin to adjust the exact location.</div>
+                    <div class="picker-selected-summary">
+                        <div class="picker-selected-name" id="pickerSelectedName">No location selected</div>
+                        <div class="text-muted rk-fs-11">San Pedro City, Laguna</div>
+                        <div class="text-muted rk-fs-11" id="pickerCoordinates"></div>
+                    </div>
+                </div>
+                <button type="button" class="btn btn-rk btn-sm" id="pickerConfirm" disabled>Use this location</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="pickerCancel">Cancel</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <!-- ── View toggle (active / archived) ────────────────────────── -->
 <div class="d-flex justify-content-between align-items-center mb-2">
@@ -135,6 +230,8 @@
                 <tr class="rk-th-soft">
                     <th class="px-3 py-3">Facility Name</th>
                     <th class="py-3">Type</th>
+                    <th class="py-3">Capacity</th>
+                    <th class="py-3">Hazard Support</th>
                     <th class="py-3">Coordinates</th>
                     <th class="py-3">Status</th>
                     <th class="py-3 px-3 text-end">Actions</th>
@@ -148,7 +245,25 @@
                         {{ f.name }}
                         {% if f.address %}<div class="text-muted rk-fs-11">{{ f.address }}</div>{% endif %}
                     </td>
-                    <td>{{ f.facility_type.value.replace('_', ' ').title() }}</td>
+                    <td>
+                        {{ f.facility_type.value.replace('_', ' ').title() }}
+                        {% if f.status %}<div class="text-muted rk-fs-11">{{ f.status }}</div>{% endif %}
+                    </td>
+                    <td class="text-muted small">
+                        {% if f.capacity_individuals %}{{ f.capacity_individuals }} indiv.
+                        {% elif f.capacity %}{{ "{:,}".format(f.capacity) }}
+                        {% else %}—{% endif %}
+                        {% if f.capacity_families %}<div class="rk-fs-11">{{ f.capacity_families }} families</div>{% endif %}
+                    </td>
+                    <td class="small">
+                        {% set any_hazard = f.supports_flooding or f.supports_tropical_cyclone or f.supports_landslide or f.supports_fire %}
+                        {% if any_hazard %}
+                        {% if f.supports_flooding %}<i class="bi bi-water text-primary me-1" title="Flooding"></i>{% endif %}
+                        {% if f.supports_tropical_cyclone %}<i class="bi bi-tropical-storm text-info me-1" title="Tropical Cyclone"></i>{% endif %}
+                        {% if f.supports_landslide %}<i class="bi bi-triangle-fill text-warning me-1" title="Landslide"></i>{% endif %}
+                        {% if f.supports_fire %}<i class="bi bi-fire text-danger me-1" title="Fire"></i>{% endif %}
+                        {% else %}<span class="text-muted">—</span>{% endif %}
+                    </td>
                     <td class="text-muted">{{ "%.5f"|format(f.latitude) }}, {{ "%.5f"|format(f.longitude) }}</td>
                     <td>
                         <span class="status-pill {{ status_classes[sval] }}">{{ status_labels[sval] }}</span>
@@ -157,7 +272,7 @@
                         {% if show_archived %}
                         <form method="POST" action="/bdrrmo/facilities/{{ f.id }}/archive" class="d-inline">
             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
-                            <button type="submit" class="btn btn-outline-secondary btn-sm">
+                            <button type="submit" class="btn btn-outline-secondary btn-sm" title="Restore" aria-label="Restore {{ f.name }}">
                                 <i class="bi bi-arrow-counterclockwise"></i> Restore
                             </button>
                         </form>
@@ -167,21 +282,21 @@
             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                             <div class="input-group input-group-sm d-inline-flex w-auto align-middle">
                                 <select name="operational_status" class="form-select form-select-sm w-auto"
-                                        data-submit-on-change>
+                                        data-submit-on-change aria-label="Change status for {{ f.name }}">
                                     {% for s in facility_statuses %}
                                     <option value="{{ s }}" {{ 'selected' if s == sval else '' }}>{{ status_labels[s] }}</option>
                                     {% endfor %}
                                 </select>
                             </div>
                         </form>
-                        <a href="/bdrrmo/facilities?edit={{ f.id }}" class="btn btn-outline-secondary btn-sm" title="Edit">
+                        <a href="/bdrrmo/facilities?edit={{ f.id }}" class="btn btn-outline-secondary btn-sm" title="Edit" aria-label="Edit {{ f.name }}">
                             <i class="bi bi-pencil"></i>
                         </a>
                         <form method="POST" action="/bdrrmo/facilities/{{ f.id }}/archive"
                               class="d-inline"
                               data-confirm='Archive {{ f.name }}? It will be hidden from the active list but kept on record.'>
             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
-                            <button type="submit" class="btn btn-outline-secondary btn-sm" title="Archive">
+                            <button type="submit" class="btn btn-outline-secondary btn-sm" title="Archive" aria-label="Archive {{ f.name }}">
                                 <i class="bi bi-archive"></i>
                             </button>
                         </form>
@@ -189,11 +304,11 @@
                     </td>
                 </tr>
                 {% else %}
-                <tr><td colspan="5" class="text-center text-muted py-4">
+                <tr><td colspan="7" class="text-center text-muted py-4">
                     {% if show_archived %}
                     No archived facilities.
                     {% else %}
-                    No critical facilities recorded for this barangay yet. Use the form above to add one.
+                    No critical facilities recorded for this barangay yet. Use "Add Facility" above to add one.
                     {% endif %}
                 </td></tr>
                 {% endfor %}
@@ -201,5 +316,553 @@
         </table>
     </div>
 </div>
+
+<!-- ── Add / Edit Facility modal (shared partial) ──────────────── -->
+{% include "shared/_facility_form_modal.html" with context %}
+
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if barangay %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin="anonymous"></script>
+<script src="/static/js/rk-map-search.js"></script>
+<script src="/static/js/rk-facility-form.js"></script>
+<script nonce="{{ request.state.csp_nonce }}">
+(function () {
+    const mapElement = document.getElementById('bdrrmoFacilityMap');
+    if (!mapElement) {
+        console.error('Facility map container was not found.');
+        return;
+    }
+    if (typeof L === 'undefined') {
+        console.error('Leaflet failed to load.');
+        return;
+    }
+    if (mapElement._leaflet_id) {
+        console.warn('Facility map was already initialized — skipping duplicate init.');
+        return;
+    }
+
+    // ── Map init, scoped to this barangay's active facilities ──────────
+    const facilities = {{ map_facilities | tojson }};
+    const barangayName = {{ barangay.name | tojson }};
+    const spBounds = {{ sp_bounds | tojson }};
+    const spBoundary = {{ sp_boundary | tojson }};  // [[lat,lng], ...] — see app/services/geocoding.py
+
+    const TYPE_COLORS = {
+        evacuation_center: '#047857',
+        school:            '#2980b9',
+        hospital:          '#c0392b',
+        health_clinic:     '#8e44ad',
+        staging_area:      '#d35400',
+    };
+
+    function esc(v) {
+        if (v === null || v === undefined) return '';
+        return String(v)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    function markerStyle(f) {
+        return {
+            radius: 7,
+            color: '#ffffff',
+            weight: 2,
+            fillColor: TYPE_COLORS[f.facility_type] || '#888',
+            fillOpacity: 1,
+        };
+    }
+
+    function na(v) {
+        return (v === null || v === undefined || v === '') ? 'Not specified' : esc(v);
+    }
+
+    function popupHtml(f) {
+        const hazards = [];
+        if (f.supports_flooding)          hazards.push('Flooding');
+        if (f.supports_tropical_cyclone)  hazards.push('Tropical Cyclone');
+        if (f.supports_landslide)         hazards.push('Landslide');
+        if (f.supports_fire)              hazards.push('Fire');
+
+        const statusLabelMap = { available: 'Available', under_maintenance: 'Under Maintenance', unavailable: 'Unavailable' };
+        const statusBadge = f.operational_status
+            ? `<span class="popup-badge">${esc(statusLabelMap[f.operational_status] || f.operational_status)}</span>` : '';
+        const classificationBadge = f.status
+            ? `<span class="popup-badge">${esc(f.status)}</span>` : '';
+
+        let eoMoaMou = null;
+        if (f.eo_moa_mou_status || f.eo_moa_mou_reference) {
+            eoMoaMou = [f.eo_moa_mou_status, f.eo_moa_mou_reference].filter(Boolean).join(' — ');
+        } else if (f.eo_moa_mou) {
+            eoMoaMou = f.eo_moa_mou;
+        }
+
+        function row(label, value) {
+            return `<tr><th>${esc(label)}</th><td>${na(value)}</td></tr>`;
+        }
+
+        return `
+            <div class="popup-name">${esc(f.name)}</div>
+            <div class="popup-sub">${esc(barangayName)} · ${esc(f.facility_type_label) || 'Not specified'}</div>
+            <div class="popup-badges">${statusBadge}${classificationBadge}</div>
+            <table class="popup-table">
+                ${row('Address', f.address)}
+                ${row('Floor area', f.floor_area_sqm ? f.floor_area_sqm + ' sqm' : null)}
+                ${row('Capacity (families)', f.capacity_families)}
+                ${row('Capacity (individuals)', f.capacity_individuals)}
+                ${row('EREID (families)', f.ereid_capacity_families)}
+                ${row('EREID (individuals)', f.ereid_capacity_individuals)}
+                <tr><th>Supported hazards</th><td>${hazards.join(', ') || 'None selected'}</td></tr>
+                ${row('Hazard reference — master list', f.vulnerability_risk)}
+                ${row('EO / MOA / MOU', eoMoaMou)}
+                ${row('Coordinates', f.lat.toFixed(6) + ', ' + f.lng.toFixed(6))}
+            </table>
+            <div class="popup-actions">
+                <a href="/bdrrmo/facilities?edit=${f.id}" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-pencil"></i> Edit Facility
+                </a>
+            </div>
+        `;
+    }
+
+    const map = L.map(mapElement).setView([14.356, 121.052], 15);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors',
+        maxZoom: 18,
+    }).addTo(map);
+    window.setTimeout(function () { map.invalidateSize(); }, 100);
+
+    // San Pedro boundary — subtle outline for context while picking, plus a
+    // generous maxBounds (padded well beyond the polygon) so panning still
+    // feels natural near the city edge. The polygon itself is what actually
+    // gates a selection (see isPointAllowed below) — maxBounds only keeps
+    // the map from being dragged out to the other side of the country.
+    if (spBoundary && spBoundary.length >= 3) {
+        L.polygon(spBoundary, {
+            color: '#10b981', weight: 2, opacity: 0.6, fill: false, dashArray: '4 4',
+        }).addTo(map);
+    }
+    if (spBounds) {
+        const pad = 0.02; // ~2km
+        map.setMaxBounds([
+            [spBounds.south - pad, spBounds.west - pad],
+            [spBounds.north + pad, spBounds.east + pad],
+        ]);
+    }
+
+    function isPointAllowed(lat, lng) {
+        return rkPointInPolygon(lat, lng, spBoundary);
+    }
+
+    const registeredFacilityLayer = L.layerGroup().addTo(map);
+    const nearbyLandmarkLayer = L.layerGroup();
+    const temporaryPickerLayer = L.layerGroup().addTo(map);
+    const bounds = [];
+
+    function applyFilters() {
+        const search = document.getElementById('filterSearch').value.trim().toLowerCase();
+        const types = Array.from(document.querySelectorAll('.filter-type:checked')).map(el => el.value);
+        const statuses = Array.from(document.querySelectorAll('.filter-status:checked')).map(el => el.value);
+        const hazards = Array.from(document.querySelectorAll('.filter-hazard:checked')).map(el => el.value);
+
+        registeredFacilityLayer.clearLayers();
+        facilities.forEach(f => {
+            if (search && !f.name.toLowerCase().includes(search)) return;
+            if (!types.includes(f.facility_type)) return;
+            if (!statuses.includes(f.operational_status)) return;
+            if (hazards.length > 0 && !hazards.every(k => f[k])) return;
+
+            const lat = Number(f.lat);
+            const lng = Number(f.lng);
+            if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+                console.warn('Skipping facility with invalid coordinates:', f);
+                return;
+            }
+
+            L.circleMarker([lat, lng], markerStyle(f))
+                .addTo(registeredFacilityLayer)
+                .bindPopup(popupHtml(f), { maxWidth: 320 });
+        });
+    }
+
+    function bindFilterEvents() {
+        document.getElementById('filterSearch').addEventListener('input', applyFilters);
+        document.querySelectorAll('.filter-type, .filter-status, .filter-hazard')
+            .forEach(el => el.addEventListener('change', applyFilters));
+        document.getElementById('resetFilters').addEventListener('click', () => {
+            document.getElementById('filterSearch').value = '';
+            document.querySelectorAll('.filter-type, .filter-status').forEach(el => el.checked = true);
+            document.querySelectorAll('.filter-hazard').forEach(el => el.checked = false);
+            applyFilters();
+        });
+    }
+
+    facilities.forEach(f => {
+        const lat = Number(f.lat);
+        const lng = Number(f.lng);
+        if (Number.isFinite(lat) && Number.isFinite(lng)) bounds.push([lat, lng]);
+    });
+    const fitTo = L.latLngBounds(bounds);
+    if (fitTo.isValid()) {
+        map.fitBounds(fitTo, { padding: [30, 30], maxZoom: 16 });
+    }
+    bindFilterEvents();
+    applyFilters();
+
+    // ── Pick-on-map (Add/Edit Facility modal) ───────────────────────────
+    // Bootstrap's modal.hide() is ASYNC (fade transition) — the backdrop and
+    // focus trap are only actually gone once `hidden.bs.modal` fires. Picking
+    // must not start until then, both so the backdrop isn't still eating map
+    // clicks, and so the SAME `hidden.bs.modal` event that later fires for a
+    // genuine dismissal (Cancel/X/backdrop) doesn't immediately undo the
+    // picking state the "Pick on map" button just set (that race was the bug
+    // — picking got flipped back off within one fade duration of starting).
+    const modalEl = document.getElementById('facilityModal');
+    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+    const latInput = document.getElementById('facilityLat');
+    const lngInput = document.getElementById('facilityLng');
+    const pickBtn = document.getElementById('pickOnMapBtn');
+    const pickerBar = document.getElementById('mapPickerBar');
+    const pickerCoords = document.getElementById('pickerCoordinates');
+    const pickerConfirmBtn = document.getElementById('pickerConfirm');
+    const pickerSelectedName = document.getElementById('pickerSelectedName');
+    const pickerShowLandmarks = document.getElementById('pickerShowLandmarks');
+    const pickerSearchSpinner = document.getElementById('pickerSearchSpinner');
+    const pickerBoundaryWarning = document.getElementById('pickerBoundaryWarning');
+    let tempMarker = null;
+    let picking = false;
+    let pendingPickerStart = false;   // set by "Pick on map", consumed by hidden.bs.modal
+    let coordsBeforePicking = null;   // {lat, lng} strings to restore on Cancel
+    let lastValidLatLng = null;       // {lat, lng} to snap a dragged pin back to if dropped outside San Pedro
+
+    function showBoundaryWarning() { pickerBoundaryWarning.classList.remove('d-none'); }
+    function hideBoundaryWarning() { pickerBoundaryWarning.classList.add('d-none'); }
+
+    // Bootstrap's Modal.hide() silently no-ops while the modal is still
+    // mid-transition from its own show() animation — calling it too soon
+    // after the modal opens (e.g. right after "+ Add Facility", or a fast
+    // click on "Pick on map") does nothing at all: no error, no state
+    // change. Track shown/hidden via Bootstrap's own events so hide() is
+    // only ever called once the show transition has actually finished.
+    let modalIsShown = false;
+    modalEl.addEventListener('shown.bs.modal', function () { modalIsShown = true; });
+
+    function dispatchInput(el) {
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+
+    function debounce(fn, waitMs) {
+        let timer = null;
+        return function (...args) {
+            if (timer) clearTimeout(timer);
+            timer = setTimeout(() => fn.apply(null, args), waitMs);
+        };
+    }
+
+    function placeTempMarker(lat, lng) {
+        if (tempMarker) {
+            tempMarker.setLatLng([lat, lng]);
+        } else {
+            tempMarker = L.marker([lat, lng], { draggable: true }).addTo(temporaryPickerLayer);
+            tempMarker.on('dragend', function () {
+                const pos = tempMarker.getLatLng();
+                if (!isPointAllowed(pos.lat, pos.lng)) {
+                    showBoundaryWarning();
+                    pickerConfirmBtn.disabled = true;
+                    // Snap back to the last confirmed-valid position rather than
+                    // leaving the pin sitting outside San Pedro.
+                    if (lastValidLatLng) tempMarker.setLatLng([lastValidLatLng.lat, lastValidLatLng.lng]);
+                    return;
+                }
+                setCoords(pos.lat, pos.lng);
+                queueReverseGeocode(pos.lat, pos.lng);
+            });
+        }
+    }
+
+    function setCoords(lat, lng, placeName) {
+        hideBoundaryWarning();
+        lastValidLatLng = { lat: lat, lng: lng };
+        latInput.value = lat.toFixed(6);
+        lngInput.value = lng.toFixed(6);
+        dispatchInput(latInput);
+        dispatchInput(lngInput);
+        pickerCoords.textContent = 'Coordinates: ' + lat.toFixed(6) + ', ' + lng.toFixed(6);
+        pickerSelectedName.textContent = placeName || 'Selected map location';
+        pickerConfirmBtn.disabled = false;
+    }
+
+    // Best-effort reverse geocode after a manual click/drag settles — never
+    // blocks selection; on failure/timeout the "Selected map location"
+    // fallback set by setCoords() simply stays as-is.
+    let reverseGeocodeController = null;
+    const queueReverseGeocode = debounce(function (lat, lng) {
+        if (reverseGeocodeController) reverseGeocodeController.abort();
+        reverseGeocodeController = new AbortController();
+        fetch('/bdrrmo/api/reverse-geocode?lat=' + encodeURIComponent(lat) + '&lng=' + encodeURIComponent(lng),
+            { signal: reverseGeocodeController.signal })
+            .then(r => r.json())
+            .then(data => {
+                if (data && data.display_name) pickerSelectedName.textContent = data.display_name;
+            })
+            .catch(err => { /* AbortError or provider failure — keep the fallback text */ });
+    }, 600);
+
+    function handleFacilityMapPick(e) {
+        if (!picking) return;
+        if (!isPointAllowed(e.latlng.lat, e.latlng.lng)) {
+            showBoundaryWarning();
+            return;
+        }
+        setCoords(e.latlng.lat, e.latlng.lng);
+        placeTempMarker(e.latlng.lat, e.latlng.lng);
+        queueReverseGeocode(e.latlng.lat, e.latlng.lng);
+    }
+    // Registered once at init (not inside the pick-button handler), so
+    // repeated Pick-on-map use never stacks duplicate click listeners.
+    map.on('click', handleFacilityMapPick);
+
+    // ── Location search (inside the picker bar) ─────────────────────────
+    const locationSearch = RkLocationSearch({
+        input: document.getElementById('pickerSearchInput'),
+        resultsEl: document.getElementById('pickerSearchResults'),
+        statusEl: document.getElementById('pickerSearchStatus'),
+        buildUrl: q => '/bdrrmo/api/location-search?q=' + encodeURIComponent(q),
+        onLoadingChange: loading => pickerSearchSpinner.classList.toggle('d-none', !loading),
+        onSelect: function (result) {
+            // Backend already hard-filters results to San Pedro; this is a
+            // defensive re-check, not the primary gate.
+            if (!isPointAllowed(result.latitude, result.longitude)) { showBoundaryWarning(); return; }
+            setCoords(result.latitude, result.longitude, result.display_name);
+            placeTempMarker(result.latitude, result.longitude);
+            map.setView([result.latitude, result.longitude], 17);
+        },
+    });
+
+    // ── Nearby landmarks (reference layer, inside the picker) ───────────
+    const nearbyLandmarks = RkNearbyLandmarks({
+        map: map,
+        layerGroup: nearbyLandmarkLayer,
+        buildUrl: (lat, lng, radius) =>
+            '/bdrrmo/api/nearby-landmarks?lat=' + encodeURIComponent(lat) +
+            '&lng=' + encodeURIComponent(lng) + '&radius=' + radius,
+        onUseAsLocation: function (landmark) {
+            if (!isPointAllowed(landmark.latitude, landmark.longitude)) { showBoundaryWarning(); return; }
+            setCoords(landmark.latitude, landmark.longitude, landmark.name);
+            placeTempMarker(landmark.latitude, landmark.longitude);
+            if (nameInput.value.trim() === '') nameInput.value = landmark.name;
+        },
+    });
+
+    function startPicking() {
+        picking = true;
+        pickerConfirmBtn.disabled = true;
+        pickerCoords.textContent = '';
+        pickerSelectedName.textContent = 'No location selected';
+        hideBoundaryWarning();
+        lastValidLatLng = null;
+        document.body.classList.add('facility-location-picking');
+        pickerBar.classList.remove('d-none');
+        map.invalidateSize();
+
+        if (pickerShowLandmarks.checked) nearbyLandmarks.enable();
+
+        // If there's already a valid coordinate (editing, or the user typed
+        // one manually before picking), show it as the starting marker.
+        const lat = parseFloat(latInput.value);
+        const lng = parseFloat(lngInput.value);
+        if (!isNaN(lat) && !isNaN(lng)) {
+            placeTempMarker(lat, lng);
+            lastValidLatLng = { lat: lat, lng: lng };
+            pickerCoords.textContent = 'Coordinates: ' + lat.toFixed(6) + ', ' + lng.toFixed(6);
+            pickerSelectedName.textContent = 'Selected map location';
+            pickerConfirmBtn.disabled = false;
+        }
+    }
+
+    function stopPicking() {
+        picking = false;
+        document.body.classList.remove('facility-location-picking');
+        pickerBar.classList.add('d-none');
+        hideBoundaryWarning();
+        locationSearch.reset();
+        nearbyLandmarks.disable();
+        if (reverseGeocodeController) reverseGeocodeController.abort();
+    }
+
+    pickerShowLandmarks.addEventListener('change', function () {
+        if (!picking) return;
+        if (pickerShowLandmarks.checked) nearbyLandmarks.enable();
+        else nearbyLandmarks.disable();
+    });
+
+    pickBtn.addEventListener('click', function () {
+        coordsBeforePicking = { lat: latInput.value, lng: lngInput.value };
+        pendingPickerStart = true;
+        if (modalIsShown) {
+            modal.hide();   // picking actually starts in hidden.bs.modal below
+        } else {
+            // The modal's own show() transition hasn't finished yet (e.g. this
+            // was clicked immediately after "+ Add Facility") — hide() would
+            // silently no-op right now, so wait for shown.bs.modal first.
+            modalEl.addEventListener('shown.bs.modal', function onShown() {
+                modalEl.removeEventListener('shown.bs.modal', onShown);
+                modal.hide();
+            });
+        }
+    });
+
+    pickerConfirmBtn.addEventListener('click', function () {
+        stopPicking();
+        modal.show();
+    });
+
+    document.getElementById('pickerCancel').addEventListener('click', function () {
+        // Restore whatever was in the fields before picking began — a map
+        // click during picking must not stick if the user cancels.
+        if (coordsBeforePicking) {
+            latInput.value = coordsBeforePicking.lat;
+            lngInput.value = coordsBeforePicking.lng;
+            dispatchInput(latInput);
+            dispatchInput(lngInput);
+            const lat = parseFloat(coordsBeforePicking.lat);
+            const lng = parseFloat(coordsBeforePicking.lng);
+            if (tempMarker) {
+                if (!isNaN(lat) && !isNaN(lng)) {
+                    tempMarker.setLatLng([lat, lng]);
+                } else {
+                    temporaryPickerLayer.clearLayers();
+                    tempMarker = null;
+                }
+            }
+        }
+        stopPicking();
+        modal.show();
+    });
+
+    // Manual coordinate edits move the temp marker too, when one exists.
+    [latInput, lngInput].forEach(function (input) {
+        input.addEventListener('input', function () {
+            const lat = parseFloat(latInput.value);
+            const lng = parseFloat(lngInput.value);
+            if (tempMarker && !isNaN(lat) && !isNaN(lng)) {
+                tempMarker.setLatLng([lat, lng]);
+            }
+        });
+    });
+
+    // Auto-open the modal when editing (?edit=id) — same trigger the old
+    // inline form used to decide whether to render in edit mode.
+    if (modalEl.dataset.autoshow === '1') {
+        const lat = parseFloat(latInput.value);
+        const lng = parseFloat(lngInput.value);
+        if (!isNaN(lat) && !isNaN(lng)) placeTempMarker(lat, lng);
+        modal.show();
+    }
+
+    // Single handler for every `hidden.bs.modal` — branches on WHY the modal
+    // was hidden instead of assuming it was always a dismissal (that
+    // assumption was the bug: it used to unconditionally cancel picking
+    // mode moments after "Pick on map" started it).
+    modalEl.addEventListener('hidden.bs.modal', function () {
+        modalIsShown = false;
+        if (pendingPickerStart) {
+            pendingPickerStart = false;
+            startPicking();
+            return;
+        }
+        // Genuine dismissal (Cancel / backdrop / X) without saving — clear
+        // the temp marker and make sure picking mode isn't left armed.
+        if (tempMarker) { temporaryPickerLayer.clearLayers(); tempMarker = null; }
+        stopPicking();
+    });
+
+    // ── Validation (required + numeric ranges + the shared detail-field
+    // validators from rk-facility-form.js) — server-side validation in
+    // bdrrmo.py/facility_details.py remains the source of truth ──
+    const form = document.getElementById('facilityForm');
+    const nameInput = document.getElementById('facilityName');
+    const detailFields = {
+        name: nameInput,
+        floorArea: document.getElementById('facilityFloorArea'),
+        capacityFamilies: document.getElementById('facilityCapacityFamilies'),
+        capacityIndividuals: document.getElementById('facilityCapacityIndividuals'),
+        ereidFamilies: document.getElementById('facilityEreidFamilies'),
+        ereidIndividuals: document.getElementById('facilityEreidIndividuals'),
+        hazardReference: document.getElementById('facilityHazardReference'),
+        eoMoaMouReference: document.getElementById('facilityEoMoaMouReference'),
+        notes: document.getElementById('facilityNotes'),
+    };
+    const resetFields = Object.assign({}, detailFields, {
+        address: document.getElementById('facilityAddress'),
+        latitude: latInput,
+        longitude: lngInput,
+        facilityType: document.getElementById('facilityType'),
+        classification: document.getElementById('facilityClassification'),
+        eoMoaMouStatus: document.getElementById('facilityEoMoaMouStatus'),
+    });
+
+    RkFacilityForm.bindLiveValidation(detailFields);
+    RkFacilityForm.bindCharCounter(detailFields.notes, document.getElementById('facilityNotesCount'), 1000);
+
+    function validateCoord(input, lo, hi) {
+        const v = parseFloat(input.value);
+        const ok = !isNaN(v) && v >= lo && v <= hi;
+        input.classList.toggle('is-invalid', !ok);
+        input.classList.toggle('is-valid', ok);
+        return ok;
+    }
+
+    latInput.addEventListener('input', function () { validateCoord(latInput, -90, 90); });
+    lngInput.addEventListener('input', function () { validateCoord(lngInput, -180, 180); });
+
+    form.addEventListener('submit', function (e) {
+        const okDetails = RkFacilityForm.validateDetailFields(detailFields);
+        const okLat = validateCoord(latInput, -90, 90);
+        const okLng = validateCoord(lngInput, -180, 180);
+        if (!okDetails || !okLat || !okLng) {
+            e.preventDefault();
+            const firstInvalid = form.querySelector('.is-invalid');
+            if (firstInvalid) firstInvalid.focus();
+            return;
+        }
+        // Prevent double submission while the request is in flight.
+        const saveBtn = document.getElementById('facilitySaveBtn');
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Saving…';
+    });
+
+    // "+ Add Facility" always forces a clean Add form — even when the page
+    // loaded in Edit mode (?edit=id, server-rendered with that facility's
+    // values/action baked in) and the user then clicks Add without
+    // reloading. Explicitly resets everything the server would have set
+    // for a fresh "new facility" render: field values, the form's POST
+    // target (edit posts to /facilities/{id}/edit), the title, and the
+    // Save button label.
+    document.getElementById('addFacilityBtn').addEventListener('click', function () {
+        RkFacilityForm.clearFields(resetFields);
+        document.getElementById('facilityStatus').value = 'available';
+        RkFacilityForm.configureModal({
+            mode: 'add',
+            formEl: form,
+            titleEl: document.getElementById('facilityModalLabel'),
+            submitBtnEl: document.getElementById('facilitySaveBtn'),
+            addTitle: 'Add Critical Facility',
+            editTitle: 'Edit Facility',
+            addAction: '/bdrrmo/facilities',
+            editAction: form.action,
+            addSubmitHtml: '<i class="bi bi-save"></i> Add Facility',
+            editSubmitHtml: '<i class="bi bi-save"></i> Save Changes',
+        });
+        document.getElementById('facilityNotesCount').textContent = '0 / 1000';
+        if (tempMarker) { temporaryPickerLayer.clearLayers(); tempMarker = null; }
+        if (picking) { pendingPickerStart = false; stopPicking(); }
+        delete modalEl.dataset.autoshow;
+    });
+})();
+</script>
 {% endif %}
 {% endblock %}

@@ -1,0 +1,268 @@
+{#
+  Shared Add/Edit Critical Facility modal, included by both
+  bdrrmo/facilities.html and admin/map.html so the two pages don't maintain
+  two copies of the same large form. Client-side wiring lives in
+  /static/js/rk-facility-form.js (shared) plus each page's own inline
+  <script> for the Leaflet map/picker, which differs per page.
+
+  Expected context variables from the including template:
+    editing                    — Facility instance being edited, or none
+    action_add                 — POST url for Add mode
+    action_edit_prefix         — POST url prefix; edit posts to
+                                  "{{ action_edit_prefix }}/{{ editing.id }}/edit"
+    facility_types             — list of FacilityType values
+    facility_statuses          — list of FacilityStatus (operational) values
+    facility_classifications   — list of classification strings
+    eo_moa_mou_statuses        — list of EO/MOA/MOU status strings
+    show_barangay_select       — bool; true for admin (any barangay), false
+                                  for bdrrmo (fixed to the user's own barangay)
+    barangays                  — list of Barangay, when show_barangay_select
+    barangay                   — the fixed Barangay, when not show_barangay_select
+#}
+{% set status_labels = {'available': 'Available', 'under_maintenance': 'Under Maintenance', 'unavailable': 'Unavailable'} %}
+
+<div class="modal fade" id="facilityModal" tabindex="-1" aria-labelledby="facilityModalLabel" aria-hidden="true"
+     data-bs-backdrop="static" {% if editing %}data-autoshow="1"{% endif %}>
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <form method="POST" id="facilityForm" novalidate
+          action="{{ action_edit_prefix ~ '/' ~ editing.id ~ '/edit' if editing else action_add }}"
+          class="modal-content">
+        <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+        <div class="modal-header">
+            <div>
+                <h5 class="modal-title" id="facilityModalLabel">
+                    {{ 'Edit Facility' if editing else 'Add Critical Facility' }}
+                </h5>
+                <p class="text-muted small mb-0">
+                    {% if show_barangay_select %}
+                    Register a facility and its full operational profile.
+                    {% else %}
+                    Register a facility and its full operational profile within {{ barangay.name }}.
+                    {% endif %}
+                </p>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+
+            <!-- A. Basic Information -->
+            <h6 class="rk-form-section-title">Basic Information</h6>
+            <div class="row g-3 mb-3">
+                <div class="col-12">
+                    <label class="form-label small fw-semibold mb-1" for="facilityName">Facility Name <span class="text-danger">*</span></label>
+                    <input type="text" name="name" id="facilityName" maxlength="100" minlength="3" class="form-control form-control-sm"
+                           value="{{ editing.name if editing else '' }}" required>
+                    <div class="invalid-feedback">Enter between 3 and 100 characters.</div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small fw-semibold mb-1" for="facilityType">Facility Type <span class="text-danger">*</span></label>
+                    <select name="facility_type" id="facilityType" class="form-select form-select-sm" required>
+                        {% for t in facility_types %}
+                        <option value="{{ t }}"
+                            {{ 'selected' if editing and editing.facility_type.value == t else '' }}>
+                            {{ t.replace('_', ' ').title() }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small fw-semibold mb-1" for="facilityStatus">Availability Status</label>
+                    <select name="operational_status" id="facilityStatus" class="form-select form-select-sm">
+                        {% for s in facility_statuses %}
+                        <option value="{{ s }}"
+                            {{ 'selected' if (editing and editing.operational_status.value == s) or (not editing and s == 'available') else '' }}>
+                            {{ status_labels[s] }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small fw-semibold mb-1" for="facilityClassification">Classification</label>
+                    <select name="classification" id="facilityClassification" class="form-select form-select-sm">
+                        <option value="" {{ 'selected' if not (editing and editing.status) else '' }}>Unspecified</option>
+                        {% for c in facility_classifications %}
+                        <option value="{{ c }}" {{ 'selected' if editing and editing.status == c else '' }}>{{ c }}</option>
+                        {% endfor %}
+                    </select>
+                    <div class="form-text small">Structural permanency — not the same as availability status.</div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small fw-semibold mb-1">Barangay</label>
+                    {% if show_barangay_select %}
+                    <select name="barangay_id" id="facilityBarangay" class="form-select form-select-sm" required>
+                        <option value="">-- Select barangay --</option>
+                        {% for b in barangays %}
+                        <option value="{{ b.id }}" {{ 'selected' if editing and editing.barangay_id == b.id else '' }}>{{ b.name }}</option>
+                        {% endfor %}
+                    </select>
+                    {% else %}
+                    <input type="text" class="form-control form-control-sm" value="{{ barangay.name }}" disabled>
+                    <div class="form-text small">Facilities you add are scoped to your assigned barangay.</div>
+                    {% endif %}
+                </div>
+                <div class="col-12">
+                    <label class="form-label small fw-semibold mb-1" for="facilityAddress">Address <span class="text-muted">(optional)</span></label>
+                    <input type="text" name="address" id="facilityAddress" maxlength="255" class="form-control form-control-sm"
+                           value="{{ editing.address or '' if editing else '' }}">
+                </div>
+            </div>
+
+            <hr>
+
+            <!-- B. Capacity and Facility Details -->
+            <h6 class="rk-form-section-title">Capacity and Facility Details</h6>
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                    <label class="form-label small fw-semibold mb-1" for="facilityFloorArea">Floor Area <span class="text-muted">(sqm)</span></label>
+                    <input type="text" inputmode="decimal" name="floor_area_sqm" id="facilityFloorArea" class="form-control form-control-sm"
+                           value="{{ editing.floor_area_sqm if editing and editing.floor_area_sqm is not none else '' }}" placeholder="e.g. 120.50">
+                    <div class="invalid-feedback">Enter a non-negative number with up to 2 decimal places.</div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small fw-semibold mb-1" for="facilityCapacityFamilies">Capacity — Families</label>
+                    <input type="text" inputmode="numeric" name="capacity_families" id="facilityCapacityFamilies" class="form-control form-control-sm"
+                           value="{{ editing.capacity_families if editing and editing.capacity_families is not none else '' }}" placeholder="e.g. 50">
+                    <div class="invalid-feedback">Enter a whole number (0 or greater).</div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small fw-semibold mb-1" for="facilityCapacityIndividuals">Capacity — Individuals</label>
+                    <input type="text" inputmode="numeric" name="capacity_individuals" id="facilityCapacityIndividuals" class="form-control form-control-sm"
+                           value="{{ editing.capacity_individuals if editing and editing.capacity_individuals is not none else '' }}" placeholder="e.g. 250">
+                    <div class="invalid-feedback">Enter a whole number (0 or greater).</div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-text small mb-1">
+                        <i class="bi bi-info-circle me-1"></i>EREID: estimated number that can be accommodated while observing emergency
+                        infectious-disease distancing requirements.
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small fw-semibold mb-1" for="facilityEreidFamilies">EREID Capacity — Families</label>
+                    <input type="text" inputmode="numeric" name="ereid_capacity_families" id="facilityEreidFamilies" class="form-control form-control-sm"
+                           value="{{ editing.ereid_capacity_families if editing and editing.ereid_capacity_families is not none else '' }}" placeholder="e.g. 30">
+                    <div class="invalid-feedback">Enter a whole number (0 or greater).</div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small fw-semibold mb-1" for="facilityEreidIndividuals">EREID Capacity — Individuals</label>
+                    <input type="text" inputmode="numeric" name="ereid_capacity_individuals" id="facilityEreidIndividuals" class="form-control form-control-sm"
+                           value="{{ editing.ereid_capacity_individuals if editing and editing.ereid_capacity_individuals is not none else '' }}" placeholder="e.g. 150">
+                    <div class="invalid-feedback">Enter a whole number (0 or greater).</div>
+                </div>
+            </div>
+
+            <hr>
+
+            <!-- C. Supported Hazards -->
+            <h6 class="rk-form-section-title">Supported Hazards</h6>
+            <div class="form-text small mb-2">Select the hazards for which this facility can provide support or serve as an operational resource.</div>
+            <div class="row g-2 mb-3">
+                <div class="col-md-6 col-lg-3 form-check">
+                    <input class="form-check-input" type="checkbox" name="supports_tropical_cyclone" id="facilityHazardTC"
+                           {{ 'checked' if editing and editing.supports_tropical_cyclone else '' }}>
+                    <label class="form-check-label" for="facilityHazardTC">Tropical Cyclone</label>
+                </div>
+                <div class="col-md-6 col-lg-3 form-check">
+                    <input class="form-check-input" type="checkbox" name="supports_flooding" id="facilityHazardFL"
+                           {{ 'checked' if editing and editing.supports_flooding else '' }}>
+                    <label class="form-check-label" for="facilityHazardFL">Flooding</label>
+                </div>
+                <div class="col-md-6 col-lg-3 form-check">
+                    <input class="form-check-input" type="checkbox" name="supports_landslide" id="facilityHazardLS"
+                           {{ 'checked' if editing and editing.supports_landslide else '' }}>
+                    <label class="form-check-label" for="facilityHazardLS">Landslide</label>
+                </div>
+                <div class="col-md-6 col-lg-3 form-check">
+                    <input class="form-check-input" type="checkbox" name="supports_fire" id="facilityHazardFR"
+                           {{ 'checked' if editing and editing.supports_fire else '' }}>
+                    <label class="form-check-label" for="facilityHazardFR">Fire</label>
+                </div>
+            </div>
+
+            <hr>
+
+            <!-- D. Hazard and Agreement References -->
+            <h6 class="rk-form-section-title">References and Agreements</h6>
+            <div class="row g-3 mb-3">
+                <div class="col-12">
+                    <label class="form-label small fw-semibold mb-1" for="facilityHazardReference">Hazard Reference — Master List</label>
+                    <textarea name="hazard_reference_master_list" id="facilityHazardReference" maxlength="255" rows="2"
+                              class="form-control form-control-sm"
+                              placeholder="e.g. Ground Shaking — Moderate Risk; Flooding — Moderate Risk">{{ editing.vulnerability_risk or '' if editing else '' }}</textarea>
+                    <div class="invalid-feedback">Must be 255 characters or fewer.</div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small fw-semibold mb-1" for="facilityEoMoaMouStatus">EO / MOA / MOU Status</label>
+                    <select name="eo_moa_mou_status" id="facilityEoMoaMouStatus" class="form-select form-select-sm">
+                        <option value="" {{ 'selected' if not (editing and editing.eo_moa_mou_status) else '' }}>Unspecified</option>
+                        {% for s in eo_moa_mou_statuses %}
+                        <option value="{{ s }}" {{ 'selected' if editing and editing.eo_moa_mou_status == s else '' }}>{{ s }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small fw-semibold mb-1" for="facilityEoMoaMouReference">Reference Number</label>
+                    <input type="text" name="eo_moa_mou_reference" id="facilityEoMoaMouReference" maxlength="150" class="form-control form-control-sm"
+                           value="{{ editing.eo_moa_mou_reference or '' if editing else '' }}" placeholder="e.g. MOA No. 2026-014">
+                    <div class="invalid-feedback">Must be 150 characters or fewer.</div>
+                    {% if editing and editing.eo_moa_mou and not editing.eo_moa_mou_reference %}
+                    <div class="form-text small">Legacy imported value: "{{ editing.eo_moa_mou }}"</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <hr>
+
+            <!-- E. Location -->
+            <h6 class="rk-form-section-title">Location</h6>
+            <div class="row g-3 mb-3">
+                <div class="col-12">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <label class="form-label small fw-semibold mb-0">Coordinates <span class="text-danger">*</span></label>
+                        <button type="button" class="btn-soft py-1" id="pickOnMapBtn">
+                            <i class="bi bi-cursor-fill"></i> Pick on map
+                        </button>
+                    </div>
+                    <div class="form-text small mb-2">Search, click the map, or enter the coordinates manually.</div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small fw-semibold mb-1" for="facilityLat">Latitude</label>
+                    <input type="number" step="any" min="-90" max="90" name="latitude" id="facilityLat" class="form-control form-control-sm"
+                           value="{{ editing.latitude if editing else '' }}" placeholder="14.3500" required>
+                    <div class="invalid-feedback">Must be a number between -90 and 90.</div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small fw-semibold mb-1" for="facilityLng">Longitude</label>
+                    <input type="number" step="any" min="-180" max="180" name="longitude" id="facilityLng" class="form-control form-control-sm"
+                           value="{{ editing.longitude if editing else '' }}" placeholder="121.0500" required>
+                    <div class="invalid-feedback">Must be a number between -180 and 180.</div>
+                </div>
+            </div>
+            <div class="small text-muted mb-3">
+                <i class="bi bi-info-circle me-1"></i>
+                Duplicate names or near-identical coordinates are blocked when you save.
+            </div>
+
+            <hr>
+
+            <!-- F. Additional Notes -->
+            <h6 class="rk-form-section-title">Additional Notes</h6>
+            <div class="row g-3">
+                <div class="col-12">
+                    <label class="form-label small fw-semibold mb-1" for="facilityNotes">Notes <span class="text-muted">(optional)</span></label>
+                    <textarea name="notes" id="facilityNotes" maxlength="1000" rows="3" class="form-control form-control-sm">{{ editing.notes or '' if editing else '' }}</textarea>
+                    <div class="d-flex justify-content-between">
+                        <div class="invalid-feedback mb-0">Must be 1000 characters or fewer.</div>
+                        <div class="form-text small" id="facilityNotesCount">0 / 1000</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="facilityCancelBtn" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-rk btn-sm" id="facilitySaveBtn">
+                <i class="bi bi-save"></i> {{ 'Save Changes' if editing else 'Add Facility' }}
+            </button>
+        </div>
+    </form>
+  </div>
+</div>

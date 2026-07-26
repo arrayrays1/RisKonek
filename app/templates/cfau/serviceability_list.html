@@ -1,4 +1,5 @@
 {% extends "admin/base.html" %}
+{% from "shared/_pagination.html" import pager %}
 
 {% block title %}Serviceability Reports — RisKonek{% endblock %}
 
@@ -132,4 +133,6 @@
         </table>
     </div>
 </div>
+
+{{ pager(page_obj, "/cfau/serviceability", base_query) }}
 {% endblock %}

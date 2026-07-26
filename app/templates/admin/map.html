@@ -5,137 +5,35 @@
 {% block head_extra %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
       integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous"/>
-<style nonce="{{ request.state.csp_nonce }}">
-    .map-wrap {
-        display: grid;
-        grid-template-columns: 280px 1fr;
-        gap: 16px;
-        height: calc(100vh - 200px);
-        min-height: 520px;
-    }
-    .filter-panel {
-        background: white;
-        border-radius: var(--rk-radius);
-        box-shadow: 0 1px 3px rgba(16,24,40,0.06), 0 1px 8px rgba(16,24,40,0.04);
-        padding: 18px;
-        overflow-y: auto;
-    }
-    .filter-panel h6 {
-        font-size: 12px;
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
-        color: var(--rk-muted);
-        margin: 0 0 8px;
-        font-weight: 600;
-    }
-    .filter-section { margin-bottom: 18px; }
-    .filter-section .form-check-label { font-size: 13px; }
-    .filter-section .form-check { margin-bottom: 4px; }
-    .filter-section select,
-    .filter-section input[type="search"] {
-        font-size: 13px;
-    }
-
-    .map-area {
-        position: relative;
-        border-radius: var(--rk-radius);
-        overflow: hidden;
-        box-shadow: 0 1px 3px rgba(16,24,40,0.06), 0 1px 8px rgba(16,24,40,0.04);
-        background: white;
-    }
-    #facilityMap { height: 100%; width: 100%; }
-
-    .map-overlay {
-        position: absolute;
-        top: 12px; right: 12px;
-        background: rgba(255,255,255,0.95);
-        border-radius: 8px;
-        padding: 10px 12px;
-        box-shadow: 0 1px 6px rgba(0,0,0,0.12);
-        font-size: 12px;
-        max-width: 260px;
-        z-index: 500;
-    }
-    .map-overlay .legend-title {
-        font-size: 11px;
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
-        color: var(--rk-muted);
-        margin-bottom: 6px;
-        font-weight: 600;
-    }
-    .legend-row {
-        display: flex; align-items: center; gap: 8px;
-        margin: 3px 0;
-    }
-    .legend-dot {
-        width: 12px; height: 12px;
-        border-radius: 50%;
-        border: 2px solid white;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.4);
-        flex-shrink: 0;
-    }
-
-    .hazard-notice {
-        background: #e8f4fd;
-        border-left: 4px solid #2980b9;
-        border-radius: 6px;
-        padding: 10px 14px;
-        font-size: 13px;
-        color: #1d4d6c;
-        margin-bottom: 16px;
-        display: flex;
-        align-items: flex-start;
-        gap: 10px;
-    }
-    .hazard-notice i { font-size: 16px; margin-top: 1px; }
-
-    .stat-row {
-        display: flex; gap: 12px;
-        margin-bottom: 16px; flex-wrap: wrap;
-    }
-    .stat-pill {
-        background: white;
-        border-radius: 10px;
-        box-shadow: 0 1px 3px rgba(16,24,40,0.06), 0 1px 8px rgba(16,24,40,0.04);
-        padding: 8px 14px;
-        font-size: 13px;
-        display: flex; align-items: center; gap: 8px;
-    }
-    .stat-pill .stat-pill-value { font-weight: 700; color: var(--rk-green); }
-
-    .popup-table { font-size: 12px; }
-    .popup-table th {
-        text-align: left;
-        color: var(--rk-muted);
-        font-weight: 500;
-        padding-right: 8px;
-        vertical-align: top;
-    }
-    .popup-table td { padding: 1px 0; vertical-align: top; }
-    .popup-name { font-size: 14px; font-weight: 700; color: var(--rk-text); margin-bottom: 2px; }
-    .popup-sub  { font-size: 11px; color: var(--rk-muted); margin-bottom: 8px; }
-    .popup-badges { margin: 6px 0 8px; display: flex; flex-wrap: wrap; gap: 4px; }
-    .popup-badge {
-        font-size: 10px; font-weight: 600;
-        padding: 2px 8px; border-radius: 12px;
-        background: #d1fae5; color: #047857;
-    }
-    .popup-badge.approx { background: #fef3cd; color: #856404; }
-    .popup-badge.city   { background: #e8f0fe; color: #1a4fb0; }
-</style>
+{# Map/legend/popup/filter-panel styles live in rk.css (shared with
+   bdrrmo/facilities.html) so they aren't duplicated per page. #}
 {% endblock %}
 
 {% set active_nav = 'map' %}
 
 {% block content %}
-<div class="page-header d-flex justify-content-between align-items-end">
+<div class="page-header d-flex justify-content-between align-items-end flex-wrap gap-2">
     <div>
         <h1><i class="bi bi-map-fill me-2"></i>Critical Facilities Map</h1>
         <p>Critical facilities of San Pedro, Laguna — sourced from the CDRRMO master list.</p>
     </div>
-    <div class="last-updated">San Pedro, Laguna</div>
+    <button type="button" class="btn btn-rk" data-bs-toggle="modal" data-bs-target="#facilityModal" id="addFacilityBtn">
+        <i class="bi bi-plus-lg"></i> <span class="d-none d-sm-inline">Add Facility</span>
+    </button>
 </div>
+
+{% if success %}
+<div class="alert alert-success alert-dismissible fade show">
+    <i class="bi bi-check-circle-fill me-1"></i>{{ success }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+{% if error %}
+<div class="alert alert-danger alert-dismissible fade show">
+    <i class="bi bi-exclamation-triangle-fill me-1"></i>{{ error }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
 
 <div class="stat-row">
     <div class="stat-pill">
@@ -228,11 +126,41 @@
         <button type="button" id="resetFilters" class="btn-soft w-100 mt-2 justify-content-center">
             <i class="bi bi-arrow-counterclockwise me-1"></i>Reset filters
         </button>
+
+        <div class="filter-section">
+            <h6>Layers</h6>
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="layerRegisteredFacilities" checked>
+                <label class="form-check-label" for="layerRegisteredFacilities">Registered Critical Facilities</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="layerNearbyLandmarks">
+                <label class="form-check-label" for="layerNearbyLandmarks">Nearby Landmarks</label>
+            </div>
+            <small class="text-muted">Reference-only OSM data (schools, hospitals, etc.) — not part of the registered facility totals or filters.</small>
+        </div>
     </aside>
 
     <!-- ── MAP + LEGEND ────────────────────────────────────────── -->
     <div class="map-area">
         <div id="facilityMap"></div>
+
+        <div class="map-search-bar" id="mapSearchBar">
+            <label class="visually-hidden" for="mapSearchInput">Search location</label>
+            <div class="picker-search-input-wrap">
+                <input type="text" id="mapSearchInput" class="form-control form-control-sm"
+                       role="combobox" aria-expanded="false" aria-controls="mapSearchResults"
+                       aria-autocomplete="list" autocomplete="off"
+                       placeholder="Search anywhere in San Pedro City">
+                <span class="picker-search-spinner spinner-border spinner-border-sm d-none" id="mapSearchSpinner" aria-hidden="true"></span>
+            </div>
+            <ul class="picker-search-results d-none" id="mapSearchResults" role="listbox"></ul>
+            <div class="visually-hidden" id="mapSearchStatus" role="status" aria-live="polite"></div>
+            <button type="button" class="btn btn-outline-secondary btn-sm d-none" id="mapSearchClear">
+                <i class="bi bi-x-lg"></i> Clear search result
+            </button>
+        </div>
+
         <div class="map-overlay">
             <div class="legend-title">Legend</div>
             <div class="legend-row">
@@ -259,21 +187,93 @@
                 <span class="legend-dot rk-bg-yellow"></span>
                 <span>Approximate location (fallback)</span>
             </div>
+            <div class="legend-row mt-2 rk-legend-sep">
+                <span class="legend-dot legend-dot-landmark"></span>
+                <span>Reference landmark (not a registered facility)</span>
+            </div>
+        </div>
+
+        <!-- Shown only while picking a location from the Add/Edit modal -->
+        <div class="map-picker-bar d-none" id="mapPickerBar">
+            <div class="picker-search-row">
+                <label class="visually-hidden" for="pickerSearchInput">Search location</label>
+                <div class="picker-search-input-wrap">
+                    <input type="text" id="pickerSearchInput" class="form-control form-control-sm"
+                           role="combobox" aria-expanded="false" aria-controls="pickerSearchResults"
+                           aria-autocomplete="list" autocomplete="off"
+                           placeholder="Search establishments, streets, landmarks, or addresses in San Pedro">
+                    <span class="picker-search-spinner spinner-border spinner-border-sm d-none" id="pickerSearchSpinner" aria-hidden="true"></span>
+                </div>
+                <ul class="picker-search-results d-none" id="pickerSearchResults" role="listbox"></ul>
+                <div class="visually-hidden" id="pickerSearchStatus" role="status" aria-live="polite"></div>
+            </div>
+            <div class="form-check form-switch picker-landmarks-toggle">
+                <input class="form-check-input" type="checkbox" id="pickerShowLandmarks" checked>
+                <label class="form-check-label rk-fs-11" for="pickerShowLandmarks">Show nearby landmarks</label>
+            </div>
+            <div class="picker-boundary-warning d-none" id="pickerBoundaryWarning" role="alert">
+                Please select a location within San Pedro City, Laguna.
+            </div>
+            <div class="picker-info-row">
+                <i class="bi bi-geo-alt-fill rk-text-green"></i>
+                <div>
+                    <div>Search anywhere within San Pedro City, or click directly on the map. Drag the pin to adjust the exact location.</div>
+                    <div class="picker-selected-summary">
+                        <div class="picker-selected-name" id="pickerSelectedName">No location selected</div>
+                        <div class="text-muted rk-fs-11">San Pedro City, Laguna</div>
+                        <div class="text-muted rk-fs-11" id="pickerCoordinates"></div>
+                    </div>
+                </div>
+                <button type="button" class="btn btn-rk btn-sm" id="pickerConfirm" disabled>Use this location</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="pickerCancel">Cancel</button>
+            </div>
         </div>
     </div>
 </div>
+
+<!-- ── Add / Edit Facility modal (shared partial) ──────────────── -->
+{% set action_add = "/admin/facilities" %}
+{% set action_edit_prefix = "/admin/facilities" %}
+{% set show_barangay_select = true %}
+{% include "shared/_facility_form_modal.html" with context %}
 {% endblock %}
 
 {% block scripts %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
         integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin="anonymous"></script>
+<script src="/static/js/rk-map-search.js"></script>
 <script nonce="{{ request.state.csp_nonce }}">
 // ── Map initialization ─────────────────────────────────────────────
-const map = L.map('facilityMap').setView([14.356, 121.052], 13);
+const mapElement = document.getElementById('facilityMap');
+if (!mapElement) {
+    console.error('Facility map container was not found.');
+} else if (typeof L === 'undefined') {
+    console.error('Leaflet failed to load.');
+} else if (mapElement._leaflet_id) {
+    console.warn('Facility map was already initialized — skipping duplicate init.');
+} else {
+
+const spBounds = {{ sp_bounds | tojson }};
+const spBoundary = {{ sp_boundary | tojson }};  // [[lat,lng], ...] — see app/services/geocoding.py
+
+const map = L.map(mapElement).setView([14.356, 121.052], 13);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap contributors',
     maxZoom: 18
 }).addTo(map);
+// Container is sized correctly at init time (rk.css gives .map-area a
+// definite height), but a late reflow (e.g. web font swap) can still leave
+// Leaflet's cached tile grid stale — this is a cheap no-op if not needed.
+window.setTimeout(function () { map.invalidateSize(); }, 100);
+
+// Subtle San Pedro boundary outline for context — this map is read-only
+// analytics, not a picker, so (unlike the BDRRMO picker) no maxBounds/
+// point-in-polygon gating is applied here, just the visual reference.
+if (spBoundary && spBoundary.length >= 3) {
+    L.polygon(spBoundary, {
+        color: '#10b981', weight: 2, opacity: 0.6, fill: false, dashArray: '4 4',
+    }).addTo(map);
+}
 
 // Future hazard layers will be added here, e.g.:
 //   L.geoJSON(floodPolygons, {...}).addTo(map);
@@ -323,13 +323,23 @@ function popupHtml(f) {
     if (f.supports_landslide)        incidents.push('Landslide');
     if (f.supports_fire)             incidents.push('Fire');
 
+    const statusLabelMap = { available: 'Available', under_maintenance: 'Under Maintenance', unavailable: 'Unavailable' };
     const badges = [];
+    if (f.operational_status)
+        badges.push(`<span class="popup-badge">${esc(statusLabelMap[f.operational_status] || f.operational_status)}</span>`);
+    if (f.status)
+        badges.push(`<span class="popup-badge">${esc(f.status)}</span>`);
     if (f.is_city_level)
         badges.push('<span class="popup-badge city">City-level</span>');
     if (f.is_approximate_location)
         badges.push('<span class="popup-badge approx">Approximate location</span>');
-    if (f.status)
-        badges.push(`<span class="popup-badge">${esc(f.status)}</span>`);
+
+    let eoMoaMou = null;
+    if (f.eo_moa_mou_status || f.eo_moa_mou_reference) {
+        eoMoaMou = [f.eo_moa_mou_status, f.eo_moa_mou_reference].filter(Boolean).join(' — ');
+    } else if (f.eo_moa_mou) {
+        eoMoaMou = f.eo_moa_mou;
+    }
 
     function row(label, value) {
         if (value === null || value === undefined || value === '') return '';
@@ -346,17 +356,84 @@ function popupHtml(f) {
             ${row('Capacity (indiv.)',   f.capacity_individuals)}
             ${row('EREID (families)',    f.ereid_capacity_families)}
             ${row('EREID (indiv.)',      f.ereid_capacity_individuals)}
-            ${row('Supports',            incidents.join(', ') || null)}
+            <tr><th>Supports</th><td>${incidents.join(', ') || 'None selected'}</td></tr>
             ${row('Hazard reference (master list)', f.vulnerability_risk)}
-            ${row('EO / MOA / MOU',      f.eo_moa_mou)}
+            ${row('EO / MOA / MOU',      eoMoaMou)}
             ${row('Coordinates',         f.lat.toFixed(6) + ', ' + f.lng.toFixed(6))}
         </table>
+        <div class="popup-actions">
+            <a href="/admin/map?edit=${f.id}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-pencil"></i> Edit Facility
+            </a>
+        </div>
     `;
 }
 
 // ── Marker layer + filtering ───────────────────────────────────────
 let allFacilities = [];
-const markerLayer = L.layerGroup().addTo(map);
+const registeredFacilityLayer = L.layerGroup().addTo(map);
+const nearbyLandmarkLayer = L.layerGroup();
+// General search results are kept in their own layer — never mixed into
+// registeredFacilityLayer/nearbyLandmarkLayer, so they can never affect
+// facility totals, filters, or the facility table.
+const searchResultLayer = L.layerGroup().addTo(map);
+
+// Kept as a named object (not an inline literal) so the Add/Edit Facility
+// picker can attach onUseAsLocation later — RkNearbyLandmarks reads that
+// option live off this same object, it doesn't need to be set upfront.
+const nearbyLandmarksOpts = {
+    map: map,
+    layerGroup: nearbyLandmarkLayer,
+    buildUrl: (lat, lng, radius) =>
+        '/admin/api/nearby-landmarks?lat=' + encodeURIComponent(lat) +
+        '&lng=' + encodeURIComponent(lng) + '&radius=' + radius,
+};
+const nearbyLandmarks = RkNearbyLandmarks(nearbyLandmarksOpts);
+
+// ── General San Pedro City location search ──────────────────────────
+const mapSearchClearBtn = document.getElementById('mapSearchClear');
+
+function showSearchResult(result) {
+    searchResultLayer.clearLayers();
+    const marker = L.marker([result.latitude, result.longitude]).addTo(searchResultLayer);
+    const rows = [`<div class="popup-name">${esc(result.primary_name || result.display_name)}</div>`];
+    if (result.secondary_text) rows.push(`<div class="popup-sub">${esc(result.secondary_text)}</div>`);
+    if (result.category) rows.push(`<div class="rk-fs-11 text-muted">${esc(result.category)}</div>`);
+    rows.push(`<div class="rk-fs-11 text-muted">Coordinates: ${result.latitude.toFixed(6)}, ${result.longitude.toFixed(6)}</div>`);
+    marker.bindPopup(rows.join(''), { maxWidth: 280 }).openPopup();
+    map.setView([result.latitude, result.longitude], 17);
+    mapSearchClearBtn.classList.remove('d-none');
+}
+
+function clearSearchResult() {
+    searchResultLayer.clearLayers();
+    mapSearchClearBtn.classList.add('d-none');
+    mapSearchInputEl.value = '';
+}
+
+const mapSearchInputEl = document.getElementById('mapSearchInput');
+const mapLocationSearch = RkLocationSearch({
+    input: mapSearchInputEl,
+    resultsEl: document.getElementById('mapSearchResults'),
+    statusEl: document.getElementById('mapSearchStatus'),
+    buildUrl: q => '/admin/api/location-search?q=' + encodeURIComponent(q),
+    onLoadingChange: loading => document.getElementById('mapSearchSpinner').classList.toggle('d-none', !loading),
+    onSelect: showSearchResult,
+});
+
+mapSearchClearBtn.addEventListener('click', function () {
+    mapLocationSearch.reset();
+    clearSearchResult();
+});
+
+document.getElementById('layerRegisteredFacilities').addEventListener('change', function (e) {
+    if (e.target.checked) registeredFacilityLayer.addTo(map);
+    else map.removeLayer(registeredFacilityLayer);
+});
+document.getElementById('layerNearbyLandmarks').addEventListener('change', function (e) {
+    if (e.target.checked) nearbyLandmarks.enable();
+    else nearbyLandmarks.disable();
+});
 
 function applyFilters() {
     const search   = document.getElementById('filterSearch').value.trim().toLowerCase();
@@ -368,7 +445,7 @@ function applyFilters() {
     const incidents = Array.from(document.querySelectorAll('.filter-incident:checked'))
                           .map(el => el.value);
 
-    markerLayer.clearLayers();
+    registeredFacilityLayer.clearLayers();
     let visible = 0;
     let approx = 0;
 
@@ -393,8 +470,15 @@ function applyFilters() {
             if (!ok) return;
         }
 
-        L.circleMarker([f.lat, f.lng], markerStyle(f))
-            .addTo(markerLayer)
+        const lat = Number(f.lat);
+        const lng = Number(f.lng);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+            console.warn('Skipping facility with invalid coordinates:', f);
+            return;
+        }
+
+        L.circleMarker([lat, lng], markerStyle(f))
+            .addTo(registeredFacilityLayer)
             .bindPopup(popupHtml(f), { maxWidth: 320 });
 
         visible++;
@@ -435,5 +519,315 @@ fetch('/admin/api/facilities-map-data')
         console.error('Failed to load facilities:', err);
         document.getElementById('statTotal').textContent = '0';
     });
+
+// ── Add/Edit Facility: pick-on-map (mirrors bdrrmo/facilities.html) ────
+function isPointAllowed(lat, lng) {
+    return rkPointInPolygon(lat, lng, spBoundary);
+}
+
+const temporaryPickerLayer = L.layerGroup().addTo(map);
+const modalEl = document.getElementById('facilityModal');
+const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+const latInput = document.getElementById('facilityLat');
+const lngInput = document.getElementById('facilityLng');
+const nameInput = document.getElementById('facilityName');
+const pickBtn = document.getElementById('pickOnMapBtn');
+const pickerBar = document.getElementById('mapPickerBar');
+const pickerCoords = document.getElementById('pickerCoordinates');
+const pickerConfirmBtn = document.getElementById('pickerConfirm');
+const pickerSelectedName = document.getElementById('pickerSelectedName');
+const pickerShowLandmarks = document.getElementById('pickerShowLandmarks');
+const pickerSearchSpinner = document.getElementById('pickerSearchSpinner');
+const pickerBoundaryWarning = document.getElementById('pickerBoundaryWarning');
+let tempMarker = null;
+let picking = false;
+let pendingPickerStart = false;
+let coordsBeforePicking = null;
+let lastValidLatLng = null;
+
+function showBoundaryWarning() { pickerBoundaryWarning.classList.remove('d-none'); }
+function hideBoundaryWarning() { pickerBoundaryWarning.classList.add('d-none'); }
+
+let modalIsShown = false;
+modalEl.addEventListener('shown.bs.modal', function () { modalIsShown = true; });
+
+function dispatchInput(el) {
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+function debounce(fn, waitMs) {
+    let timer = null;
+    return function (...args) {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(() => fn.apply(null, args), waitMs);
+    };
+}
+
+function placeTempMarker(lat, lng) {
+    if (tempMarker) {
+        tempMarker.setLatLng([lat, lng]);
+    } else {
+        tempMarker = L.marker([lat, lng], { draggable: true }).addTo(temporaryPickerLayer);
+        tempMarker.on('dragend', function () {
+            const pos = tempMarker.getLatLng();
+            if (!isPointAllowed(pos.lat, pos.lng)) {
+                showBoundaryWarning();
+                pickerConfirmBtn.disabled = true;
+                if (lastValidLatLng) tempMarker.setLatLng([lastValidLatLng.lat, lastValidLatLng.lng]);
+                return;
+            }
+            setCoords(pos.lat, pos.lng);
+            queueReverseGeocode(pos.lat, pos.lng);
+        });
+    }
+}
+
+function setCoords(lat, lng, placeName) {
+    hideBoundaryWarning();
+    lastValidLatLng = { lat: lat, lng: lng };
+    latInput.value = lat.toFixed(6);
+    lngInput.value = lng.toFixed(6);
+    dispatchInput(latInput);
+    dispatchInput(lngInput);
+    pickerCoords.textContent = 'Coordinates: ' + lat.toFixed(6) + ', ' + lng.toFixed(6);
+    pickerSelectedName.textContent = placeName || 'Selected map location';
+    pickerConfirmBtn.disabled = false;
+}
+
+let reverseGeocodeController = null;
+const queueReverseGeocode = debounce(function (lat, lng) {
+    if (reverseGeocodeController) reverseGeocodeController.abort();
+    reverseGeocodeController = new AbortController();
+    fetch('/admin/api/reverse-geocode?lat=' + encodeURIComponent(lat) + '&lng=' + encodeURIComponent(lng),
+        { signal: reverseGeocodeController.signal })
+        .then(r => r.json())
+        .then(data => {
+            if (data && data.display_name) pickerSelectedName.textContent = data.display_name;
+        })
+        .catch(err => { /* AbortError or provider failure — keep the fallback text */ });
+}, 600);
+
+function handleFacilityMapPick(e) {
+    if (!picking) return;
+    if (!isPointAllowed(e.latlng.lat, e.latlng.lng)) {
+        showBoundaryWarning();
+        return;
+    }
+    setCoords(e.latlng.lat, e.latlng.lng);
+    placeTempMarker(e.latlng.lat, e.latlng.lng);
+    queueReverseGeocode(e.latlng.lat, e.latlng.lng);
+}
+map.on('click', handleFacilityMapPick);
+
+const pickerLocationSearch = RkLocationSearch({
+    input: document.getElementById('pickerSearchInput'),
+    resultsEl: document.getElementById('pickerSearchResults'),
+    statusEl: document.getElementById('pickerSearchStatus'),
+    buildUrl: q => '/admin/api/location-search?q=' + encodeURIComponent(q),
+    onLoadingChange: loading => pickerSearchSpinner.classList.toggle('d-none', !loading),
+    onSelect: function (result) {
+        if (!isPointAllowed(result.latitude, result.longitude)) { showBoundaryWarning(); return; }
+        setCoords(result.latitude, result.longitude, result.display_name);
+        placeTempMarker(result.latitude, result.longitude);
+        map.setView([result.latitude, result.longitude], 17);
+    },
+});
+
+// Reuses the same nearbyLandmarks instance the read-only "Nearby Landmarks"
+// layer toggle uses above — the picker just enables/disables it, and adds
+// a "use as location" callback for while the modal is closed for picking.
+nearbyLandmarksOpts.onUseAsLocation = function (landmark) {
+    if (!isPointAllowed(landmark.latitude, landmark.longitude)) { showBoundaryWarning(); return; }
+    setCoords(landmark.latitude, landmark.longitude, landmark.name);
+    placeTempMarker(landmark.latitude, landmark.longitude);
+    if (nameInput.value.trim() === '') nameInput.value = landmark.name;
+};
+
+function startPicking() {
+    picking = true;
+    pickerConfirmBtn.disabled = true;
+    pickerCoords.textContent = '';
+    pickerSelectedName.textContent = 'No location selected';
+    hideBoundaryWarning();
+    lastValidLatLng = null;
+    document.body.classList.add('facility-location-picking');
+    pickerBar.classList.remove('d-none');
+    map.invalidateSize();
+
+    if (pickerShowLandmarks.checked) nearbyLandmarks.enable();
+
+    const lat = parseFloat(latInput.value);
+    const lng = parseFloat(lngInput.value);
+    if (!isNaN(lat) && !isNaN(lng)) {
+        placeTempMarker(lat, lng);
+        lastValidLatLng = { lat: lat, lng: lng };
+        pickerCoords.textContent = 'Coordinates: ' + lat.toFixed(6) + ', ' + lng.toFixed(6);
+        pickerSelectedName.textContent = 'Selected map location';
+        pickerConfirmBtn.disabled = false;
+    }
+}
+
+function stopPicking() {
+    picking = false;
+    document.body.classList.remove('facility-location-picking');
+    pickerBar.classList.add('d-none');
+    hideBoundaryWarning();
+    pickerLocationSearch.reset();
+    nearbyLandmarks.disable();
+    if (reverseGeocodeController) reverseGeocodeController.abort();
+}
+
+pickerShowLandmarks.addEventListener('change', function () {
+    if (!picking) return;
+    if (pickerShowLandmarks.checked) nearbyLandmarks.enable();
+    else nearbyLandmarks.disable();
+});
+
+pickBtn.addEventListener('click', function () {
+    coordsBeforePicking = { lat: latInput.value, lng: lngInput.value };
+    pendingPickerStart = true;
+    if (modalIsShown) {
+        modal.hide();
+    } else {
+        modalEl.addEventListener('shown.bs.modal', function onShown() {
+            modalEl.removeEventListener('shown.bs.modal', onShown);
+            modal.hide();
+        });
+    }
+});
+
+pickerConfirmBtn.addEventListener('click', function () {
+    stopPicking();
+    modal.show();
+});
+
+document.getElementById('pickerCancel').addEventListener('click', function () {
+    if (coordsBeforePicking) {
+        latInput.value = coordsBeforePicking.lat;
+        lngInput.value = coordsBeforePicking.lng;
+        dispatchInput(latInput);
+        dispatchInput(lngInput);
+        const lat = parseFloat(coordsBeforePicking.lat);
+        const lng = parseFloat(coordsBeforePicking.lng);
+        if (tempMarker) {
+            if (!isNaN(lat) && !isNaN(lng)) {
+                tempMarker.setLatLng([lat, lng]);
+            } else {
+                temporaryPickerLayer.clearLayers();
+                tempMarker = null;
+            }
+        }
+    }
+    stopPicking();
+    modal.show();
+});
+
+[latInput, lngInput].forEach(function (input) {
+    input.addEventListener('input', function () {
+        const lat = parseFloat(latInput.value);
+        const lng = parseFloat(lngInput.value);
+        if (tempMarker && !isNaN(lat) && !isNaN(lng)) {
+            tempMarker.setLatLng([lat, lng]);
+        }
+    });
+});
+
+// Auto-open the modal when editing (?edit=id) — set by the shared partial
+// via data-autoshow when the server rendered an `editing` facility.
+if (modalEl.dataset.autoshow === '1') {
+    const lat = parseFloat(latInput.value);
+    const lng = parseFloat(lngInput.value);
+    if (!isNaN(lat) && !isNaN(lng)) placeTempMarker(lat, lng);
+    modal.show();
+}
+
+modalEl.addEventListener('hidden.bs.modal', function () {
+    modalIsShown = false;
+    if (pendingPickerStart) {
+        pendingPickerStart = false;
+        startPicking();
+        return;
+    }
+    if (tempMarker) { temporaryPickerLayer.clearLayers(); tempMarker = null; }
+    stopPicking();
+});
+
+// ── Validation (shared detail-field validators + coordinates) ──────────
+const facilityForm = document.getElementById('facilityForm');
+const detailFields = {
+    name: nameInput,
+    floorArea: document.getElementById('facilityFloorArea'),
+    capacityFamilies: document.getElementById('facilityCapacityFamilies'),
+    capacityIndividuals: document.getElementById('facilityCapacityIndividuals'),
+    ereidFamilies: document.getElementById('facilityEreidFamilies'),
+    ereidIndividuals: document.getElementById('facilityEreidIndividuals'),
+    hazardReference: document.getElementById('facilityHazardReference'),
+    eoMoaMouReference: document.getElementById('facilityEoMoaMouReference'),
+    notes: document.getElementById('facilityNotes'),
+};
+const resetFields = Object.assign({}, detailFields, {
+    address: document.getElementById('facilityAddress'),
+    latitude: latInput,
+    longitude: lngInput,
+    facilityType: document.getElementById('facilityType'),
+    classification: document.getElementById('facilityClassification'),
+    eoMoaMouStatus: document.getElementById('facilityEoMoaMouStatus'),
+    barangayId: document.getElementById('facilityBarangay'),
+});
+
+RkFacilityForm.bindLiveValidation(detailFields);
+RkFacilityForm.bindCharCounter(detailFields.notes, document.getElementById('facilityNotesCount'), 1000);
+
+function validateCoord(input, lo, hi) {
+    const v = parseFloat(input.value);
+    const ok = !isNaN(v) && v >= lo && v <= hi;
+    input.classList.toggle('is-invalid', !ok);
+    input.classList.toggle('is-valid', ok);
+    return ok;
+}
+
+latInput.addEventListener('input', function () { validateCoord(latInput, -90, 90); });
+lngInput.addEventListener('input', function () { validateCoord(lngInput, -180, 180); });
+
+facilityForm.addEventListener('submit', function (e) {
+    const okDetails = RkFacilityForm.validateDetailFields(detailFields);
+    const okLat = validateCoord(latInput, -90, 90);
+    const okLng = validateCoord(lngInput, -180, 180);
+    const barangaySelect = document.getElementById('facilityBarangay');
+    const okBarangay = !barangaySelect || barangaySelect.value !== '';
+    if (barangaySelect) barangaySelect.classList.toggle('is-invalid', !okBarangay);
+    if (!okDetails || !okLat || !okLng || !okBarangay) {
+        e.preventDefault();
+        const firstInvalid = facilityForm.querySelector('.is-invalid');
+        if (firstInvalid) firstInvalid.focus();
+        return;
+    }
+    const saveBtn = document.getElementById('facilitySaveBtn');
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Saving…';
+});
+
+document.getElementById('addFacilityBtn').addEventListener('click', function () {
+    RkFacilityForm.clearFields(resetFields);
+    document.getElementById('facilityStatus').value = 'available';
+    RkFacilityForm.configureModal({
+        mode: 'add',
+        formEl: facilityForm,
+        titleEl: document.getElementById('facilityModalLabel'),
+        submitBtnEl: document.getElementById('facilitySaveBtn'),
+        addTitle: 'Add Critical Facility',
+        editTitle: 'Edit Facility',
+        addAction: '/admin/facilities',
+        editAction: facilityForm.action,
+        addSubmitHtml: '<i class="bi bi-save"></i> Add Facility',
+        editSubmitHtml: '<i class="bi bi-save"></i> Save Changes',
+    });
+    document.getElementById('facilityNotesCount').textContent = '0 / 1000';
+    if (tempMarker) { temporaryPickerLayer.clearLayers(); tempMarker = null; }
+    if (picking) { pendingPickerStart = false; stopPicking(); }
+    delete modalEl.dataset.autoshow;
+});
+
+} // end mapElement/L guard
 </script>
 {% endblock %}

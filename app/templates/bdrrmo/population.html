@@ -1,4 +1,5 @@
 {% extends "admin/base.html" %}
+{% from "shared/_pagination.html" import pager %}
 
 {% block title %}Population Records — RisKonek{% endblock %}
 
@@ -75,7 +76,7 @@
         <i class="bi bi-plus-circle rk-text-green"></i>
         <h6>Record New Population Data</h6>
     </div>
-    <form method="POST" action="/bdrrmo/population" class="row g-3"
+    <form method="POST" action="/bdrrmo/population" class="row g-3" data-validate
           data-confirm='Save this population record? It will be added as a new dated entry.'>
             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
         <div class="col-md-4">
@@ -144,5 +145,7 @@
         </table>
     </div>
 </div>
+
+<div class="px-1">{{ pager(page_obj, "/bdrrmo/population", base_query) }}</div>
 {% endif %}
 {% endblock %}

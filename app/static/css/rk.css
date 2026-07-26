@@ -629,3 +629,267 @@ html.rk-no-anim .main-content { transition: none !important; }
 .rk-w-p98{width:98%}
 .rk-w-p99{width:99%}
 .rk-w-p100{width:100%}
+
+/* ── Shared facility-map components ───────────────────────────────
+ * Used by admin/map.html (city-wide, read-only) and
+ * bdrrmo/facilities.html (own-barangay, editable). Kept here instead
+ * of inline per-page so the second consumer doesn't duplicate it. */
+.map-wrap {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 16px;
+    height: calc(100vh - 200px);
+    min-height: 480px;
+}
+.filter-panel {
+    background: white;
+    border-radius: var(--rk-radius);
+    box-shadow: 0 1px 3px rgba(16,24,40,0.06), 0 1px 8px rgba(16,24,40,0.04);
+    padding: 18px;
+    overflow-y: auto;
+}
+.filter-panel h6 {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--rk-muted);
+    margin: 0 0 8px;
+    font-weight: 600;
+}
+.filter-section { margin-bottom: 18px; }
+.filter-section .form-check-label { font-size: 13px; }
+.filter-section .form-check { margin-bottom: 4px; }
+.filter-section select,
+.filter-section input[type="search"] {
+    font-size: 13px;
+}
+
+.map-area {
+    position: relative;
+    border-radius: var(--rk-radius);
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(16,24,40,0.06), 0 1px 8px rgba(16,24,40,0.04);
+    background: white;
+}
+.map-area .leaflet-container { height: 100%; width: 100%; }
+
+/* Below lg, .map-wrap's single-column grid stacks .filter-panel and
+   .map-area into two auto-height rows instead of stretching them across
+   the wrapper's fixed height — .map-area would collapse to 0 height (the
+   same failure mode as an unstyled container) without an explicit height
+   here. */
+@media (max-width: 991.98px) {
+    .map-wrap {
+        grid-template-columns: 1fr;
+        height: auto;
+        min-height: 0;
+    }
+    .filter-panel { max-height: none; }
+    .map-area { height: 440px; min-height: 360px; }
+}
+@media (max-width: 575.98px) {
+    .map-area { height: 380px; min-height: 320px; }
+}
+
+.map-overlay {
+    position: absolute;
+    top: 12px; right: 12px;
+    background: rgba(255,255,255,0.95);
+    border-radius: 8px;
+    padding: 10px 12px;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.12);
+    font-size: 12px;
+    max-width: 260px;
+    z-index: 500;
+}
+.map-overlay .legend-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--rk-muted);
+    margin-bottom: 6px;
+    font-weight: 600;
+}
+.legend-row {
+    display: flex; align-items: center; gap: 8px;
+    margin: 3px 0;
+}
+.legend-dot {
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    border: 2px solid white;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.4);
+    flex-shrink: 0;
+}
+.rk-legend-sep { border-top: 1px solid rgba(16,24,40,0.08); padding-top: 6px; }
+
+/* Floating confirm/cancel bar shown while picking a location on the map
+   (Add/Edit Facility modal is temporarily hidden during this). */
+.map-picker-bar {
+    position: absolute;
+    top: 12px; left: 50%;
+    transform: translateX(-50%);
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.18);
+    padding: 8px 12px;
+    font-size: 13px;
+    z-index: 600;
+    display: flex; flex-direction: column; gap: 8px;
+    width: 440px;
+    max-width: 92%;
+}
+.map-picker-bar .picker-info-row {
+    display: flex; align-items: center; gap: 10px;
+}
+.map-picker-bar .picker-search-row {
+    position: relative;
+}
+.picker-search-input-wrap {
+    position: relative;
+}
+.picker-search-spinner {
+    position: absolute;
+    top: 50%; right: 8px;
+    transform: translateY(-50%);
+}
+.picker-search-results {
+    position: absolute;
+    top: 100%; left: 0; right: 0;
+    margin-top: 2px;
+    background: white;
+    border: 1px solid rgba(16,24,40,0.12);
+    border-radius: 8px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+    max-height: 220px;
+    overflow-y: auto;
+    z-index: 700;
+    list-style: none;
+    padding: 4px 0;
+    margin-bottom: 0;
+}
+.picker-search-result {
+    padding: 6px 12px;
+    cursor: pointer;
+}
+.picker-search-result:hover,
+.picker-search-result.active {
+    background: var(--rk-bg-soft, #f3f6f4);
+}
+.picker-search-result-name { font-weight: 600; font-size: 13px; }
+.picker-search-result-sub  { font-size: 11px; color: var(--rk-muted); }
+.picker-search-result-cat  { font-size: 10px; color: var(--rk-muted); text-transform: uppercase; letter-spacing: 0.03em; }
+.picker-search-empty {
+    padding: 8px 12px;
+    font-size: 12px;
+    color: var(--rk-muted);
+}
+.picker-landmarks-toggle { font-size: 12px; }
+.picker-selected-summary { line-height: 1.3; }
+.picker-selected-name { font-weight: 600; font-size: 13px; }
+.picker-boundary-warning {
+    background: #fef3cd;
+    color: #856404;
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+/* Floating general-location search bar on /admin/map (read-only analytics
+   map — no confirm/cancel/selected-location summary, just search + clear). */
+.map-search-bar {
+    position: absolute;
+    top: 12px; left: 12px;
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.18);
+    padding: 8px 12px;
+    z-index: 600;
+    width: 320px;
+    max-width: 70%;
+}
+.map-search-bar #mapSearchClear { margin-top: 6px; }
+
+/* Muted marker for the "reference landmark" legend swatch on /admin/map —
+   deliberately duller/greyer than any registered-facility legend dot so the
+   two categories read as visually distinct even before reading text. */
+.legend-dot-landmark {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: #9aa0a6;
+    border: 1px solid white;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+    flex-shrink: 0;
+}
+.landmark-ref-label {
+    font-size: 10px;
+    color: var(--rk-muted);
+    font-style: italic;
+    margin-top: 4px;
+}
+
+/* Visible cursor feedback while a facility location pick is in progress
+   (the Add/Edit Facility modal is hidden and the main map is armed for a
+   single click-to-place). */
+body.facility-location-picking .map-area .leaflet-container {
+    cursor: crosshair;
+}
+
+.hazard-notice {
+    background: #e8f4fd;
+    border-left: 4px solid #2980b9;
+    border-radius: 6px;
+    padding: 10px 14px;
+    font-size: 13px;
+    color: #1d4d6c;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+}
+.hazard-notice i { font-size: 16px; margin-top: 1px; }
+
+.stat-row {
+    display: flex; gap: 12px;
+    margin-bottom: 16px; flex-wrap: wrap;
+}
+.stat-pill {
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 1px 3px rgba(16,24,40,0.06), 0 1px 8px rgba(16,24,40,0.04);
+    padding: 8px 14px;
+    font-size: 13px;
+    display: flex; align-items: center; gap: 8px;
+}
+.stat-pill .stat-pill-value { font-weight: 700; color: var(--rk-green); }
+
+.rk-form-section-title {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--rk-muted);
+    margin-bottom: 4px;
+}
+
+.popup-table { font-size: 12px; }
+.popup-table th {
+    text-align: left;
+    color: var(--rk-muted);
+    font-weight: 500;
+    padding-right: 8px;
+    vertical-align: top;
+}
+.popup-table td { padding: 1px 0; vertical-align: top; }
+.popup-name { font-size: 14px; font-weight: 700; color: var(--rk-text); margin-bottom: 2px; }
+.popup-sub  { font-size: 11px; color: var(--rk-muted); margin-bottom: 8px; }
+.popup-badges { margin: 6px 0 8px; display: flex; flex-wrap: wrap; gap: 4px; }
+.popup-badge {
+    font-size: 10px; font-weight: 600;
+    padding: 2px 8px; border-radius: 12px;
+    background: #d1fae5; color: #047857;
+}
+.popup-badge.approx { background: #fef3cd; color: #856404; }
+.popup-badge.city   { background: #e8f0fe; color: #1a4fb0; }
+.popup-actions { margin-top: 8px; display: flex; gap: 6px; }

@@ -17,7 +17,7 @@
 <div class="dash-card">
     <form method="POST"
           action="{{ '/admin/equipment/' ~ target.id ~ '/edit' if edit_mode else '/admin/equipment/new' }}"
-          class="row g-3">
+          class="row g-3" data-validate>
             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
 
         <div class="col-md-8">
@@ -52,10 +52,11 @@
         {% endif %}
 
         <div class="col-md-4">
-            <label class="form-label small fw-semibold">Plate / Serial Number</label>
-            <input type="text" name="plate_or_serial" class="form-control"
+            <label class="form-label small fw-semibold">Plate / Serial Number *</label>
+            <input type="text" name="plate_or_serial" class="form-control" required
+                   data-rule="plate-serial"
                    value="{{ target.plate_or_serial if target else '' }}"
-                   placeholder="e.g. SAA-1234 or SN-EQUIP-001">
+                   placeholder="e.g. ABC-1234">
         </div>
 
         <div class="col-md-4">

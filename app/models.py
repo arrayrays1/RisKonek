@@ -261,6 +261,13 @@ class Facility(Base):
     is_approximate_location = Column(Boolean, default=False)
     is_city_level = Column(Boolean, default=False)
 
+    # New — structured EO/MOA/MOU tracking, kept separate from the legacy
+    # free-text `eo_moa_mou` above (imported values there are preserved
+    # as-is; the popup/edit form fall back to it when these are empty).
+    eo_moa_mou_status = Column(String(20))          # Available / Pending / Not Available / Not Applicable
+    eo_moa_mou_reference = Column(String(150))
+    notes = Column(Text)
+
     # relationships
     barangay = relationship("Barangay", back_populates="facilities")
 
@@ -343,6 +350,10 @@ class Resource(Base):
     updated_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     name = Column(String(150), nullable=False)
     category = Column(Enum(ResourceCategory), nullable=False)
+    # Optional food sub-classification, only meaningful when category == food
+    # (e.g. rice, canned_goods, rte_meals). Plain nullable String rather than an
+    # enum so new categories need no schema change; NULL for non-food items.
+    food_type = Column(String(30), nullable=True)
     is_perishable = Column(Boolean, default=False)
     quantity = Column(Integer, default=0)
     unit = Column(String(30))  # packs, liters, kg, pieces

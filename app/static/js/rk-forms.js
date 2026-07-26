@@ -45,4 +45,188 @@
             el.form.submit();
         }
     });
+
+    // Copy-to-clipboard for <button data-copy="0917…">. Briefly flips the
+    // button's icon to a check so the user sees the copy landed. Used by the
+    // Contact Directory's copy-number buttons.
+    document.addEventListener("click", function (e) {
+        var btn = e.target.closest ? e.target.closest("[data-copy]") : null;
+        if (!btn) return;
+        var value = btn.getAttribute("data-copy");
+        if (!value) return;
+
+        function flash() {
+            var icon = btn.querySelector("i");
+            if (!icon) return;
+            var prev = icon.className;
+            icon.className = "bi bi-check-lg";
+            btn.classList.add("text-success");
+            setTimeout(function () {
+                icon.className = prev;
+                btn.classList.remove("text-success");
+            }, 1200);
+        }
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(value).then(flash, function () {});
+        } else {
+            // Fallback for older browsers / non-secure contexts.
+            var ta = document.createElement("textarea");
+            ta.value = value;
+            ta.style.position = "fixed";
+            ta.style.opacity = "0";
+            document.body.appendChild(ta);
+            ta.select();
+            try { document.execCommand("copy"); flash(); } catch (err) { /* ignore */ }
+            document.body.removeChild(ta);
+        }
+    });
+
+    // ── Client-side form validation (opt-in via <form data-validate>) ──────
+    //
+    // Replaces the browser's default validation bubbles with Bootstrap-styled
+    // inline messages, using the native Constraint Validation API plus a small
+    // set of custom rules. Only forms carrying data-validate are touched, so
+    // GET filter forms, single-button action forms, and the self-contained
+    // facility modal (rk-facility-form.js) are left alone.
+    //
+    // Declare on a form:   <form method="POST" data-validate> … </form>
+    // Extra per-field:     data-rule="phone-ph"   custom format check
+    //                      data-error="…"         override the shown message
+    var CUSTOM_RULES = {
+        // Philippine mobile number: 11 digits starting 09 (e.g. 09171234567).
+        "phone-ph": {
+            test: function (v) { return /^09\d{9}$/.test(v); },
+            message: "Enter an 11-digit PH mobile number (e.g. 09171234567)."
+        },
+        // Equipment plate/serial: 3 letters then 3-4 digits, dash optional
+        // (e.g. ABC-1234, SAA123).
+        "plate-serial": {
+            test: function (v) { return /^[A-Za-z]{3}-?[0-9]{3,4}$/.test(v); },
+            message: "Use 3 letters then 3–4 digits (e.g. ABC-1234)."
+        }
+    };
+
+    // Find (or lazily create) the .invalid-feedback element that shows a field's
+    // message. Templates need not declare one — if absent it is injected after
+    // the field, or as the last child of an .input-group so Bootstrap displays it.
+    function ensureFeedback(field) {
+        var group = field.closest ? field.closest(".input-group") : null;
+        var anchor = group || field;
+        var sib = anchor.nextElementSibling;
+        while (sib) {
+            if (sib.classList && sib.classList.contains("invalid-feedback")) return sib;
+            sib = sib.nextElementSibling;
+        }
+        if (group) {
+            var existing = group.querySelector(".invalid-feedback");
+            if (existing) return existing;
+        }
+        var fb = document.createElement("div");
+        fb.className = "invalid-feedback";
+        if (group) {
+            group.classList.add("has-validation");
+            group.appendChild(fb);
+        } else if (anchor.parentNode) {
+            anchor.parentNode.insertBefore(fb, anchor.nextSibling);
+        }
+        return fb;
+    }
+
+    function setInvalid(field, message) {
+        field.classList.add("is-invalid");
+        var fb = ensureFeedback(field);
+        if (fb) fb.textContent = message;
+    }
+
+    function clearInvalid(field) {
+        field.classList.remove("is-invalid");
+    }
+
+    // Returns true when the field is valid. Custom data-rule checks run first,
+    // then native constraints (required / type / min / max / minlength / …).
+    function validateField(field) {
+        if (field.disabled || field.type === "hidden" ||
+            field.type === "submit" || field.type === "button") return true;
+
+        var rule = CUSTOM_RULES[field.getAttribute("data-rule")];
+        if (rule) {
+            var v = field.value.trim();
+            // Custom format rules apply only to non-empty values; presence is
+            // the `required` attribute's job (checked natively below).
+            if (v !== "" && !rule.test(v)) {
+                setInvalid(field, field.getAttribute("data-error") || rule.message);
+                return false;
+            }
+        }
+
+        if (field.checkValidity && !field.checkValidity()) {
+            setInvalid(field, field.getAttribute("data-error") || field.validationMessage);
+            return false;
+        }
+
+        clearInvalid(field);
+        return true;
+    }
+
+    function validateForm(form) {
+        var fields = form.querySelectorAll("input, select, textarea");
+        var ok = true, first = null;
+        for (var i = 0; i < fields.length; i++) {
+            if (!validateField(fields[i])) {
+                ok = false;
+                if (!first) first = fields[i];
+            }
+        }
+        if (first) {
+            try { first.focus(); } catch (e) { /* ignore */ }
+            if (first.scrollIntoView) first.scrollIntoView({ block: "center", behavior: "smooth" });
+        }
+        return ok;
+    }
+
+    // Suppress native bubbles on opt-in forms so our inline messages are the
+    // only feedback the user sees.
+    document.querySelectorAll("form[data-validate]").forEach(function (form) {
+        form.setAttribute("novalidate", "");
+    });
+
+    // Validate on submit-button click in the CAPTURE phase, before the bubbling
+    // data-confirm handler above — so an invalid form never reaches its confirm
+    // dialog. Covers forms with multiple submit buttons (draft / submit).
+    document.addEventListener("click", function (e) {
+        var btn = e.target.closest ?
+            e.target.closest('button[type="submit"], input[type="submit"]') : null;
+        if (!btn) return;
+        var form = btn.form || (btn.closest ? btn.closest("form") : null);
+        if (!form || !form.matches("form[data-validate]")) return;
+        if (!validateForm(form)) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+        }
+    }, true);
+
+    // Also catch Enter-key submits (no button click) in the capture phase.
+    document.addEventListener("submit", function (e) {
+        var form = e.target;
+        if (form && form.matches && form.matches("form[data-validate]")) {
+            if (!validateForm(form)) {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+            }
+        }
+    }, true);
+
+    // Live re-validation: once a field is flagged, clear/update it as the user
+    // fixes it, so the error doesn't linger until the next submit.
+    function liveRevalidate(e) {
+        var f = e.target;
+        if (f && f.matches &&
+            f.matches("form[data-validate] input, form[data-validate] select, form[data-validate] textarea") &&
+            f.classList.contains("is-invalid")) {
+            validateField(f);
+        }
+    }
+    document.addEventListener("input", liveRevalidate);
+    document.addEventListener("change", liveRevalidate);
 })();

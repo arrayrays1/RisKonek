@@ -1,0 +1,136 @@
+{% extends "admin/base.html" %}
+{% from "shared/_pagination.html" import pager %}
+
+{% block title %}Contact Directory — RisKonek{% endblock %}
+
+{# active_nav is supplied by each role's route so the sidebar highlights. #}
+
+{% macro number_cell(number) -%}
+    {% if number %}
+    <span class="d-inline-flex align-items-center gap-1">
+        <a href="tel:{{ number }}" class="text-decoration-none">{{ number }}</a>
+        <button type="button" class="btn-soft py-0 px-1" data-copy="{{ number }}"
+                title="Copy number">
+            <i class="bi bi-clipboard"></i>
+        </button>
+    </span>
+    {% else %}<span class="text-muted">—</span>{% endif %}
+{%- endmacro %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start page-header">
+    <div>
+        <h1>Contact Directory</h1>
+        <p>Barangay officials and emergency responder hotlines across San Pedro,
+           grouped per barangay. Maintained by each BDRRMO Chairperson; read-only here.</p>
+    </div>
+</div>
+
+<!-- ── Summary ────────────────────────────────────────────────── -->
+<div class="row g-3 mb-3">
+    <div class="col-md-4">
+        <div class="stat-card d-flex justify-content-between align-items-center">
+            <div>
+                <div class="stat-label">Barangays</div>
+                <div class="stat-value">{{ total }}</div>
+            </div>
+            <div class="stat-icon rk-tint-green-rk"><i class="bi bi-geo-alt"></i></div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="stat-card d-flex justify-content-between align-items-center">
+            <div>
+                <div class="stat-label">With Contacts on File</div>
+                <div class="stat-value">{{ with_contacts }}</div>
+            </div>
+            <div class="stat-icon rk-tint-green-alt"><i class="bi bi-person-vcard"></i></div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="stat-card d-flex justify-content-between align-items-center">
+            <div>
+                <div class="stat-label">Contact Persons</div>
+                <div class="stat-value">{{ total_contacts }}</div>
+            </div>
+            <div class="stat-icon rk-tint-amber"><i class="bi bi-telephone"></i></div>
+        </div>
+    </div>
+</div>
+
+<!-- ── Filters (auto-apply) ───────────────────────────────────── -->
+<div class="dash-card mb-3">
+    <form method="GET" action="{{ directory_url }}" class="row g-2 align-items-end js-live-filter">
+        <div class="col-md-8">
+            <label class="form-label small fw-semibold mb-1">Search</label>
+            <input type="search" name="q" value="{{ f_q }}" class="form-control form-control-sm"
+                   placeholder="Search barangay, name, role, or number…" autocomplete="off">
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small fw-semibold mb-1">Barangay</label>
+            <select name="brgy" class="form-select form-select-sm">
+                <option value="">All barangays</option>
+                {% for name in barangay_names %}
+                <option value="{{ name }}" {% if f_brgy == name %}selected{% endif %}>{{ name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-1 d-grid">
+            <a href="{{ directory_url }}" class="btn btn-outline-secondary btn-sm" title="Reset filters">
+                <i class="bi bi-x-circle"></i>
+            </a>
+        </div>
+    </form>
+</div>
+
+<!-- ── Directory — grouped per barangay, two cards per row ─────── -->
+<div class="row g-3">
+{% for b in rows %}
+    <div class="col-lg-6">
+    <div class="dash-card h-100 p-3">
+        <div class="card-title-row justify-content-between mb-2">
+            <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-geo-alt-fill rk-text-green"></i>
+                <h6 class="mb-0">Barangay {{ b.name }}</h6>
+            </div>
+            <span class="badge rk-bg-soft text-muted">
+                {{ b.entries | length }} contact{{ '' if b.entries | length == 1 else 's' }}
+            </span>
+        </div>
+
+        {% if b.entries %}
+        <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle mb-0 rk-fs-13">
+                <tbody>
+                    {% for e in b.entries %}
+                    <tr>
+                        <td class="ps-0 pe-2">
+                            <span class="badge rk-bg-soft text-muted fw-semibold">{{ e.role }}</span>
+                        </td>
+                        <td class="fw-semibold">{{ e.name or '—' }}</td>
+                        <td class="text-end pe-0">{{ number_cell(e.number) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="small text-muted mb-0">
+            <i class="bi bi-info-circle me-1"></i>No contacts on file for this barangay yet.
+        </p>
+        {% endif %}
+    </div>
+    </div>
+{% else %}
+    <div class="col-12">
+    <div class="dash-card text-center text-muted py-5">
+        No barangays match your filters.
+        {% if f_q or f_brgy %}
+        <a href="{{ directory_url }}" class="ms-2">Clear filters</a>
+        {% endif %}
+    </div>
+    </div>
+{% endfor %}
+</div>
+
+{{ pager(page_obj, directory_url, base_query) }}
+{% endblock %}

@@ -64,7 +64,12 @@
                         Disaster Type
                     </label>
                     <select class="form-select" id="disaster_type"
-                            name="disaster_type" required>
+                            name="disaster_type" required
+                            {% if preselect_barangay_id %}
+                            data-bs-toggle="tooltip" data-bs-placement="right"
+                            data-bs-trigger="manual"
+                            data-bs-title="Now pick a disaster type and duration to continue."
+                            {% endif %}>
                         <option value="" disabled selected>Select a disaster type…</option>
                         {% for dt in disaster_types %}
                         <option value="{{ dt.value }}">
@@ -81,12 +86,23 @@
                     </label>
                     <select class="form-select" id="barangay_id"
                             name="barangay_id" required>
-                        <option value="" disabled selected>Select a barangay…</option>
+                        <option value="" disabled {{ '' if preselect_barangay_id else 'selected' }}>
+                            Select a barangay…
+                        </option>
                         {% for b in barangays %}
-                        <option value="{{ b.id }}">{{ b.name }}</option>
+                        <option value="{{ b.id }}"
+                            {{ 'selected' if b.id == preselect_barangay_id else '' }}>{{ b.name }}</option>
                         {% endfor %}
                     </select>
-                    <div class="form-text">One barangay per simulation.</div>
+                    <div class="form-text">
+                        {% if preselect_barangay_name %}
+                        <i class="bi bi-info-circle me-1"></i>Pre-filled with
+                        <strong>{{ preselect_barangay_name }}</strong> from its profile —
+                        you can change it.
+                        {% else %}
+                        One barangay per simulation.
+                        {% endif %}
+                    </div>
                 </div>
 
                 {# 3. Estimated Duration — drives water/food sizing #}
@@ -369,6 +385,22 @@
         if (sel.length !== 2) return;
         window.location.href = '/admin/simulator/scenarios/compare?a='
             + encodeURIComponent(sel[0].value) + '&b=' + encodeURIComponent(sel[1].value);
+    });
+})();
+
+// "Use for Planning" hand-off — when a barangay is pre-selected from its
+// profile, nudge the user to pick a disaster type + duration. The tooltip is
+// shown on load and dismissed once a disaster type is chosen.
+(function () {
+    var sel = document.getElementById('disaster_type');
+    if (!sel || !sel.getAttribute('data-bs-toggle')) return;
+    if (!(window.bootstrap && bootstrap.Tooltip)) return;
+
+    var tip = new bootstrap.Tooltip(sel);
+    sel.focus();
+    tip.show();
+    sel.addEventListener('change', function () {
+        if (sel.value) tip.hide();
     });
 })();
 </script>

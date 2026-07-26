@@ -18,7 +18,7 @@
 <div class="dash-card">
     <form method="POST"
           action="{{ '/cfau/incident-reports/' ~ target.id ~ '/edit' if edit_mode else '/cfau/incident-reports/new' }}"
-          class="row g-3">
+          class="row g-3" data-validate>
             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
 
         <div class="col-12">

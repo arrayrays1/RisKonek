@@ -11,6 +11,10 @@ from app.models import (
     UploadedReport, UploadHistory, ReportStatus, FileType,
     LifecycleStatus, UploadEvent, add_upload_history,
 )
+from app.utils.pagination import (
+    paginate, parse_per_page, parse_page, build_base_query,
+)
+from app.services.contact_directory import build_directory_context
 from typing import Optional
 from datetime import datetime, timezone, timedelta
 import os
@@ -117,6 +121,35 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
 
 
 # ══════════════════════════════════════════════════════════════════════
+# CONTACT DIRECTORY — read-only, shared across roles (see
+# app/services/contact_directory.py). Same Barangay records the BDRRMO
+# Chairperson maintains, grouped per barangay.
+# ══════════════════════════════════════════════════════════════════════
+
+@router.get("/contacts", response_class=HTMLResponse)
+def contact_directory(
+    request: Request,
+    db: Session = Depends(get_db),
+    q: Optional[str] = None,
+    brgy: Optional[str] = None,
+    page: Optional[str] = None,
+    per_page: Optional[str] = None,
+):
+    user = require_role(request, ["cfau_oic"])
+    if isinstance(user, RedirectResponse):
+        return user
+
+    context = build_directory_context(
+        db, q=q, brgy=brgy, page=page, per_page=per_page,
+        directory_url="/cfau/contacts", active_nav="contacts",
+    )
+    context["user"] = user
+    return templates.TemplateResponse(
+        request=request, name="shared/contact_directory.html", context=context,
+    )
+
+
+# ══════════════════════════════════════════════════════════════════════
 # MODULE A & B — EQUIPMENT SERVICEABILITY REPORTS
 # ══════════════════════════════════════════════════════════════════════
 
@@ -125,6 +158,8 @@ def serviceability_list(
     request: Request,
     db: Session = Depends(get_db),
     status: Optional[str] = None,
+    page: Optional[str] = None,
+    per_page: Optional[str] = None,
 ):
     user = require_role(request, CFAU_ROLES)
     if isinstance(user, RedirectResponse):
@@ -170,13 +205,18 @@ def serviceability_list(
         "resolved": sum(1 for x in all_visible if x.report_status == ServiceabilityStatus.resolved),
     }
 
+    page_obj = paginate(rows, parse_page(page), parse_per_page(per_page))
+    base_query = build_base_query({"status": status or ""})
+
     return templates.TemplateResponse(
         request=request,
         name="cfau/serviceability_list.html",
         context={
             "user": user,
             "active_nav": "serviceability",
-            "rows": rows,
+            "rows": page_obj.items,
+            "page_obj": page_obj,
+            "base_query": base_query,
             "summary": summary,
             "statuses": [(s.value, WORKFLOW_LABELS[s.value]) for s in ServiceabilityStatus],
             "f_status": status or "",
@@ -454,6 +494,8 @@ def incident_report_list(
     request: Request,
     db: Session = Depends(get_db),
     status: Optional[str] = None,
+    page: Optional[str] = None,
+    per_page: Optional[str] = None,
 ):
     user = require_role(request, CFAU_ROLES)
     if isinstance(user, RedirectResponse):
@@ -485,13 +527,18 @@ def incident_report_list(
             "reporter": r.submitted_by_user.username if r.submitted_by_user else "—",
         })
 
+    page_obj = paginate(rows, parse_page(page), parse_per_page(per_page))
+    base_query = build_base_query({"status": status or ""})
+
     return templates.TemplateResponse(
         request=request,
         name="cfau/incident_report_list.html",
         context={
             "user": user,
             "active_nav": "incident_reports",
-            "rows": rows,
+            "rows": page_obj.items,
+            "page_obj": page_obj,
+            "base_query": base_query,
             # Only draft/submitted are meaningful for post-incident reports.
             "statuses": [("draft", "Draft"), ("submitted", "Submitted")],
             "f_status": status or "",

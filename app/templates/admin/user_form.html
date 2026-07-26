@@ -31,7 +31,7 @@
             </div>
             {% endif %}
 
-            <form method="POST"
+            <form method="POST" data-validate
                   action="{{ '/admin/users/' + target_user.id|string + '/edit' if edit_mode else '/admin/users/create' }}">
             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
 
@@ -63,7 +63,7 @@
                     </label>
                     <input type="password"
                            name="{{ 'new_password' if edit_mode else 'password' }}"
-                           class="form-control"
+                           class="form-control" minlength="8"
                            {{ 'required' if not edit_mode else '' }}
                            placeholder="{{ 'Leave blank to keep current password' if edit_mode else 'Set initial password' }}">
                     {% if edit_mode %}
@@ -109,6 +109,7 @@
                 <div class="mb-4">
                     <label class="form-label fw-medium">Contact Number</label>
                     <input type="text" name="contact_number" class="form-control"
+                           data-rule="phone-ph"
                            value="{{ target_user.contact_number or '' if edit_mode else '' }}"
                            placeholder="e.g. 09171234567">
                 </div>
@@ -131,9 +132,17 @@
 <script nonce="{{ request.state.csp_nonce }}">
 (function () {
     var roleSelect = document.getElementById('roleSelect');
+    var barangaySelect = document.querySelector('#barangayField select[name="barangay_id"]');
     function toggleBarangayField() {
         var field = document.getElementById('barangayField');
-        field.classList.toggle('d-none', roleSelect.value !== 'bdrrmo');
+        var isBdrrmo = roleSelect.value === 'bdrrmo';
+        field.classList.toggle('d-none', !isBdrrmo);
+        // Barangay is required for the BDRRMO / Barangay Focal role only; a
+        // hidden field must not be required, or validation would block silently.
+        if (barangaySelect) {
+            barangaySelect.required = isBdrrmo;
+            if (!isBdrrmo) barangaySelect.classList.remove('is-invalid');
+        }
     }
     roleSelect.addEventListener('change', toggleBarangayField);
     toggleBarangayField();  // reflect the initial/selected role on load

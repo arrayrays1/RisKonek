@@ -55,7 +55,7 @@
     </div>
     <form method="POST"
           action="/bdrrmo/equipment{{ '/' ~ editing.id ~ '/edit' if editing else '' }}"
-          class="row g-3">
+          class="row g-3" data-validate>
             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
         <div class="col-md-5">
             <label class="form-label small fw-semibold mb-1">Name</label>
@@ -91,10 +91,11 @@
             </select>
         </div>
         <div class="col-md-4">
-            <label class="form-label small fw-semibold mb-1">Plate / Serial <span class="text-muted">(optional)</span></label>
-            <input type="text" name="plate_or_serial" maxlength="50" class="form-control form-control-sm"
+            <label class="form-label small fw-semibold mb-1">Plate / Serial *</label>
+            <input type="text" name="plate_or_serial" maxlength="50" class="form-control form-control-sm" required
+                   data-rule="plate-serial"
                    value="{{ editing.plate_or_serial or '' if editing else '' }}"
-                   placeholder="Plate for vehicles, serial for gear">
+                   placeholder="e.g. ABC-1234">
         </div>
         <div class="col-md-3">
             <label class="form-label small fw-semibold mb-1">Last Inspected <span class="text-muted">(optional)</span></label>

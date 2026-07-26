@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Request, Depends, Form
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, Response
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -7,7 +7,7 @@ from app.database import get_db
 from app.models import (
     User, UserRole, Barangay, AuditLog, Incident,
     Resource, Equipment, Population, EquipmentStatus,
-    DisasterType, RiskLevel, Facility, FacilityType,
+    DisasterType, RiskLevel, Facility, FacilityType, FacilityStatus,
     UploadedReport, UploadHistory, UploadEvent,
     ResourceCategory, EquipmentType, log_action,
     EquipmentReport, IncidentReport, ServiceabilityStatus, Urgency,
@@ -15,9 +15,29 @@ from app.models import (
 from app.auth import require_role, hash_password
 from app.analytics.simulator import compute_risk_score
 from app.utils.geo import BARANGAY_COORDS
+from app.services.geocoding import (
+    nearby_landmarks, search_locations, reverse_geocode_san_pedro,
+    get_san_pedro_bounds, get_san_pedro_boundary, is_within_san_pedro,
+)
+from app.services.facility_details import (
+    parse_coord as _parse_coord,
+    find_duplicate_facility as _find_duplicate,
+    validate_name as _validate_facility_name,
+    validate_address as _validate_facility_address,
+    validate_facility_details,
+    FACILITY_CLASSIFICATIONS,
+    EO_MOA_MOU_STATUSES,
+)
+from app.services.contact_directory import build_directory_context
+from app.utils.pagination import (
+    paginate, parse_per_page, parse_page, build_base_query,
+)
 from typing import Optional
 from datetime import date, datetime, timedelta, timezone
-from urllib.parse import urlencode
+from urllib.parse import quote_plus
+import csv
+import io
+import re
 
 router = APIRouter(prefix="/admin")
 templates = Jinja2Templates(directory="app/templates")
@@ -170,16 +190,51 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
 # ─────────────────────────────────────────────────────────────────────
 
 @router.get("/users", response_class=HTMLResponse)
-def user_list(request: Request, db: Session = Depends(get_db)):
+def user_list(
+    request: Request,
+    db: Session = Depends(get_db),
+    q: Optional[str] = None,
+    role: Optional[str] = None,
+    status: Optional[str] = None,
+    page: Optional[str] = None,
+    per_page: Optional[str] = None,
+):
     user = require_role(request, ["admin"])
     if isinstance(user, RedirectResponse):
         return user
 
-    all_users = db.query(User).order_by(User.created_at.desc()).all()
+    query = db.query(User)
+    if q:
+        like = f"%{q.strip()}%"
+        query = query.filter(
+            (User.username.ilike(like)) | (User.email.ilike(like))
+        )
+    if role and role in {r.value for r in UserRole}:
+        query = query.filter(User.role == UserRole(role))
+    if status == "active":
+        query = query.filter(User.is_active == True)
+    elif status == "inactive":
+        query = query.filter(User.is_active == False)
+
+    all_users = query.order_by(User.created_at.desc()).all()
+    page_obj = paginate(all_users, parse_page(page), parse_per_page(per_page))
+    base_query = build_base_query({
+        "q": q or "", "role": role or "", "status": status or "",
+    })
+
     return templates.TemplateResponse(
         request=request,
         name="admin/users.html",
-        context={"user": user, "all_users": all_users}
+        context={
+            "user": user,
+            "all_users": page_obj.items,
+            "page_obj": page_obj,
+            "base_query": base_query,
+            "roles": [r.value for r in UserRole],
+            "f_q": q or "",
+            "f_role": role or "",
+            "f_status": status or "",
+        }
     )
 
 
@@ -424,8 +479,6 @@ AUDIT_CATEGORIES = [
     "Barangay Data", "Resources", "Vehicle & Equipment", "System Actions",
 ]
 
-_AUDIT_PER_PAGE = 25
-
 
 def _audit_category(action: str, target_table: str) -> str:
     """Rule-based category for an audit entry, from its action + target
@@ -465,26 +518,9 @@ def _audit_day_label(dt) -> str:
     return dt.astimezone(_PHT).strftime("%B %d, %Y")
 
 
-@router.get("/audit", response_class=HTMLResponse)
-def audit_trail(
-    request: Request,
-    db: Session = Depends(get_db),
-    q: Optional[str] = None,
-    user_id: Optional[str] = None,
-    action: Optional[str] = None,
-    category: Optional[str] = None,
-    date_from: Optional[str] = None,
-    date_to: Optional[str] = None,
-    page: int = 1,
-):
-    user = require_role(request, ["admin"])
-    if isinstance(user, RedirectResponse):
-        return user
-
-    # Empty form values arrive as "" (selects/inputs left blank). Treat them
-    # as None and coerce the numeric user filter safely — never parse "" as int.
-    uid = int(user_id) if (user_id or "").strip().isdigit() else None
-
+def _audit_filtered_rows(db, q, uid, action, category, date_from, date_to):
+    """Apply the audit-trail filters and return matching rows, newest-first.
+    Shared by the list view and the export endpoint so both see the same set."""
     query = db.query(AuditLog).outerjoin(User, AuditLog.user_id == User.id)
 
     if uid:
@@ -509,12 +545,37 @@ def audit_trail(
     # Category is derived, so apply it in Python after the SQL filters.
     if category and category in AUDIT_CATEGORIES:
         rows = [r for r in rows if _audit_category(r.action, r.target_table) == category]
+    return rows
 
-    total = len(rows)
-    total_pages = max(1, (total + _AUDIT_PER_PAGE - 1) // _AUDIT_PER_PAGE)
-    page = max(1, min(page, total_pages))
-    start = (page - 1) * _AUDIT_PER_PAGE
-    page_rows = rows[start:start + _AUDIT_PER_PAGE]
+
+@router.get("/audit", response_class=HTMLResponse)
+def audit_trail(
+    request: Request,
+    db: Session = Depends(get_db),
+    q: Optional[str] = None,
+    user_id: Optional[str] = None,
+    action: Optional[str] = None,
+    category: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    page: Optional[str] = None,
+    per_page: Optional[str] = None,
+):
+    user = require_role(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
+
+    page_num = parse_page(page)
+    per_page_val = parse_per_page(per_page)
+
+    # Empty form values arrive as "" (selects/inputs left blank). Treat them
+    # as None and coerce the numeric user filter safely — never parse "" as int.
+    uid = int(user_id) if (user_id or "").strip().isdigit() else None
+
+    rows = _audit_filtered_rows(db, q, uid, action, category, date_from, date_to)
+
+    page_obj = paginate(rows, page_num, per_page_val)
+    page_rows = page_obj.items
 
     # Build view items grouped by PHT day, preserving newest-first order.
     grouped = []
@@ -540,15 +601,12 @@ def audit_trail(
     users = db.query(User).order_by(User.username).all()
     focus_user = db.query(User).filter(User.id == uid).first() if uid else None
 
-    # Query string (filters minus page) for building pagination links.
-    filter_params = {
-        k: v for k, v in {
-            "q": q or "", "user_id": uid or "", "action": action or "",
-            "category": category or "", "date_from": date_from or "",
-            "date_to": date_to or "",
-        }.items() if v not in ("", None)
-    }
-    base_query = urlencode(filter_params)
+    # Query string (filters minus page / per_page) for pagination links.
+    base_query = build_base_query({
+        "q": q or "", "user_id": uid or "", "action": action or "",
+        "category": category or "", "date_from": date_from or "",
+        "date_to": date_to or "",
+    })
 
     return templates.TemplateResponse(
         request=request,
@@ -557,10 +615,8 @@ def audit_trail(
             "user": user,
             "active_nav": "audit",
             "grouped": grouped,
-            "total": total,
-            "page": page,
-            "total_pages": total_pages,
-            "per_page": _AUDIT_PER_PAGE,
+            "total": page_obj.total,
+            "page_obj": page_obj,
             "categories": AUDIT_CATEGORIES,
             "actions": sorted(actions),
             "users": users,
@@ -574,6 +630,159 @@ def audit_trail(
             "f_date_from": date_from or "",
             "f_date_to": date_to or "",
         },
+    )
+
+
+def _audit_export_time(dt) -> str:
+    """Sortable PHT timestamp for export cells (distinct from the prose `pht`)."""
+    if dt is None:
+        return ""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(_PHT).strftime("%Y-%m-%d %I:%M %p")
+
+
+def _pdf_safe(s) -> str:
+    """Core PDF fonts are latin-1 only; fold common punctuation and replace
+    anything else so a stray unicode char never aborts the whole export."""
+    s = (s or "")
+    for bad, good in (("—", "-"), ("–", "-"), ("•", "-"),
+                      ("’", "'"), ("‘", "'"),
+                      ("“", '"'), ("”", '"'), ("·", "-")):
+        s = s.replace(bad, good)
+    return s.encode("latin-1", "replace").decode("latin-1")
+
+
+def _audit_records(rows):
+    """Flatten AuditLog rows into export-ready dicts (shared by CSV + PDF)."""
+    records = []
+    for log in rows:
+        entity = log.target_table or ""
+        if log.target_id:
+            entity = f"{entity} #{log.target_id}".strip()
+        records.append({
+            "time": _audit_export_time(log.timestamp),
+            "user": log.user.username if log.user else "—",
+            "category": _audit_category(log.action, log.target_table),
+            "action": log.action or "",
+            "entity": entity or "—",
+            "description": log.description or "",
+        })
+    return records
+
+
+def _audit_filter_summary(db, q, uid, action, category, date_from, date_to) -> str:
+    """Human-readable description of the active filters, for the PDF header."""
+    parts = []
+    if q:
+        parts.append(f'search "{q.strip()}"')
+    if uid:
+        u = db.query(User).filter(User.id == uid).first()
+        parts.append(f"user {u.username}" if u else f"user #{uid}")
+    if category:
+        parts.append(f"category {category}")
+    if action:
+        parts.append(f"action {action}")
+    if date_from:
+        parts.append(f"from {date_from}")
+    if date_to:
+        parts.append(f"to {date_to}")
+    return ", ".join(parts) if parts else "none (all entries)"
+
+
+def _audit_pdf_bytes(records, filter_summary) -> bytes:
+    from fpdf import FPDF
+    from fpdf.enums import XPos, YPos
+
+    pdf = FPDF(orientation="L", unit="mm", format="A4")
+    pdf.set_auto_page_break(auto=True, margin=12)
+    pdf.add_page()
+
+    pdf.set_font("Helvetica", "B", 16)
+    pdf.cell(0, 9, _pdf_safe("RisKonek — Audit Trail"),
+             new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+
+    n = len(records)
+    stamp = datetime.now(_PHT).strftime("%B %d, %Y at %I:%M %p")
+    pdf.set_font("Helvetica", "", 9)
+    pdf.set_text_color(90, 90, 90)
+    pdf.cell(0, 5, _pdf_safe(f"Generated {stamp} PHT - {n} entr"
+                             f"{'y' if n == 1 else 'ies'}"),
+             new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    pdf.multi_cell(0, 5, _pdf_safe(f"Filters: {filter_summary}"),
+                   new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    pdf.set_text_color(0, 0, 0)
+    pdf.ln(2)
+
+    headings = ["Time (PHT)", "User", "Category", "Action", "Entity", "Description"]
+    pdf.set_font("Helvetica", "", 7.5)
+    with pdf.table(col_widths=(16, 11, 13, 12, 12, 36),
+                   text_align="LEFT", line_height=4.6) as table:
+        head = table.row()
+        for h in headings:
+            head.cell(h)
+        for r in records:
+            row = table.row()
+            row.cell(_pdf_safe(r["time"]))
+            row.cell(_pdf_safe(r["user"]))
+            row.cell(_pdf_safe(r["category"]))
+            row.cell(_pdf_safe(r["action"]))
+            row.cell(_pdf_safe(r["entity"]))
+            row.cell(_pdf_safe(r["description"]))
+
+    return bytes(pdf.output())
+
+
+@router.get("/audit/export")
+def audit_export(
+    request: Request,
+    db: Session = Depends(get_db),
+    q: Optional[str] = None,
+    user_id: Optional[str] = None,
+    action: Optional[str] = None,
+    category: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    format: str = "csv",
+):
+    """Export the currently-filtered audit trail as CSV or PDF. Exports the
+    full filtered set (all pages), newest-first — mirrors the list filters."""
+    user = require_role(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
+
+    uid = int(user_id) if (user_id or "").strip().isdigit() else None
+    rows = _audit_filtered_rows(db, q, uid, action, category, date_from, date_to)
+    records = _audit_records(rows)
+
+    stamp = datetime.now(_PHT).strftime("%Y-%m-%d")
+    fmt = (format or "csv").lower()
+
+    if fmt == "pdf":
+        summary = _audit_filter_summary(
+            db, q, uid, action, category, date_from, date_to
+        )
+        content = _audit_pdf_bytes(records, summary)
+        return Response(
+            content=content,
+            media_type="application/pdf",
+            headers={"Content-Disposition":
+                     f'attachment; filename="audit-trail-{stamp}.pdf"'},
+        )
+
+    # CSV (default). UTF-8 BOM so Excel renders accented names correctly.
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["Time (PHT)", "User", "Category", "Action", "Entity", "Description"])
+    for r in records:
+        writer.writerow([r["time"], r["user"], r["category"],
+                         r["action"], r["entity"], r["description"]])
+    content = ("﻿" + buf.getvalue()).encode("utf-8")
+    return Response(
+        content=content,
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition":
+                 f'attachment; filename="audit-trail-{stamp}.csv"'},
     )
 
 
@@ -624,6 +833,128 @@ def audit_detail(log_id: int, request: Request, db: Session = Depends(get_db)):
 
 
 # ─────────────────────────────────────────────────────────────────────
+# LOGIN HISTORY — admin-only view of authentication events. A focused,
+# read-only projection of the SAME AuditLog rows the auth flow already
+# writes (login / logout / login_failed / login_lockout /
+# login_blocked_inactive). No new table and no change to auth.
+# ─────────────────────────────────────────────────────────────────────
+
+# Auth action → (human status label, badge class). Order also drives the
+# status filter dropdown.
+LOGIN_STATUS_META = {
+    "login": ("Success", "status-operational"),
+    "logout": ("Logout", "rk-cat-system"),
+    "login_failed": ("Failed", "status-maintenance"),
+    "login_lockout": ("Locked", "status-unavailable"),
+    "login_blocked_inactive": ("Blocked (inactive)", "status-unavailable"),
+}
+_LOGIN_ACTIONS = list(LOGIN_STATUS_META.keys())
+
+# IP is embedded in the audit description as "(from X)" — pull it back out
+# for a dedicated column rather than adding a schema column.
+_IP_RE = re.compile(r"\(from\s+([^)]+)\)")
+
+
+def _extract_ip(description: str) -> str:
+    if not description:
+        return "—"
+    m = _IP_RE.search(description)
+    return m.group(1).strip() if m else "—"
+
+
+@router.get("/login-history", response_class=HTMLResponse)
+def login_history(
+    request: Request,
+    db: Session = Depends(get_db),
+    q: Optional[str] = None,
+    user_id: Optional[str] = None,
+    status: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    page: Optional[str] = None,
+    per_page: Optional[str] = None,
+):
+    user = require_role(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
+
+    uid = int(user_id) if (user_id or "").strip().isdigit() else None
+
+    query = (
+        db.query(AuditLog)
+        .outerjoin(User, AuditLog.user_id == User.id)
+        .filter(AuditLog.action.in_(_LOGIN_ACTIONS))
+    )
+    if uid:
+        query = query.filter(AuditLog.user_id == uid)
+    if status in LOGIN_STATUS_META:
+        query = query.filter(AuditLog.action == status)
+    if q:
+        like = f"%{q.strip()}%"
+        query = query.filter(
+            (User.username.ilike(like)) | (AuditLog.description.ilike(like))
+        )
+    df = _parse_audit_date(date_from)
+    if df:
+        query = query.filter(AuditLog.timestamp >= df)
+    dt_to = _parse_audit_date(date_to)
+    if dt_to:
+        query = query.filter(AuditLog.timestamp < dt_to + timedelta(days=1))
+
+    events = query.order_by(AuditLog.timestamp.desc(), AuditLog.id.desc()).all()
+
+    rows = []
+    for e in events:
+        label, badge = LOGIN_STATUS_META.get(e.action, (e.action, "rk-cat-system"))
+        rows.append({
+            "id": e.id,
+            "timestamp": e.timestamp,
+            "username": e.user.username if e.user else "—",
+            "status_label": label,
+            "status_badge": badge,
+            "ip": _extract_ip(e.description),
+        })
+
+    # Summary over the full (unpaginated) filtered set.
+    summary = {
+        "total": len(rows),
+        "success": sum(1 for r in rows if r["status_label"] == "Success"),
+        "failed": sum(1 for r in rows if r["status_label"] == "Failed"),
+        "locked": sum(1 for r in rows if r["status_label"] == "Locked"),
+    }
+
+    page_obj = paginate(rows, parse_page(page), parse_per_page(per_page))
+    base_query = build_base_query({
+        "q": q or "", "user_id": uid or "", "status": status or "",
+        "date_from": date_from or "", "date_to": date_to or "",
+    })
+
+    users = db.query(User).order_by(User.username).all()
+    focus_user = db.query(User).filter(User.id == uid).first() if uid else None
+
+    return templates.TemplateResponse(
+        request=request,
+        name="admin/login_history.html",
+        context={
+            "user": user,
+            "active_nav": "login_history",
+            "rows": page_obj.items,
+            "page_obj": page_obj,
+            "base_query": base_query,
+            "summary": summary,
+            "statuses": [(k, v[0]) for k, v in LOGIN_STATUS_META.items()],
+            "users": users,
+            "focus_user": focus_user,
+            "f_q": q or "",
+            "f_user_id": uid or "",
+            "f_status": status or "",
+            "f_date_from": date_from or "",
+            "f_date_to": date_to or "",
+        },
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────
 # BARANGAY FIELD DATA — list + profile
 # TR-ADM-22, TR-ADM-23
 # ─────────────────────────────────────────────────────────────────────
@@ -663,6 +994,8 @@ def barangay_list(
     db: Session = Depends(get_db),
     q: Optional[str] = None,
     risk: Optional[str] = None,
+    page: Optional[str] = None,
+    per_page: Optional[str] = None,
 ):
     user = require_role(request, ["admin"])
     if isinstance(user, RedirectResponse):
@@ -690,16 +1023,22 @@ def barangay_list(
             "risk_level": brgy.risk_level.value if brgy.risk_level else "low",
         })
 
+    total_count = len(rows)
+    page_obj = paginate(rows, parse_page(page), parse_per_page(per_page))
+    base_query = build_base_query({"q": q or "", "risk": risk or ""})
+
     return templates.TemplateResponse(
         request=request,
         name="admin/barangays_list.html",
         context={
             "user": user,
-            "rows": rows,
+            "rows": page_obj.items,
+            "page_obj": page_obj,
+            "base_query": base_query,
             "q": q or "",
             "risk_filter": risk or "",
             "risk_levels": [r.value for r in RiskLevel],
-            "total_count": len(rows),
+            "total_count": total_count,
         },
     )
 
@@ -783,6 +1122,36 @@ def barangay_profile_context(db, brgy: Barangay) -> dict:
     }
 
 
+# ─────────────────────────────────────────────────────────────────────
+# CONTACT DIRECTORY — admin-wide, read-only view over Barangay contact
+# columns (captain / chairperson / emergency responders). Reuses the SAME
+# Barangay record the BDRRMO Chairperson maintains at /bdrrmo/contacts, so
+# there is a single source of truth — no separate contacts table.
+# ─────────────────────────────────────────────────────────────────────
+
+@router.get("/contacts", response_class=HTMLResponse)
+def contact_directory(
+    request: Request,
+    db: Session = Depends(get_db),
+    q: Optional[str] = None,
+    brgy: Optional[str] = None,
+    page: Optional[str] = None,
+    per_page: Optional[str] = None,
+):
+    user = require_role(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
+
+    context = build_directory_context(
+        db, q=q, brgy=brgy, page=page, per_page=per_page,
+        directory_url="/admin/contacts", active_nav="contacts",
+    )
+    context["user"] = user
+    return templates.TemplateResponse(
+        request=request, name="shared/contact_directory.html", context=context,
+    )
+
+
 @router.get("/barangays/{barangay_id}", response_class=HTMLResponse)
 def barangay_profile(
     barangay_id: int,
@@ -822,6 +1191,11 @@ def gis_map(request: Request, db: Session = Depends(get_db)):
     facility_types = [t.value for t in FacilityType]
     statuses = ["Permanent", "Temporary", "Under Construction"]
 
+    edit_id = request.query_params.get("edit")
+    editing = None
+    if edit_id:
+        editing = db.query(Facility).filter(Facility.id == edit_id).first()
+
     return templates.TemplateResponse(
         request=request,
         name="admin/map.html",
@@ -831,6 +1205,14 @@ def gis_map(request: Request, db: Session = Depends(get_db)):
             "barangays": barangays,
             "facility_types": facility_types,
             "statuses": statuses,
+            "facility_statuses": [s.value for s in FacilityStatus],
+            "facility_classifications": FACILITY_CLASSIFICATIONS,
+            "eo_moa_mou_statuses": EO_MOA_MOU_STATUSES,
+            "editing": editing,
+            "sp_bounds": get_san_pedro_bounds(),
+            "sp_boundary": get_san_pedro_boundary(),
+            "success": request.query_params.get("success"),
+            "error": request.query_params.get("error"),
         },
     )
 
@@ -878,12 +1260,300 @@ def facilities_map_data(request: Request, db: Session = Depends(get_db)):
             "supports_fire": bool(f.supports_fire),
             "vulnerability_risk": f.vulnerability_risk,
             "eo_moa_mou": f.eo_moa_mou,
+            "eo_moa_mou_status": f.eo_moa_mou_status,
+            "eo_moa_mou_reference": f.eo_moa_mou_reference,
+            "operational_status": f.operational_status.value if f.operational_status else None,
+            "barangay_id": f.barangay_id,
             "is_approximate_location": bool(f.is_approximate_location),
             "is_city_level": bool(f.is_city_level),
             "is_active": bool(f.is_active),
         })
 
     return JSONResponse(payload)
+
+
+# ─────────────────────────────────────────────────────────────────────
+# GIS MAP — Add / Edit Critical Facility (Admin has no barangay scope of
+# its own; the submitter picks any barangay via a selector). Reuses the
+# same shared validation/duplicate-detection helpers as the BDRRMO flow
+# (app/services/facility_details.py) so both stay in lock step.
+# ─────────────────────────────────────────────────────────────────────
+
+@router.post("/facilities")
+def admin_facility_create(
+    request: Request,
+    db: Session = Depends(get_db),
+    barangay_id: str = Form(...),
+    name: str = Form(...),
+    facility_type: str = Form(...),
+    latitude: str = Form(...),
+    longitude: str = Form(...),
+    address: str = Form(""),
+    operational_status: str = Form("available"),
+    classification: str = Form(""),
+    floor_area_sqm: str = Form(""),
+    capacity_families: str = Form(""),
+    capacity_individuals: str = Form(""),
+    ereid_capacity_families: str = Form(""),
+    ereid_capacity_individuals: str = Form(""),
+    supports_tropical_cyclone: Optional[str] = Form(None),
+    supports_flooding: Optional[str] = Form(None),
+    supports_landslide: Optional[str] = Form(None),
+    supports_fire: Optional[str] = Form(None),
+    hazard_reference_master_list: str = Form(""),
+    eo_moa_mou_status: str = Form(""),
+    eo_moa_mou_reference: str = Form(""),
+    notes: str = Form(""),
+):
+    user = require_role(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
+
+    barangay = db.query(Barangay).filter(Barangay.id == barangay_id).first()
+    if not barangay:
+        return RedirectResponse(url="/admin/map?error=Invalid+barangay", status_code=302)
+
+    name_clean, name_err = _validate_facility_name(name)
+    if name_err:
+        return RedirectResponse(url="/admin/map?error=" + quote_plus(name_err), status_code=302)
+    if facility_type not in {t.value for t in FacilityType}:
+        return RedirectResponse(url="/admin/map?error=Invalid+facility+type", status_code=302)
+    if operational_status not in {s.value for s in FacilityStatus}:
+        operational_status = FacilityStatus.available.value
+    address_clean, address_err = _validate_facility_address(address)
+    if address_err:
+        return RedirectResponse(url="/admin/map?error=" + quote_plus(address_err), status_code=302)
+
+    lat = _parse_coord(latitude, -90, 90)
+    lon = _parse_coord(longitude, -180, 180)
+    if lat is None or lon is None:
+        return RedirectResponse(url="/admin/map?error=Invalid+coordinates", status_code=302)
+    if not is_within_san_pedro(lat, lon):
+        return RedirectResponse(
+            url="/admin/map?error=" + quote_plus("Location must be within San Pedro City, Laguna."),
+            status_code=302,
+        )
+
+    details, details_err = validate_facility_details({
+        "classification": classification,
+        "floor_area_sqm": floor_area_sqm,
+        "capacity_families": capacity_families,
+        "capacity_individuals": capacity_individuals,
+        "ereid_capacity_families": ereid_capacity_families,
+        "ereid_capacity_individuals": ereid_capacity_individuals,
+        "supports_tropical_cyclone": supports_tropical_cyclone,
+        "supports_flooding": supports_flooding,
+        "supports_landslide": supports_landslide,
+        "supports_fire": supports_fire,
+        "hazard_reference_master_list": hazard_reference_master_list,
+        "eo_moa_mou_status": eo_moa_mou_status,
+        "eo_moa_mou_reference": eo_moa_mou_reference,
+        "notes": notes,
+    })
+    if details_err:
+        return RedirectResponse(url="/admin/map?error=" + quote_plus(details_err), status_code=302)
+
+    dup = _find_duplicate(db, barangay.id, name_clean, lat, lon)
+    if dup:
+        return RedirectResponse(
+            url="/admin/map?error=" + quote_plus(
+                f"A similar facility already exists: '{dup.name}'. "
+                "Edit that record instead of adding a duplicate."
+            ),
+            status_code=302,
+        )
+
+    facility = Facility(
+        barangay_id=barangay.id,
+        name=name_clean,
+        facility_type=FacilityType(facility_type),
+        latitude=lat,
+        longitude=lon,
+        address=address_clean,
+        operational_status=FacilityStatus(operational_status),
+        is_archived=False,
+        **details,
+    )
+    facility.is_active = facility.operational_status == FacilityStatus.available
+    db.add(facility)
+    db.commit()
+    db.refresh(facility)
+
+    log_action(
+        db, user["id"], "created", "facilities", facility.id,
+        f"Admin added critical facility '{facility.name}' "
+        f"({facility.facility_type.value}) in {barangay.name}",
+    )
+    return RedirectResponse(url="/admin/map?success=Facility+added", status_code=302)
+
+
+@router.post("/facilities/{facility_id}/edit")
+def admin_facility_edit(
+    facility_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    barangay_id: str = Form(...),
+    name: str = Form(...),
+    facility_type: str = Form(...),
+    latitude: str = Form(...),
+    longitude: str = Form(...),
+    address: str = Form(""),
+    operational_status: str = Form("available"),
+    classification: str = Form(""),
+    floor_area_sqm: str = Form(""),
+    capacity_families: str = Form(""),
+    capacity_individuals: str = Form(""),
+    ereid_capacity_families: str = Form(""),
+    ereid_capacity_individuals: str = Form(""),
+    supports_tropical_cyclone: Optional[str] = Form(None),
+    supports_flooding: Optional[str] = Form(None),
+    supports_landslide: Optional[str] = Form(None),
+    supports_fire: Optional[str] = Form(None),
+    hazard_reference_master_list: str = Form(""),
+    eo_moa_mou_status: str = Form(""),
+    eo_moa_mou_reference: str = Form(""),
+    notes: str = Form(""),
+):
+    user = require_role(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
+
+    facility = db.query(Facility).filter(Facility.id == facility_id).first()
+    if not facility:
+        return RedirectResponse(url="/admin/map?error=Facility+not+found", status_code=302)
+
+    barangay = db.query(Barangay).filter(Barangay.id == barangay_id).first()
+    if not barangay:
+        return RedirectResponse(
+            url=f"/admin/map?edit={facility.id}&error=Invalid+barangay", status_code=302
+        )
+
+    name_clean, name_err = _validate_facility_name(name)
+    if name_err:
+        return RedirectResponse(
+            url=f"/admin/map?edit={facility.id}&error=" + quote_plus(name_err), status_code=302
+        )
+    if facility_type not in {t.value for t in FacilityType}:
+        return RedirectResponse(url="/admin/map?error=Invalid+facility+type", status_code=302)
+    if operational_status not in {s.value for s in FacilityStatus}:
+        operational_status = FacilityStatus.available.value
+    address_clean, address_err = _validate_facility_address(address)
+    if address_err:
+        return RedirectResponse(
+            url=f"/admin/map?edit={facility.id}&error=" + quote_plus(address_err), status_code=302
+        )
+
+    lat = _parse_coord(latitude, -90, 90)
+    lon = _parse_coord(longitude, -180, 180)
+    if lat is None or lon is None:
+        return RedirectResponse(url="/admin/map?error=Invalid+coordinates", status_code=302)
+    if not is_within_san_pedro(lat, lon):
+        return RedirectResponse(
+            url=f"/admin/map?edit={facility.id}&error=" + quote_plus(
+                "Location must be within San Pedro City, Laguna."
+            ),
+            status_code=302,
+        )
+
+    details, details_err = validate_facility_details({
+        "classification": classification,
+        "floor_area_sqm": floor_area_sqm,
+        "capacity_families": capacity_families,
+        "capacity_individuals": capacity_individuals,
+        "ereid_capacity_families": ereid_capacity_families,
+        "ereid_capacity_individuals": ereid_capacity_individuals,
+        "supports_tropical_cyclone": supports_tropical_cyclone,
+        "supports_flooding": supports_flooding,
+        "supports_landslide": supports_landslide,
+        "supports_fire": supports_fire,
+        "hazard_reference_master_list": hazard_reference_master_list,
+        "eo_moa_mou_status": eo_moa_mou_status,
+        "eo_moa_mou_reference": eo_moa_mou_reference,
+        "notes": notes,
+    })
+    if details_err:
+        return RedirectResponse(
+            url=f"/admin/map?edit={facility.id}&error=" + quote_plus(details_err), status_code=302
+        )
+
+    dup = _find_duplicate(db, barangay.id, name_clean, lat, lon, exclude_id=facility.id)
+    if dup:
+        return RedirectResponse(
+            url=f"/admin/map?edit={facility.id}&error=" + quote_plus(
+                f"Another facility already matches this name/location: '{dup.name}'."
+            ),
+            status_code=302,
+        )
+
+    facility.barangay_id = barangay.id
+    facility.name = name_clean
+    facility.facility_type = FacilityType(facility_type)
+    facility.latitude = lat
+    facility.longitude = lon
+    facility.address = address_clean
+    facility.operational_status = FacilityStatus(operational_status)
+    for key, value in details.items():
+        setattr(facility, key, value)
+    facility.is_active = facility.operational_status == FacilityStatus.available
+    db.commit()
+
+    log_action(
+        db, user["id"], "updated", "facilities", facility.id,
+        f"Admin updated critical facility '{facility.name}' in {barangay.name}",
+    )
+    return RedirectResponse(url="/admin/map?success=Facility+updated", status_code=302)
+
+
+@router.get("/api/location-search")
+def api_location_search(request: Request, db: Session = Depends(get_db), q: Optional[str] = None):
+    """General San Pedro City place search for /admin/map — same shared
+    service as the BDRRMO picker, but its own route since the BDRRMO route
+    is guarded by require_role(["bdrrmo"]).
+    """
+    user = require_role(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
+    return search_locations(db, q or "")
+
+
+@router.get("/api/reverse-geocode")
+def api_reverse_geocode(
+    request: Request, lat: Optional[str] = None, lng: Optional[str] = None,
+):
+    """Best-effort place name for a picked point, used by the Add/Edit
+    Facility map picker on /admin/map (mirrors the BDRRMO equivalent)."""
+    user = require_role(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
+    try:
+        lat_f, lng_f = float(lat), float(lng)
+    except (TypeError, ValueError):
+        return {"available": True, "display_name": None}
+    return reverse_geocode_san_pedro(lat_f, lng_f)
+
+
+@router.get("/api/nearby-landmarks")
+def api_nearby_landmarks(
+    request: Request,
+    lat: Optional[str] = None, lng: Optional[str] = None, radius: Optional[str] = None,
+):
+    """Optional reference layer for /admin/map — category-filtered OSM
+    landmarks near a point, proxied server-side (see app/services/geocoding.py).
+    These are read-only reference data, never counted as registered facilities.
+    """
+    user = require_role(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
+
+    try:
+        lat_f, lng_f = float(lat), float(lng)
+    except (TypeError, ValueError):
+        return {"available": True, "results": []}
+    try:
+        radius_i = int(radius) if radius else 400
+    except (TypeError, ValueError):
+        radius_i = 400
+    return nearby_landmarks(lat_f, lng_f, radius_i)
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -895,6 +1565,18 @@ def facilities_map_data(request: Request, db: Session = Depends(get_db)):
 
 RESOURCE_ROLES = ["admin", "cdrrmo_staff"]
 EQUIPMENT_ROLES = ["admin", "cdrrmo_staff", "cfau_oic"]
+
+# Optional food sub-classification (only meaningful when category == food).
+# Stored as a plain string in Resource.food_type; NULL for non-food items.
+FOOD_TYPE_LABELS = {
+    "rice": "Rice",
+    "canned_goods": "Canned Goods",
+    "drinking_water": "Drinking Water",
+    "rte_meals": "Ready-to-Eat Meals",
+    "baby_food": "Baby Food",
+    "medical_nutrition": "Medical Nutrition",
+}
+FOOD_TYPE_CHOICES = list(FOOD_TYPE_LABELS.keys())
 
 _NEAR_EXPIRY_DAYS = 30
 
@@ -930,8 +1612,11 @@ def resources_list(
     db: Session = Depends(get_db),
     q: Optional[str] = None,
     category: Optional[str] = None,
+    food_type: Optional[str] = None,
     alert: Optional[str] = None,
     archived: Optional[str] = None,
+    page: Optional[str] = None,
+    per_page: Optional[str] = None,
 ):
     user = require_role(request, RESOURCE_ROLES)
     if isinstance(user, RedirectResponse):
@@ -948,6 +1633,8 @@ def resources_list(
         )
     if category and category in {c.value for c in ResourceCategory}:
         query = query.filter(Resource.category == ResourceCategory(category))
+    if food_type and food_type in FOOD_TYPE_CHOICES:
+        query = query.filter(Resource.food_type == food_type)
 
     rows = query.order_by(Resource.name).all()
 
@@ -967,6 +1654,8 @@ def resources_list(
             "name": r.name,
             "category": r.category.value if r.category else "",
             "category_label": r.category.value.title() if r.category else "—",
+            "food_type": r.food_type or "",
+            "food_type_label": FOOD_TYPE_LABELS.get(r.food_type or "", ""),
             "is_perishable": r.is_perishable,
             "quantity": r.quantity or 0,
             "unit": r.unit or "",
@@ -978,17 +1667,27 @@ def resources_list(
             "last_updated": r.last_updated,
         })
 
+    page_obj = paginate(view_rows, parse_page(page), parse_per_page(per_page))
+    base_query = build_base_query({
+        "q": q or "", "category": category or "", "food_type": food_type or "",
+        "alert": alert or "", "archived": "1" if show_archived else "",
+    })
+
     return templates.TemplateResponse(
         request=request,
         name="admin/resources_list.html",
         context={
             "user": user,
             "active_nav": "resources",
-            "rows": view_rows,
+            "rows": page_obj.items,
+            "page_obj": page_obj,
+            "base_query": base_query,
             "summary": summary,
             "categories": [c.value for c in ResourceCategory],
+            "food_types": [(v, FOOD_TYPE_LABELS[v]) for v in FOOD_TYPE_CHOICES],
             "f_q": q or "",
             "f_category": category or "",
+            "f_food_type": food_type or "",
             "f_alert": alert or "",
             "f_archived": "1" if show_archived else "",
             "show_archived": show_archived,
@@ -1010,6 +1709,7 @@ def resource_new_form(request: Request, db: Session = Depends(get_db)):
             "edit_mode": False,
             "target": None,
             "categories": [c.value for c in ResourceCategory],
+            "food_types": [(v, FOOD_TYPE_LABELS[v]) for v in FOOD_TYPE_CHOICES],
             "error": None,
         },
     )
@@ -1030,6 +1730,7 @@ def resource_create(
     db: Session = Depends(get_db),
     name: str = Form(...),
     category: str = Form(...),
+    food_type: str = Form(""),
     is_perishable: Optional[str] = Form(None),
     quantity: int = Form(0),
     unit: str = Form(""),
@@ -1051,6 +1752,7 @@ def resource_create(
                 "edit_mode": False,
                 "target": None,
                 "categories": [c.value for c in ResourceCategory],
+                "food_types": [(v, FOOD_TYPE_LABELS[v]) for v in FOOD_TYPE_CHOICES],
                 "error": msg,
             },
         )
@@ -1063,10 +1765,17 @@ def resource_create(
 
     perish = bool(is_perishable)
     exp = _parse_date_or_none(expiry_date) if perish else None
+    # Food sub-classification applies only to the food category.
+    food_type_value = (
+        food_type if (category == ResourceCategory.food.value
+                      and food_type in FOOD_TYPE_CHOICES)
+        else None
+    )
 
     r = Resource(
         name=name,
         category=ResourceCategory(category),
+        food_type=food_type_value,
         is_perishable=perish,
         quantity=max(0, quantity or 0),
         unit=unit.strip() or None,
@@ -1110,6 +1819,7 @@ def resource_edit_form(resource_id: int, request: Request, db: Session = Depends
             "edit_mode": True,
             "target": r,
             "categories": [c.value for c in ResourceCategory],
+            "food_types": [(v, FOOD_TYPE_LABELS[v]) for v in FOOD_TYPE_CHOICES],
             "error": None,
         },
     )
@@ -1122,6 +1832,7 @@ def resource_edit(
     db: Session = Depends(get_db),
     name: str = Form(...),
     category: str = Form(...),
+    food_type: str = Form(""),
     is_perishable: Optional[str] = Form(None),
     unit: str = Form(""),
     storage_location: str = Form(""),
@@ -1147,6 +1858,18 @@ def resource_edit(
     if category in {c.value for c in ResourceCategory} and r.category.value != category:
         changes.append(f"category: {r.category.value} → {category}")
         r.category = ResourceCategory(category)
+
+    # Food sub-classification: kept only while the item is in the food
+    # category, otherwise cleared so a re-categorised item doesn't keep a
+    # stale food_type. r.category reflects any change applied just above.
+    new_food_type = (
+        food_type if (r.category == ResourceCategory.food
+                      and food_type in FOOD_TYPE_CHOICES)
+        else None
+    )
+    if new_food_type != r.food_type:
+        changes.append(f"food_type: {r.food_type or '—'} → {new_food_type or '—'}")
+        r.food_type = new_food_type
 
     perish = bool(is_perishable)
     if perish != bool(r.is_perishable):
@@ -1320,6 +2043,8 @@ def equipment_list(
     equipment_type: Optional[str] = None,
     status: Optional[str] = None,
     archived: Optional[str] = None,
+    page: Optional[str] = None,
+    per_page: Optional[str] = None,
 ):
     user = require_role(request, EQUIPMENT_ROLES)
     if isinstance(user, RedirectResponse):
@@ -1384,13 +2109,21 @@ def equipment_list(
         "repair_attention": len(reminders),
     }
 
+    page_obj = paginate(view_rows, parse_page(page), parse_per_page(per_page))
+    base_query = build_base_query({
+        "q": q or "", "equipment_type": equipment_type or "",
+        "status": status or "", "archived": "1" if show_archived else "",
+    })
+
     return templates.TemplateResponse(
         request=request,
         name="admin/equipment_list.html",
         context={
             "user": user,
             "active_nav": "equipment",
-            "rows": view_rows,
+            "rows": page_obj.items,
+            "page_obj": page_obj,
+            "base_query": base_query,
             "summary": summary,
             "types": [(t.value, EQUIPMENT_TYPE_LABELS.get(t.value, t.value.title()))
                       for t in EquipmentType],
@@ -1772,6 +2505,8 @@ def serviceability_review_list(
     db: Session = Depends(get_db),
     status: Optional[str] = None,
     urgency: Optional[str] = None,
+    page: Optional[str] = None,
+    per_page: Optional[str] = None,
 ):
     user = require_role(request, ["admin"])
     if isinstance(user, RedirectResponse):
@@ -1846,13 +2581,18 @@ def serviceability_review_list(
         "repair_attention": len(assets_needing_repair_attention(db)),
     }
 
+    page_obj = paginate(rows, parse_page(page), parse_per_page(per_page))
+    base_query = build_base_query({"status": status or "", "urgency": urgency or ""})
+
     return templates.TemplateResponse(
         request=request,
         name="admin/serviceability_review.html",
         context={
             "user": user,
             "active_nav": "serviceability_review",
-            "rows": rows,
+            "rows": page_obj.items,
+            "page_obj": page_obj,
+            "base_query": base_query,
             "summary": summary,
             "statuses": [(s.value, SERVICEABILITY_WORKFLOW_LABELS[s.value]) for s in ServiceabilityStatus],
             "urgencies": [(u.value, u.value.title()) for u in Urgency],
@@ -2132,6 +2872,8 @@ def incident_reports_list(
     disaster_type: Optional[str] = None,
     status: Optional[str] = None,
     origin: Optional[str] = None,
+    page: Optional[str] = None,
+    per_page: Optional[str] = None,
 ):
     user = require_role(request, ["admin"])
     if isinstance(user, RedirectResponse):
@@ -2203,13 +2945,22 @@ def incident_reports_list(
     )
     barangays = db.query(Barangay).order_by(Barangay.name).all()
 
+    page_obj = paginate(rows, parse_page(page), parse_per_page(per_page))
+    base_query = build_base_query({
+        "reporter": reporter or "", "barangay": barangay or "",
+        "disaster_type": disaster_type or "", "status": status or "",
+        "origin": origin_filter or "",
+    })
+
     return templates.TemplateResponse(
         request=request,
         name="admin/incident_reports_list.html",
         context={
             "user": user,
             "active_nav": "incident_reports_review",
-            "rows": rows,
+            "rows": page_obj.items,
+            "page_obj": page_obj,
+            "base_query": base_query,
             "summary": summary,
             "reporters": [(u.id, u.username) for u in reporter_users],
             "barangays": [(b.id, b.name) for b in barangays],

@@ -1,0 +1,132 @@
+{% extends "admin/base.html" %}
+{% from "shared/_pagination.html" import pager %}
+
+{% block title %}Login History — RisKonek{% endblock %}
+
+{% set active_nav = 'login_history' %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Login History</h1>
+    <p>Authentication events across the system — successful logins, logouts, failed
+       attempts, and account lockouts. {{ summary.total }} matching event{{ 's' if summary.total != 1 else '' }}.</p>
+</div>
+
+{% if focus_user %}
+<div class="alert alert-info d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-person-badge me-1"></i>
+        Showing login history for <strong>{{ focus_user.username }}</strong>.</span>
+    <a href="/admin/login-history" class="btn-soft">View all users</a>
+</div>
+{% endif %}
+
+<!-- ── Summary ────────────────────────────────────────────────── -->
+<div class="row g-3 mb-3">
+    <div class="col-md-3">
+        <div class="stat-card d-flex justify-content-between align-items-center">
+            <div><div class="stat-label">Total Events</div><div class="stat-value">{{ summary.total }}</div></div>
+            <div class="stat-icon rk-tint-green-rk"><i class="bi bi-shield-lock"></i></div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card d-flex justify-content-between align-items-center">
+            <div><div class="stat-label">Successful Logins</div><div class="stat-value">{{ summary.success }}</div></div>
+            <div class="stat-icon rk-tint-green-alt"><i class="bi bi-box-arrow-in-right"></i></div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card d-flex justify-content-between align-items-center">
+            <div><div class="stat-label">Failed Attempts</div><div class="stat-value">{{ summary.failed }}</div></div>
+            <div class="stat-icon rk-tint-amber"><i class="bi bi-exclamation-triangle"></i></div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card d-flex justify-content-between align-items-center">
+            <div><div class="stat-label">Lockouts</div><div class="stat-value">{{ summary.locked }}</div></div>
+            <div class="stat-icon rk-tint-red"><i class="bi bi-lock"></i></div>
+        </div>
+    </div>
+</div>
+
+<!-- ── Filters (auto-apply) ───────────────────────────────────── -->
+<div class="dash-card mb-3">
+    <form method="GET" action="/admin/login-history" class="row g-2 align-items-end js-live-filter">
+        <div class="col-md-4">
+            <label class="form-label small fw-semibold mb-1">Search</label>
+            <input type="text" name="q" value="{{ f_q }}" class="form-control form-control-sm"
+                   placeholder="Search username or detail…" autocomplete="off">
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small fw-semibold mb-1">User</label>
+            <select name="user_id" class="form-select form-select-sm">
+                <option value="">All users</option>
+                {% for u in users %}
+                <option value="{{ u.id }}" {% if f_user_id|string == u.id|string %}selected{% endif %}>{{ u.username }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small fw-semibold mb-1">Status</label>
+            <select name="status" class="form-select form-select-sm">
+                <option value="">All</option>
+                {% for v, label in statuses %}
+                <option value="{{ v }}" {% if f_status == v %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <div class="row g-1">
+                <div class="col-6">
+                    <label class="form-label small fw-semibold mb-1">From</label>
+                    <input type="date" name="date_from" value="{{ f_date_from }}" class="form-control form-control-sm">
+                </div>
+                <div class="col-6">
+                    <label class="form-label small fw-semibold mb-1">To</label>
+                    <input type="date" name="date_to" value="{{ f_date_to }}" class="form-control form-control-sm">
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- ── Table ──────────────────────────────────────────────────── -->
+<div class="dash-card p-0">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="rk-bg-soft">
+                <tr class="rk-th-soft">
+                    <th class="px-3 py-3">Time</th>
+                    <th class="py-3">User</th>
+                    <th class="py-3">Status</th>
+                    <th class="py-3 px-3">IP Address</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in rows %}
+                <tr class="rk-fs-13">
+                    <td class="px-3 text-nowrap">{{ r.timestamp | pht }}</td>
+                    <td class="fw-semibold">{{ r.username }}</td>
+                    <td><span class="status-pill {{ r.status_badge }}">{{ r.status_label }}</span></td>
+                    <td class="px-3 text-muted">{{ r.ip }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="4" class="text-center text-muted py-5">
+                        <i class="bi bi-shield-lock fs-3 d-block mb-2"></i>
+                        No login events match your filters.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{{ pager(page_obj, "/admin/login-history", base_query) }}
+
+<p class="text-muted small mt-3 mb-0">
+    <i class="bi bi-info-circle me-1"></i>
+    Logout time pairing and device/browser details are not tracked at this stage;
+    each row is a single recorded authentication event.
+</p>
+{% endblock %}
