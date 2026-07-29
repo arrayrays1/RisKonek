@@ -1691,6 +1691,8 @@ def resources_list(
             "f_alert": alert or "",
             "f_archived": "1" if show_archived else "",
             "show_archived": show_archived,
+            # Default + max for the stock modal's date-time field (PHT).
+            "now_local": datetime.now(_PHT).strftime("%Y-%m-%dT%H:%M"),
         },
     )
 
@@ -1911,6 +1913,44 @@ def resource_edit(
     )
 
 
+# ── Logistics movement accountability ────────────────────────────────
+# Shared by the stock-change modal (below) and the equipment status
+# modal (Module B). Every movement must say WHY it happened, WHERE the
+# goods / unit went (when it is a deployment), and WHEN it actually
+# happened — the last one is user-stated and backdatable, unlike
+# AuditLog.timestamp which stays the system record time.
+
+def _movement_fields(reason, deployed_to, occurred_at, location_required):
+    """Validate and normalise the accountability fields. Returns
+    (values, error): `error` is a user-facing message when validation
+    fails, otherwise None. Mirrors the client-side rules in rk-forms.js —
+    JS is convenience, this is the enforcement."""
+    r = (reason or "").strip()
+    if len(r) < 3:
+        return None, "Reason is required (at least 3 characters)."
+
+    loc = (deployed_to or "").strip() or None
+    if location_required and not loc:
+        return None, "Deployment location is required for this change."
+
+    raw = (occurred_at or "").strip()
+    if not raw:
+        return None, "Date and time is required."
+    try:
+        # <input type="datetime-local"> submits "YYYY-MM-DDTHH:MM" (PHT,
+        # as typed by the user); seconds may be appended by some browsers.
+        local = datetime.strptime(raw[:16], "%Y-%m-%dT%H:%M")
+    except ValueError:
+        return None, "Invalid date and time."
+
+    # Stored UTC-naive, like every other timestamp in the system.
+    dt_utc = local.replace(tzinfo=_PHT).astimezone(timezone.utc).replace(tzinfo=None)
+    if dt_utc > datetime.utcnow() + timedelta(minutes=5):
+        return None, "Date and time cannot be in the future."
+
+    return {"reason": r, "deployed_to": loc, "occurred_at": dt_utc}, None
+
+
 @router.post("/resources/{resource_id}/stock")
 def resource_stock_change(
     resource_id: int,
@@ -1919,6 +1959,8 @@ def resource_stock_change(
     action: str = Form(...),       # "add" or "deduct"
     amount: int = Form(...),
     reason: str = Form(""),
+    deployed_to: str = Form(""),
+    occurred_at: str = Form(""),
 ):
     user = require_role(request, RESOURCE_ROLES)
     if isinstance(user, RedirectResponse):
@@ -1938,6 +1980,16 @@ def resource_stock_change(
             status_code=302,
         )
 
+    # Deducting stock moves goods somewhere, so a destination is required;
+    # adding stock (supplier delivery, returned goods) does not need one.
+    movement, err = _movement_fields(
+        reason, deployed_to, occurred_at, location_required=(action == "deduct")
+    )
+    if err:
+        return RedirectResponse(
+            url=f"/admin/resources?error={quote_plus(err)}", status_code=302
+        )
+
     before = r.quantity or 0
     if action == "add":
         after = before + amount
@@ -1955,10 +2007,15 @@ def resource_stock_change(
     r.updated_by = user["id"]
     db.commit()
 
-    note = f" — reason: {reason.strip()}" if reason.strip() else ""
+    note = f" — reason: {movement['reason']}"
+    if movement["deployed_to"]:
+        note += f"; deployed to: {movement['deployed_to']}"
     log_action(
         db, user["id"], verb, "resources", r.id,
         f"Resource '{r.name}' quantity {before} → {after} ({'+' if action == 'add' else '-'}{amount} {r.unit or ''}){note}",
+        reason=movement["reason"],
+        deployed_to=movement["deployed_to"],
+        occurred_at=movement["occurred_at"],
     )
 
     return RedirectResponse(
@@ -2033,6 +2090,31 @@ EQUIPMENT_TYPE_LABELS = {
     "life_vest": "Life Vest",
     "other": "Other",
 }
+
+# Legacy statuses fold into their client-aligned bucket so a fleet snapshot
+# reads in the four terms the client uses, without mutating stored rows.
+_EQUIPMENT_STATUS_BUCKET = {
+    "available": "available",
+    "serviceable": "available",
+    "deployed": "deployed",
+    "under_repair": "under_repair",
+    "unserviceable": "unserviceable",
+    "not_serviceable": "unserviceable",
+}
+
+
+def equipment_status_breakdown(db):
+    """Fleet snapshot over active (non-archived) equipment:
+    {"counts": {status_value: n}, "total": n}. Shared by the Logistics and
+    CFAU dashboards. A unit with an unrecognised status is counted in the
+    total but in no bucket, so the buckets never overstate the fleet."""
+    counts = {v: 0 for v in EQUIPMENT_STATUS_CHOICES}
+    units = db.query(Equipment).filter(Equipment.is_archived == False).all()
+    for e in units:
+        bucket = _EQUIPMENT_STATUS_BUCKET.get(e.status.value if e.status else "")
+        if bucket:
+            counts[bucket] += 1
+    return {"counts": counts, "total": len(units)}
 
 
 @router.get("/equipment", response_class=HTMLResponse)
@@ -2135,6 +2217,8 @@ def equipment_list(
             "f_status": status or "",
             "f_archived": "1" if show_archived else "",
             "show_archived": show_archived,
+            # Default + max for the status modal's date-time field (PHT).
+            "now_local": datetime.now(_PHT).strftime("%Y-%m-%dT%H:%M"),
         },
     )
 
@@ -2313,6 +2397,8 @@ def equipment_status_change(
     db: Session = Depends(get_db),
     status: str = Form(...),
     reason: str = Form(""),
+    deployed_to: str = Form(""),
+    occurred_at: str = Form(""),
 ):
     user = require_role(request, EQUIPMENT_ROLES)
     if isinstance(user, RedirectResponse):
@@ -2332,13 +2418,28 @@ def equipment_status_change(
             url="/admin/equipment?success=Status+unchanged", status_code=302
         )
 
+    # A unit going to "deployed" must name where; repairs and returns
+    # to the motorpool may leave the location blank.
+    movement, err = _movement_fields(
+        reason, deployed_to, occurred_at, location_required=(status == "deployed")
+    )
+    if err:
+        return RedirectResponse(
+            url=f"/admin/equipment?error={quote_plus(err)}", status_code=302
+        )
+
     e.status = EquipmentStatus(status)
     db.commit()
 
-    note = f" — reason: {reason.strip()}" if reason.strip() else ""
+    note = f" — reason: {movement['reason']}"
+    if movement["deployed_to"]:
+        note += f"; deployed to: {movement['deployed_to']}"
     log_action(
         db, user["id"], "status_changed", "equipment", e.id,
         f"Equipment '{e.name}' status {old} → {status}{note}",
+        reason=movement["reason"],
+        deployed_to=movement["deployed_to"],
+        occurred_at=movement["occurred_at"],
     )
 
     return RedirectResponse(

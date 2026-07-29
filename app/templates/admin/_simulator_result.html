@@ -1,81 +1,55 @@
 {# ── Shared simulator results body ─────────────────────────────────────────
    Rendered by both the live results page (admin/simulator_results.html) and a
    saved-scenario snapshot (admin/scenario_detail.html). Consumes `result`,
-   `ai_briefing`, and `ai_note` from the parent context. The page-specific
-   header/action row lives in each wrapper, NOT here. #}
+   `view` (the presentation model from app/simulation/presenter.build_view),
+   `ai_briefing`, `ai_note`, `ai_actions` and `ai_advisory_note` from the parent
+   context. The page-specific header/action row lives in each wrapper, NOT here.
 
-{# ── Presentation maps ── #}
-{% set display_order = ['water', 'food', 'blankets', 'evac_capacity', 'medicine', 'vehicles'] %}
-{% set class_label = {
-    'water': 'Water',
-    'food': 'Food Packs',
-    'blankets': 'Blankets / NFI Kits',
-    'evac_capacity': 'Evacuation Capacity',
-    'medicine': 'Medicine Kits',
-    'vehicles': 'Response Vehicles'
-} %}
-{# engine status -> UI vocabulary (label + Bootstrap/base classes) #}
-{% set status_ui = {
-    'Adequate': {'label': 'Sufficient', 'pill': 'status-operational', 'bar': 'bg-success', 'alert': 'alert-success'},
-    'Partial':  {'label': 'At Risk',    'pill': 'status-maintenance', 'bar': 'bg-warning', 'alert': 'alert-warning'},
-    'Critical': {'label': 'Critical',   'pill': 'status-unavailable', 'bar': 'bg-danger',  'alert': 'alert-danger'}
-} %}
-{% set band_ui = {
-    'Adequate': {'label': 'Low Risk',      'text': 'text-success', 'bar': 'bg-success'},
-    'Partial':  {'label': 'Moderate Risk', 'text': 'text-warning', 'bar': 'bg-warning'},
-    'Critical': {'label': 'High Risk',      'text': 'text-danger',  'bar': 'bg-danger'}
-} %}
-{% set band = band_ui.get(result.overall_readiness, band_ui['Critical']) %}
+   Information order (most understandable first): assumptions disclaimer ->
+   scenario context -> overall readiness -> key figures -> what needs attention
+   -> suggested actions -> resource coverage -> detailed calculations ->
+   consequences -> AI brief. Everything below "Resource Coverage" is
+   collapsible detail.
 
-{# Sub-score groups — worst coverage per group drives its bar + status.
-   NOT a single 0–100 composite; each is its own readiness band. #}
-{% set groups = [
-    {'label': 'Evacuation Readiness', 'icon': 'bi-house-heart-fill', 'classes': ['evac_capacity']},
-    {'label': 'Resource Readiness',   'icon': 'bi-box-seam-fill',    'classes': ['water', 'food', 'blankets', 'medicine']},
-    {'label': 'Response Readiness',   'icon': 'bi-truck',            'classes': ['vehicles']}
-] %}
+   No inline style="" attributes (CSP): bar widths use the static .rk-w-p<0..100>
+   utilities in rk.css. No inline on* handlers: disclosure uses Bootstrap's
+   data-bs-toggle="collapse", which is keyboard accessible out of the box. #}
 
-<!-- ── Overall readiness band + sub-score bars ─────────────────────────── -->
-<div class="dash-card mb-3">
-    <div class="row align-items-center">
-        <div class="col-md-4 text-center border-end">
-            <div class="stat-label">Overall Readiness</div>
-            <div class="{{ band.text }} rk-fs-30 rk-fw-800">
-                {{ band.label }}
-            </div>
-            <div class="text-muted rk-fs-12">
-                Worst-status band across all resource classes
-            </div>
-        </div>
-        <div class="col-md-8">
-            {% for g in groups %}
-                {% set covs = [] %}
-                {% for c in g.classes %}
-                    {% if c in result.gaps %}{% set _ = covs.append(result.gaps[c].coverage) %}{% endif %}
-                {% endfor %}
-                {% set gcov = (covs | min) if covs else 1.0 %}
-                {% set gpct = (gcov * 100) | round(0, 'floor') | int %}
-                {% set gpct = 100 if gpct > 100 else gpct %}
-                {% set gstatus = 'Adequate' if gcov >= 1.0 else ('Partial' if gcov >= 0.5 else 'Critical') %}
-                {% set gui = status_ui[gstatus] %}
-                <div class="mb-2">
-                    <div class="d-flex justify-content-between rk-fs-13">
-                        <span><i class="bi {{ g.icon }} me-1"></i>{{ g.label }}</span>
-                        <span class="fw-semibold">{{ gui.label }}</span>
-                    </div>
-                    <div class="progress rk-h-10">
-                        <div class="progress-bar {{ gui.bar }} rk-w-p{{ gpct }}" role="progressbar"
-                             aria-valuenow="{{ gpct }}" aria-valuemin="0" aria-valuemax="100"></div>
-                    </div>
-                </div>
-            {% endfor %}
-        </div>
-    </div>
-</div>
+{% set fig = view.figures %}
 
-<!-- ── Scenario config strip ───────────────────────────────────────────── -->
-<div class="dash-card mb-3">
-    <div class="row text-center">
+<!-- ── 1. Assumptions and limitations (disclaimer, always visible) ──────── -->
+{# Deliberately the FIRST thing on the page: every figure below is a planning
+   estimate, so the caveats must be read before the numbers, not after them. #}
+<section class="rk-disclaimer mb-3" aria-labelledby="rk-assumptions-h">
+    <h2 id="rk-assumptions-h" class="rk-h-section rk-disclaimer-title">
+        <i class="bi bi-exclamation-triangle-fill me-1" aria-hidden="true"></i>
+        Assumptions and Limitations
+    </h2>
+    <ul class="mb-0 rk-fs-13 rk-lh-16">
+        <li>
+            The affected population is an exposure estimate for
+            {{ result.inputs.barangay_name }} at its recorded
+            <span class="text-capitalize">{{ result.inputs.risk_level }}</span>
+            risk level over {{ result.inputs.horizon_days }} day(s) — not a forecast.
+        </li>
+        <li>
+            Availability figures are the quantities currently recorded in
+            RisKonek; stock held elsewhere is not counted.
+        </li>
+        <li>
+            Figures marked <strong>Assumption</strong> are adjustable CDRRMO
+            planning targets and can be changed in Planning Thresholds.
+        </li>
+        <li>
+            AI-generated text is advisory. CDRRMO personnel retain final
+            authority over every planning and deployment decision.
+        </li>
+    </ul>
+</section>
+
+<!-- ── 2. Scenario context bar ─────────────────────────────────────────── -->
+<div class="dash-card rk-section mb-3">
+    <div class="row g-3 rk-scenario-bar">
         <div class="col-md-4">
             <div class="stat-label">Barangay</div>
             <div class="fw-semibold">{{ result.inputs.barangay_name }}</div>
@@ -85,161 +59,437 @@
             <div class="fw-semibold text-capitalize">{{ result.inputs.disaster_type }}</div>
         </div>
         <div class="col-md-4">
-            <div class="stat-label">Planning Horizon</div>
-            <div class="fw-semibold">{{ result.duration_label }} ({{ result.inputs.horizon_days }} days)</div>
+            <div class="stat-label">Planning Period</div>
+            <div class="fw-semibold">
+                {{ result.duration_label }}
+                <span class="text-muted rk-fs-12">({{ result.inputs.horizon_days }} days)</span>
+            </div>
         </div>
     </div>
     {% if not result.hazard_recorded %}
     <div class="alert-banner mt-3 mb-0">
-        <i class="bi bi-exclamation-triangle-fill"></i>
+        <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
         <span>{{ result.hazard_note }}</span>
     </div>
     {% endif %}
 </div>
 
-<div class="row">
-    <!-- ── Affected population card ─────────────────────────────────────── -->
-    <div class="col-lg-4 mb-3">
-        <div class="dash-card h-100">
-            <div class="card-title-row">
-                <h6><i class="bi bi-people-fill me-1"></i>Estimated Affected Population</h6>
-            </div>
-            <div class="stat-value rk-fs-32">
-                {{ "{:,}".format(result.estimated_affected) }}
-            </div>
-            <div class="text-muted rk-fs-12">
-                of {{ "{:,}".format(result.inputs.total_population) }} residents
-            </div>
-            <hr>
-            {% set vpct = (result.estimated_vulnerable / result.estimated_affected * 100) if result.estimated_affected else 0 %}
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <div class="stat-label">Vulnerable (PWD + elderly + children)</div>
-                    <div class="fw-semibold">{{ "{:,}".format(result.estimated_vulnerable) }}</div>
-                </div>
-                <span class="risk-badge risk-moderate">{{ vpct | round(1) }}% of affected</span>
+<!-- ── 3. Overall readiness hero ───────────────────────────────────────── -->
+<section class="dash-card rk-section mb-3" aria-labelledby="rk-readiness-h">
+    {# The hero surface is tinted by status so the situation is legible at a
+       glance; the tints are light, and the wording + icon carry the status on
+       their own so colour is never the only indicator. #}
+    <div class="rk-hero {{ view.overall.hero }}">
+        <div class="d-flex align-items-start gap-3">
+            <span class="rk-hero-icon" aria-hidden="true">
+                <i class="bi {{ view.overall.icon }}"></i>
+            </span>
+            <div>
+                <div class="stat-label rk-hero-label">Overall Readiness — Planning Priority</div>
+                <h2 id="rk-readiness-h" class="{{ view.overall.text_class }} rk-fs-32 rk-fw-800 mb-2">
+                    {{ view.overall.label }}
+                </h2>
+                <p class="mb-0 rk-fs-14 rk-lh-16 rk-maxw-720">{{ view.overall.sentence }}</p>
+                <p class="rk-fs-12 mb-0 mt-2 rk-hero-note">
+                    Based on the worst-status resource class. This ranks how urgently
+                    the gaps below need planning attention — it is not a forecast of
+                    the hazard itself.
+                </p>
             </div>
         </div>
     </div>
 
-    <!-- ── Planning status summary (alert rows per class) ───────────────── -->
-    <div class="col-lg-8 mb-3">
-        <div class="dash-card h-100">
-            <div class="card-title-row">
-                <h6><i class="bi bi-ui-checks me-1"></i>Planning Status Summary</h6>
+    <div class="row g-3 mt-1">
+        {% for d in view.dimensions %}
+        <div class="col-md-4">
+            <div class="rk-mini-card {{ d.accent }} h-100">
+                <div class="d-flex justify-content-between align-items-center gap-2 mb-1">
+                    <span class="fw-semibold rk-fs-13">
+                        <i class="bi {{ d.icon }} me-1" aria-hidden="true"></i>{{ d.label }}
+                    </span>
+                    <span class="status-pill {{ d.pill }}">{{ d.status_label }}</span>
+                </div>
+                <div class="progress rk-h-10 mb-2">
+                    <div class="progress-bar {{ d.bar }} rk-w-p{{ d.pct }}" role="progressbar"
+                         aria-label="{{ d.label }} coverage"
+                         aria-valuenow="{{ d.pct }}" aria-valuemin="0" aria-valuemax="100"></div>
+                </div>
+                <p class="text-muted rk-fs-12 mb-0 rk-lh-16">{{ d.sentence }}</p>
             </div>
-            {% for c in display_order %}
-                {% if c in result.gaps %}
-                    {% set g = result.gaps[c] %}
-                    {% set sui = status_ui[result.status_by_class[c]] %}
-                    <div class="alert {{ sui.alert }} d-flex justify-content-between align-items-center py-2 mb-2">
-                        <span><strong>{{ class_label[c] }}</strong>
-                            {% if g.gap > 0 %}
-                                — short by {{ "{:,}".format(g.gap) }} {{ g.unit }}
-                            {% else %}
-                                — fully covered
-                            {% endif %}
-                        </span>
-                        <span class="status-pill {{ sui.pill }}">{{ sui.label }}</span>
-                    </div>
-                {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</section>
+
+<!-- ── 4. Key figure cards ─────────────────────────────────────────────── -->
+<section class="mb-3" aria-labelledby="rk-figures-h">
+    <h2 id="rk-figures-h" class="visually-hidden">Key figures</h2>
+    {# Each card carries a category icon (decorative — the label always states
+       the category in text) plus a small proportion bar where the figure is a
+       share of a larger number, so the scale is readable without arithmetic. #}
+    {% set aff_pct = ((fig.affected / fig.total_population * 100) | round | int) if fig.total_population else 0 %}
+    {% set veh_pct = ((fig.vehicles_available / fig.vehicles_needed * 100) | round | int) if fig.vehicles_needed else 100 %}
+    {% set veh_pct = 100 if veh_pct > 100 else veh_pct %}
+    <div class="row g-3">
+        <div class="col-6 col-lg-3">
+            <div class="dash-card rk-figure h-100">
+                <div class="rk-figure-head">
+                    <span class="stat-label mb-0">People Potentially Affected</span>
+                    <span class="stat-icon rk-tint-blue" aria-hidden="true">
+                        <i class="bi bi-people-fill"></i>
+                    </span>
+                </div>
+                <div class="rk-fs-26 rk-fw-800 rk-num">{{ "{:,}".format(fig.affected) }}</div>
+                <div class="progress rk-h-6 my-2">
+                    <div class="progress-bar rk-bg-blue rk-w-p{{ aff_pct }}" role="progressbar"
+                         aria-label="Share of total residents potentially affected"
+                         aria-valuenow="{{ aff_pct }}" aria-valuemin="0" aria-valuemax="100"></div>
+                </div>
+                <div class="text-muted rk-fs-12">
+                    {{ aff_pct }}% of {{ "{:,}".format(fig.total_population) }} total residents
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="dash-card rk-figure h-100">
+                <div class="rk-figure-head">
+                    <span class="stat-label mb-0">Vulnerable Residents</span>
+                    <span class="stat-icon rk-tint-purple" aria-hidden="true">
+                        <i class="bi bi-heart-pulse-fill"></i>
+                    </span>
+                </div>
+                <div class="rk-fs-26 rk-fw-800 rk-num">{{ "{:,}".format(fig.vulnerable) }}</div>
+                <div class="progress rk-h-6 my-2">
+                    <div class="progress-bar rk-bg-purple rk-w-p{{ fig.vulnerable_pct }}" role="progressbar"
+                         aria-label="Share of the affected population who are vulnerable"
+                         aria-valuenow="{{ fig.vulnerable_pct }}" aria-valuemin="0" aria-valuemax="100"></div>
+                </div>
+                <div class="text-muted rk-fs-12">
+                    {{ fig.vulnerable_pct }}% of the estimated affected population
+                    <span class="d-block rk-fs-11">PWD, elderly and children</span>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="dash-card rk-figure h-100">
+                <div class="rk-figure-head">
+                    <span class="stat-label mb-0">Critical Resource Gaps</span>
+                    <span class="stat-icon {{ 'rk-tint-red' if fig.critical_count else 'rk-tint-green' }}"
+                          aria-hidden="true">
+                        <i class="bi {{ 'bi-exclamation-triangle-fill' if fig.critical_count else 'bi-check-circle-fill' }}"></i>
+                    </span>
+                </div>
+                <div class="rk-fs-26 rk-fw-800 rk-num">{{ fig.critical_count }}</div>
+                <div class="rk-figure-dots my-2" aria-hidden="true">
+                    {% for r in view.rows %}
+                    <span class="rk-dot {{ 'rk-bg-red' if r.status == 'Critical' else ('rk-bg-amber' if r.status == 'Partial' else 'rk-bg-green') }}"></span>
+                    {% endfor %}
+                </div>
+                <div class="text-muted rk-fs-12">
+                    of {{ view.rows | length }} resource
+                    {{ 'category' if view.rows | length == 1 else 'categories' }},
+                    below half of the estimated requirement
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="dash-card rk-figure h-100">
+                <div class="rk-figure-head">
+                    <span class="stat-label mb-0">Available Response Vehicles</span>
+                    <span class="stat-icon rk-tint-green" aria-hidden="true">
+                        <i class="bi bi-truck"></i>
+                    </span>
+                </div>
+                <div class="rk-fs-26 rk-fw-800 rk-num">{{ "{:,}".format(fig.vehicles_available) }}</div>
+                <div class="progress rk-h-6 my-2">
+                    <div class="progress-bar {{ 'bg-danger' if veh_pct < 50 else ('bg-warning' if veh_pct < 100 else 'bg-success') }} rk-w-p{{ veh_pct }}"
+                         role="progressbar" aria-label="Response vehicle coverage"
+                         aria-valuenow="{{ veh_pct }}" aria-valuemin="0" aria-valuemax="100"></div>
+                </div>
+                <div class="text-muted rk-fs-12">
+                    {{ "{:,}".format(fig.vehicles_needed) }} estimated as required
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ── 5. What needs attention ─────────────────────────────────────────── -->
+<section class="dash-card rk-section rk-section-warn mb-3" aria-labelledby="rk-attention-h">
+    <div class="card-title-row">
+        <h2 id="rk-attention-h" class="rk-h-section">
+            <i class="bi bi-exclamation-diamond me-1" aria-hidden="true"></i>What Needs Attention
+        </h2>
+    </div>
+
+    {% if view.concerns %}
+        {% for c in view.concerns %}
+        {% include "admin/_simulator_concern.html" %}
+        {% endfor %}
+
+        {% if view.more_concerns %}
+        <button class="btn btn-soft rk-fs-13 collapsed" type="button" data-bs-toggle="collapse"
+                data-bs-target="#rk-more-gaps" aria-expanded="false" aria-controls="rk-more-gaps">
+            <i class="bi bi-chevron-down" aria-hidden="true"></i>
+            <span class="rk-when-collapsed">View all resource gaps ({{ view.more_concerns | length }} more)</span>
+            <span class="rk-when-open">Hide the remaining resource gaps</span>
+        </button>
+        <div class="collapse mt-3" id="rk-more-gaps">
+            {% for c in view.more_concerns %}
+            {% include "admin/_simulator_concern.html" %}
             {% endfor %}
         </div>
-    </div>
-</div>
+        {% endif %}
+    {% else %}
+        <p class="text-muted rk-fs-14 mb-0">
+            No resource shortfalls were identified for this scenario. Recorded
+            availability meets every estimated requirement.
+        </p>
+    {% endif %}
+</section>
 
-<!-- ── Resource analysis table ─────────────────────────────────────────── -->
-<div class="dash-card mb-3">
-    <div class="card-title-row">
-        <h6><i class="bi bi-table me-1"></i>Resource Analysis</h6>
+<!-- ── 6. Suggested planning actions (AI-assisted) ─────────────────────── -->
+{# Rendered from the validated `ai_actions` list, ALWAYS escaped (never |safe)
+   and capped at five. The heading and the disclaimer are hardcoded here, not
+   model output, so they stay visible when the list is empty or the AI failed.
+   Informational only: the system has no assign/deploy workflow, so no such
+   control is offered. #}
+{% set actions = (ai_actions | default([], true))[:5] %}
+<section class="dash-card rk-section rk-section-ok mb-3" aria-labelledby="rk-actions-h">
+    <div class="card-title-row flex-wrap">
+        <h2 id="rk-actions-h" class="rk-h-section">
+            <i class="bi bi-list-check me-1" aria-hidden="true"></i>Suggested Planning Actions
+        </h2>
+        <span class="risk-badge risk-moderate">AI-Assisted</span>
     </div>
-    <div class="table-responsive">
-        <table class="table align-middle">
-            <thead>
-                <tr>
-                    <th>Resource Class</th>
-                    <th class="text-end">Required</th>
-                    <th class="text-end">Available</th>
-                    <th class="text-end">Gap / Surplus</th>
-                    <th>Basis</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for c in display_order %}
-                    {% if c in result.gaps %}
-                        {% set g = result.gaps[c] %}
-                        {% set sui = status_ui[result.status_by_class[c]] %}
+    <p class="text-muted rk-fs-12 mb-3">
+        For planning purposes only. Subject to CDRRMO validation.
+    </p>
+
+    {% if actions %}
+        {% for a in actions %}
+        <div class="rk-action-card mb-2">
+            <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+                <div class="fw-semibold rk-fs-14">{{ a.action }}</div>
+                {% if a.priority %}
+                <span class="status-pill {{ {'high': 'status-unavailable',
+                                             'medium': 'status-maintenance'}.get(a.priority, 'rk-pill-low') }}">
+                    {{ a.priority | title }} priority
+                </span>
+                {% endif %}
+            </div>
+            {% if a.basis %}
+            <div class="text-muted rk-fs-12 mt-1">Basis: {{ a.basis }}</div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    {% else %}
+        <p class="text-muted rk-fs-13 mb-0">
+            No additional AI-assisted planning actions were identified from the available data.
+        </p>
+    {% endif %}
+</section>
+
+<!-- ── 7. Resource coverage overview ───────────────────────────────────── -->
+{# Replaces the old shared-axis Need-vs-Available bar chart: litres, packs, kits,
+   slots and vehicles are not comparable on one numeric axis, so every class is
+   shown as its own 0–100% coverage bar with the exact values beside it. #}
+<section class="dash-card rk-section mb-3" aria-labelledby="rk-coverage-h">
+    <div class="card-title-row">
+        <h2 id="rk-coverage-h" class="rk-h-section">
+            <i class="bi bi-bar-chart-steps me-1" aria-hidden="true"></i>Resource Coverage
+        </h2>
+    </div>
+    {% for r in view.rows %}
+    <div class="rk-coverage-row">
+        <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-1">
+            <span class="fw-semibold rk-fs-13">{{ r.label }}</span>
+            <span class="d-flex align-items-center gap-2">
+                <span class="rk-fs-12 text-muted rk-num">{{ r.pct_label }} covered</span>
+                <span class="status-pill {{ r.pill }}">{{ r.status_label }}</span>
+            </span>
+        </div>
+        <div class="progress rk-h-10">
+            <div class="progress-bar {{ r.bar }} rk-w-p{{ r.pct }}" role="progressbar"
+                 aria-label="{{ r.label }} coverage"
+                 aria-valuenow="{{ r.pct }}" aria-valuemin="0" aria-valuemax="100"></div>
+        </div>
+        <div class="text-muted rk-fs-12 mt-1 rk-num">
+            {{ "{:,}".format(r.available) }} of {{ "{:,}".format(r.need) }} {{ r.unit }} available
+            {% if r.is_surplus %}
+                — {{ "{:,}".format(r.surplus) }} {{ r.unit }} above the estimated requirement
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+    <p class="text-muted rk-fs-12 mb-0 mt-2">
+        Each bar shows coverage on its own 0–100% scale. Resource classes use
+        different units and are not compared against one another.
+    </p>
+</section>
+
+<!-- ── 8–10. Detailed planning view (collapsed by default) ─────────────── -->
+<section class="mb-3" aria-labelledby="rk-detail-h">
+    <div class="dash-card rk-section">
+        <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
+            <div>
+                <h2 id="rk-detail-h" class="rk-h-section mb-1">
+                    <i class="bi bi-sliders me-1" aria-hidden="true"></i>Detailed Planning View
+                </h2>
+                <p class="text-muted rk-fs-12 mb-0">
+                    Full calculations, potential consequences, the complete AI brief,
+                    and the assumptions behind each figure.
+                </p>
+            </div>
+            <button class="btn btn-soft rk-fs-13 collapsed" type="button" data-bs-toggle="collapse"
+                    data-bs-target="#rk-detail" aria-expanded="false" aria-controls="rk-detail">
+                <i class="bi bi-chevron-down" aria-hidden="true"></i>
+                <span class="rk-when-collapsed">Show detailed view</span>
+                <span class="rk-when-open">Hide detailed view</span>
+            </button>
+        </div>
+    </div>
+
+    <div class="collapse" id="rk-detail">
+        <!-- ── 8. Detailed resource calculations ───────────────────────── -->
+        <div class="dash-card rk-section mt-3">
+            <div class="card-title-row">
+                <h3 class="rk-h-section">
+                    <i class="bi bi-table me-1" aria-hidden="true"></i>Detailed Resource Calculations
+                </h3>
+            </div>
+            <div class="table-responsive">
+                <table class="table align-middle rk-detail-table">
+                    <caption class="visually-hidden">
+                        Estimated requirement, recorded availability, shortfall or
+                        surplus, calculation basis and status for each resource class.
+                    </caption>
+                    <thead>
                         <tr>
-                            <td>{{ class_label[c] }}<span class="text-muted"> ({{ g.unit }})</span></td>
-                            <td class="text-end">{{ "{:,}".format(g.need) }}</td>
-                            <td class="text-end">{{ "{:,}".format(g.available) }}</td>
-                            <td class="text-end">
-                                {% if g.gap > 0 %}
-                                    <span class="text-danger fw-semibold">−{{ "{:,}".format(g.gap) }}</span>
+                            <th scope="col">Resource Availability</th>
+                            <th scope="col" class="text-end">Required</th>
+                            <th scope="col" class="text-end">Available</th>
+                            <th scope="col" class="text-end">Additional Amount Needed</th>
+                            <th scope="col">Basis</th>
+                            <th scope="col">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for r in view.rows %}
+                        <tr class="{{ r.accent }}">
+                            <th scope="row" class="fw-normal">
+                                {{ r.label }}
+                                <span class="d-block text-muted rk-fs-11">
+                                    {{ r.technical_label }} ({{ r.unit }})
+                                </span>
+                            </th>
+                            <td class="text-end rk-num">{{ "{:,}".format(r.need) }}</td>
+                            <td class="text-end rk-num">{{ "{:,}".format(r.available) }}</td>
+                            <td class="text-end rk-num">
+                                {% if r.gap > 0 %}
+                                    <span class="rk-text-crit fw-semibold">{{ "{:,}".format(r.gap) }}</span>
+                                {% elif r.surplus > 0 %}
+                                    <span class="rk-text-ok fw-semibold">
+                                        None — {{ "{:,}".format(r.surplus) }} surplus
+                                    </span>
                                 {% else %}
-                                    <span class="text-success fw-semibold">+{{ "{:,}".format(g.available - g.need) }}</span>
+                                    <span class="rk-text-ok fw-semibold">None — exactly covered</span>
                                 {% endif %}
                             </td>
                             <td>
-                                {% if g.basis == 'standard' %}
-                                    <span class="badge bg-light text-dark border" title="Traceable to Sphere / DSWD">Standard</span>
+                                {% if r.basis == 'standard' %}
+                                    <span class="badge bg-light text-dark border">Standard</span>
                                 {% else %}
-                                    <span class="badge bg-light text-secondary border" title="CDRRMO planning assumption, adjustable">Assumption</span>
+                                    <span class="badge bg-light text-secondary border">Assumption</span>
                                 {% endif %}
                             </td>
-                            <td><span class="status-pill {{ sui.pill }}">{{ sui.label }}</span></td>
+                            <td><span class="status-pill {{ r.pill }}">{{ r.status_label }}</span></td>
                         </tr>
-                    {% endif %}
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-    <p class="text-muted mb-0 rk-fs-12">
-        <i class="bi bi-info-circle me-1"></i><strong>Standard</strong> figures follow
-        Sphere / DSWD guidance; <strong>Assumption</strong> figures are adjustable CDRRMO
-        planning targets, not standard-based requirements.
-    </p>
-</div>
-
-<!-- ── Operational risks ───────────────────────────────────────────────── -->
-{% if result.operational_risks %}
-<div class="dash-card mb-3">
-    <div class="card-title-row">
-        <h6><i class="bi bi-shield-exclamation me-1"></i>Operational Risks</h6>
-    </div>
-    <ul class="mb-0">
-        {% for r in result.operational_risks %}
-        <li>{{ r }}</li>
-        {% endfor %}
-    </ul>
-</div>
-{% endif %}
-
-<!-- ── Need vs Available chart ─────────────────────────────────────────── -->
-<div class="dash-card mb-3">
-    <div class="card-title-row">
-        <h6><i class="bi bi-bar-chart-fill me-1"></i>Need vs. Available</h6>
-    </div>
-    <canvas id="needChart" height="110"></canvas>
-</div>
-
-<!-- ── AI briefing (optional; below the numeric tables) ─────────────────── -->
-<div class="dash-card mb-3">
-    <div class="card-title-row">
-        <h6><i class="bi bi-robot me-1"></i>AI Planning Briefing</h6>
-        <span class="risk-badge risk-moderate ms-auto">
-            AI-generated · advisory · validate with current conditions and expert judgment
-        </span>
-    </div>
-    {% if ai_briefing %}
-        {# ai_briefing is markdown already converted to a SANITIZED HTML fragment
-           in ai_layer.to_safe_html() (nh3 allowlist). Safe to mark |safe. #}
-        <div class="ai-briefing rk-fs-14 rk-lh-16">{{ ai_briefing | safe }}</div>
-    {% else %}
-        <div class="alert-banner mb-0">
-            <i class="bi bi-info-circle-fill"></i>
-            <span>{{ ai_note or "The AI summary is unavailable. The numeric report above is complete and unaffected." }}</span>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <p class="text-muted mb-0 rk-fs-12 rk-lh-16">
+                <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
+                <strong>Standard</strong> figures follow Sphere / DSWD guidance.
+                <strong>Assumption</strong> figures are adjustable CDRRMO planning
+                targets, not standard-based requirements. Statuses use the
+                system's readiness bands: below half of the requirement is
+                Critical, at least half is At Risk, and the full requirement is
+                Sufficient.
+            </p>
         </div>
-    {% endif %}
-</div>
+
+        <!-- ── 9. Potential consequences if gaps remain ────────────────── -->
+        {% if view.consequences or result.operational_risks %}
+        <div class="dash-card rk-section mt-3">
+            <div class="card-title-row flex-wrap">
+                <h3 class="rk-h-section">
+                    <i class="bi bi-shield-exclamation me-1" aria-hidden="true"></i>
+                    Potential Consequences if Gaps Remain
+                </h3>
+                <span class="text-muted rk-fs-11">Operational Risks</span>
+            </div>
+            {% for c in view.consequences %}
+            <div class="rk-consequence">
+                <div class="fw-semibold rk-fs-13">{{ c.label }}</div>
+                <p class="text-muted rk-fs-13 mb-0 rk-lh-16">{{ c.text }}</p>
+            </div>
+            {% else %}
+            <p class="text-muted rk-fs-13 mb-0">
+                No shortfall-driven consequences were identified for this scenario.
+            </p>
+            {% endfor %}
+
+            {% if result.operational_risks %}
+            <button class="btn btn-soft rk-fs-12 mt-3 collapsed" type="button" data-bs-toggle="collapse"
+                    data-bs-target="#rk-raw-risks" aria-expanded="false" aria-controls="rk-raw-risks">
+                <i class="bi bi-chevron-down" aria-hidden="true"></i>
+                <span class="rk-when-collapsed">Show the system's operational-risk notes</span>
+                <span class="rk-when-open">Hide the system's operational-risk notes</span>
+            </button>
+            <ul class="collapse mt-2 mb-0 rk-fs-13" id="rk-raw-risks">
+                {% for r in result.operational_risks %}
+                <li>{{ r }}</li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- ── 10. AI planning brief ───────────────────────────────────── -->
+        <div class="dash-card rk-section mt-3">
+            <div class="card-title-row flex-wrap">
+                <h3 class="rk-h-section">
+                    <i class="bi bi-robot me-1" aria-hidden="true"></i>AI Planning Brief
+                </h3>
+                <span class="risk-badge risk-moderate">
+                    AI-generated · advisory · validate with current conditions and expert judgment
+                </span>
+            </div>
+
+            {% if ai_briefing %}
+                <div class="rk-ai-panel">
+                    <p class="text-muted rk-fs-12 mb-2">
+                        Generated from this run's figures. Kept separate from the
+                        verified system calculations above.
+                    </p>
+                    {# ai_briefing is markdown already converted to a SANITIZED HTML
+                       fragment in ai_layer.to_safe_html() (nh3 allowlist, no
+                       attributes). Safe to mark |safe; nothing else on this page is. #}
+                    <div class="ai-briefing rk-fs-14 rk-lh-16">{{ ai_briefing | safe }}</div>
+                </div>
+            {% else %}
+                <div class="alert-banner mb-0">
+                    <i class="bi bi-info-circle-fill" aria-hidden="true"></i>
+                    <span>{{ ai_note or "The AI summary is unavailable. The numeric report above is complete and unaffected." }}</span>
+                </div>
+            {% endif %}
+
+            <p class="text-muted rk-fs-12 mb-0 mt-3">
+                {{ ai_advisory_note or "Note: The CDRRMO planners retain final authority for deployment decisions. This briefing is advisory in nature." }}
+            </p>
+        </div>
+
+    </div>
+</section>

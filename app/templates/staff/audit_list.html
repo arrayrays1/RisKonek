@@ -1,0 +1,147 @@
+{% extends "admin/base.html" %}
+{% from "shared/_pagination.html" import pager %}
+
+{% block title %}Logistics Audit Trail — RisKonek{% endblock %}
+
+{% set active_nav = 'staff_audit' %}
+
+{% macro category_badge(cat) -%}
+    {% set m = {
+        'Resources': 'rk-cat-resource',
+        'Vehicle & Equipment': 'rk-cat-equip'
+    } %}
+    <span class="status-pill {{ m.get(cat, 'rk-cat-system') }}">{{ cat }}</span>
+{%- endmacro %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start page-header">
+    <div>
+        <h1>Logistics Audit Trail</h1>
+        <p>
+            Every recorded change to stockpile resources and to vehicles &amp; equipment.
+            {{ total }} matching entr{{ 'y' if total == 1 else 'ies' }}.
+        </p>
+    </div>
+    <div class="dropdown">
+        <button class="btn btn-rk dropdown-toggle" type="button"
+                data-bs-toggle="dropdown" aria-expanded="false"
+                {% if total == 0 %}disabled title="No entries to export"{% endif %}>
+            <i class="bi bi-download"></i> Export Logs
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end">
+            <li>
+                <a class="dropdown-item"
+                   href="/staff/audit/export?format=csv{% if base_query %}&{{ base_query }}{% endif %}">
+                    <i class="bi bi-filetype-csv me-2"></i>Export as CSV
+                </a>
+            </li>
+            <li>
+                <a class="dropdown-item"
+                   href="/staff/audit/export?format=pdf{% if base_query %}&{{ base_query }}{% endif %}">
+                    <i class="bi bi-filetype-pdf me-2"></i>Export as PDF
+                </a>
+            </li>
+        </ul>
+    </div>
+</div>
+
+<!-- ── Filter bar (auto-applies — no submit button needed) ────────── -->
+<div class="dash-card mb-3">
+    <form method="GET" action="/staff/audit" class="row g-2 align-items-end js-live-filter">
+        <div class="col-md-6">
+            <label class="form-label small fw-semibold mb-1">Search</label>
+            <input type="text" name="q" value="{{ f_q }}" class="form-control form-control-sm"
+                   placeholder="Search description or username…" autocomplete="off">
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small fw-semibold mb-1">Module</label>
+            <select name="category" class="form-select form-select-sm">
+                <option value="">All modules</option>
+                {% for c in categories %}
+                <option value="{{ c }}" {% if f_category == c %}selected{% endif %}>{{ c }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small fw-semibold mb-1">Action</label>
+            <select name="action" class="form-select form-select-sm">
+                <option value="">All actions</option>
+                {% for a in actions %}
+                <option value="{{ a }}" {% if f_action == a %}selected{% endif %}>{{ a }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small fw-semibold mb-1">From</label>
+            <input type="date" name="date_from" value="{{ f_date_from }}" class="form-control form-control-sm">
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small fw-semibold mb-1">To</label>
+            <input type="date" name="date_to" value="{{ f_date_to }}" class="form-control form-control-sm">
+        </div>
+        <div class="col-md-3 d-flex align-items-end">
+            <a href="/staff/audit" class="btn-soft w-100 justify-content-center">
+                <i class="bi bi-x-circle"></i> Reset
+            </a>
+        </div>
+    </form>
+</div>
+
+<!-- ── Results ────────────────────────────────────────────────────── -->
+<div class="dash-card p-0">
+    <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+            <thead class="rk-bg-soft">
+                <tr class="rk-th-soft">
+                    <th class="px-3 py-3">Recorded</th>
+                    <th class="py-3">Occurred</th>
+                    <th class="py-3">User</th>
+                    <th class="py-3">Module</th>
+                    <th class="py-3">Action</th>
+                    <th class="py-3">Deployed to</th>
+                    <th class="py-3">Description</th>
+                    <th class="py-3 text-end px-3">Detail</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for day_label, items in grouped %}
+                <tr><td colspan="8" class="bg-light text-muted small fw-semibold px-3 py-2">
+                    <i class="bi bi-calendar3 me-1"></i>{{ day_label }}
+                </td></tr>
+                {% for it in items %}
+                <tr class="rk-fs-13">
+                    <td class="px-3 text-nowrap">{{ it.timestamp | pht }}</td>
+                    <td class="text-nowrap text-muted">
+                        {{ it.occurred_at | pht if it.occurred_at else '—' }}
+                    </td>
+                    <td>{{ it.username }}</td>
+                    <td>{{ category_badge(it.category) }}</td>
+                    <td><span class="badge bg-light text-dark border">{{ it.action }}</span></td>
+                    <td class="small text-muted">{{ it.deployed_to or '—' }}</td>
+                    <td class="small rk-maxw-340">
+                        <span class="d-inline-block text-truncate rk-maxw-340" title="{{ it.description }}">
+                            {{ it.description or '—' }}
+                        </span>
+                    </td>
+                    <td class="text-end px-3">
+                        <a href="/staff/audit/{{ it.id }}" class="btn-soft" title="View detail">
+                            <i class="bi bi-eye"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+                {% else %}
+                <tr>
+                    <td colspan="8" class="text-center text-muted py-5">
+                        <i class="bi bi-search fs-3 d-block mb-2"></i>
+                        No audit entries match your filters.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{{ pager(page_obj, "/staff/audit", base_query) }}
+{% endblock %}

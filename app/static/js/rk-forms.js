@@ -93,6 +93,14 @@
     // Declare on a form:   <form method="POST" data-validate> … </form>
     // Extra per-field:     data-rule="phone-ph"   custom format check
     //                      data-error="…"         override the shown message
+    //                      data-require-if="name" data-require-if-value="a,b"
+    //                                             required only while the named
+    //                                             sibling control holds one of
+    //                                             those values
+    //
+    // A rule's `test` receives (value, field) so a rule can read the field's
+    // own data-* attributes or other controls in the same form; `message` may
+    // be a string or a function(value, field) for a value-dependent message.
     var CUSTOM_RULES = {
         // Philippine mobile number: 11 digits starting 09 (e.g. 09171234567).
         "phone-ph": {
@@ -104,8 +112,61 @@
         "plate-serial": {
             test: function (v) { return /^[A-Za-z]{3}-?[0-9]{3,4}$/.test(v); },
             message: "Use 3 letters then 3–4 digits (e.g. ABC-1234)."
+        },
+        // Logistics stock movement: a positive whole number that, when the
+        // form's action is "deduct", never exceeds the current stock held in
+        // data-max-stock. Adding stock has no ceiling.
+        "stock-amount": {
+            test: function (v, field) {
+                var n = Number(v);
+                if (!isFinite(n) || n <= 0 || Math.floor(n) !== n) return false;
+                if (!isDeduction(field)) return true;
+                var max = Number(field.getAttribute("data-max-stock"));
+                return !isFinite(max) || n <= max;
+            },
+            message: function (v, field) {
+                var n = Number(v);
+                if (!isFinite(n) || n <= 0 || Math.floor(n) !== n) {
+                    return "Enter a whole number greater than 0.";
+                }
+                return "Cannot deduct more than the current stock (" +
+                    field.getAttribute("data-max-stock") + ").";
+            }
+        },
+        // A movement can be backdated but never postdated.
+        "not-future": {
+            test: function (v) {
+                var t = Date.parse(v);
+                // Unparseable values are left to the native type check.
+                if (isNaN(t)) return true;
+                return t <= Date.now() + 60000;   // 1 min clock-skew allowance
+            },
+            message: "Date and time cannot be in the future."
         }
     };
+
+    // True when the stock modal owning `field` is set to deduct.
+    function isDeduction(field) {
+        var form = field.form;
+        var action = form && form.elements ? form.elements["action"] : null;
+        return !!(action && action.value === "deduct");
+    }
+
+    // Apply data-require-if: toggle the native `required` attribute so the
+    // conditional field is validated by the same code path as everything else.
+    // Clears a stale error when the condition stops applying.
+    function syncConditionalRequired(form) {
+        form.querySelectorAll("[data-require-if]").forEach(function (field) {
+            var other = form.elements[field.getAttribute("data-require-if")];
+            var wanted = (field.getAttribute("data-require-if-value") || "").split(",");
+            if (other && wanted.indexOf(other.value) !== -1) {
+                field.setAttribute("required", "");
+            } else {
+                field.removeAttribute("required");
+                clearInvalid(field);
+            }
+        });
+    }
 
     // Find (or lazily create) the .invalid-feedback element that shows a field's
     // message. Templates need not declare one — if absent it is injected after
@@ -154,8 +215,10 @@
             var v = field.value.trim();
             // Custom format rules apply only to non-empty values; presence is
             // the `required` attribute's job (checked natively below).
-            if (v !== "" && !rule.test(v)) {
-                setInvalid(field, field.getAttribute("data-error") || rule.message);
+            if (v !== "" && !rule.test(v, field)) {
+                var msg = typeof rule.message === "function"
+                    ? rule.message(v, field) : rule.message;
+                setInvalid(field, field.getAttribute("data-error") || msg);
                 return false;
             }
         }
@@ -170,6 +233,7 @@
     }
 
     function validateForm(form) {
+        syncConditionalRequired(form);
         var fields = form.querySelectorAll("input, select, textarea");
         var ok = true, first = null;
         for (var i = 0; i < fields.length; i++) {
@@ -221,9 +285,19 @@
     // fixes it, so the error doesn't linger until the next submit.
     function liveRevalidate(e) {
         var f = e.target;
-        if (f && f.matches &&
-            f.matches("form[data-validate] input, form[data-validate] select, form[data-validate] textarea") &&
-            f.classList.contains("is-invalid")) {
+        if (!f || !f.matches ||
+            !f.matches("form[data-validate] input, form[data-validate] select, form[data-validate] textarea")) {
+            return;
+        }
+        // Changing the controller of a data-require-if field (Action / New
+        // status) flips which fields are mandatory and can invalidate an
+        // already-typed amount, so re-check the whole form's flagged fields.
+        if (f.form && f.form.querySelector('[data-require-if="' + f.name + '"]')) {
+            syncConditionalRequired(f.form);
+            f.form.querySelectorAll(".is-invalid").forEach(validateField);
+            return;
+        }
+        if (f.classList.contains("is-invalid")) {
             validateField(f);
         }
     }

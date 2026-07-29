@@ -12,6 +12,7 @@ from app.models import (
     DisasterType, Severity, FacilityType, FacilityStatus,
     UploadedReport, ReportStatus, FileType, LifecycleStatus, UploadEvent,
     add_upload_history, BarangayEquipment, EquipmentType,
+    IncidentReport, ServiceabilityStatus,
 )
 from app.auth import require_role, require_barangay_access
 from app.utils.pagination import (
@@ -29,7 +30,11 @@ from app.routes.uploads import (
 )
 from app.etl.extract_pdf import extract_pdf
 from app.etl.extract_excel import extract_excel, extract_csv
-from app.etl.structure import structure_text, structure_rows
+from app.etl.structure import (
+    structure_text, structure_rows,
+    structure_incident_report_rows, structure_incident_report_text,
+    empty_incident_report_fields,
+)
 from app.etl.ai_pipeline import summarize as ai_summarize, is_available as ai_available
 from app.services.geocoding import (
     search_locations, reverse_geocode_san_pedro, nearby_landmarks,
@@ -763,18 +768,724 @@ async def incident_upload_convert(
 
 
 # ══════════════════════════════════════════════════════════════════════
+# POST-INCIDENT REPORTS (barangay-scoped)
+# The same workflow CFAU runs in app/routes/cfau.py — manual entry or an
+# uploaded document reviewed into the SAME IncidentReport model — with two
+# scoping rules layered on: a BDRRMO user only ever sees their OWN reports,
+# and a report may only be attached to an incident in their OWN barangay.
+# Uploads are tagged with the same `post_incident` kind CFAU uses, so the
+# admin review list keeps showing correct provenance for both portals.
+# ══════════════════════════════════════════════════════════════════════
+
+# Mirrors cfau.WORKFLOW_LABELS — only draft/submitted are reachable here.
+REPORT_WORKFLOW_LABELS = {
+    "draft": "Draft",
+    "submitted": "Submitted",
+    "reviewed": "Reviewed",
+    "resolved": "Resolved",
+}
+
+UPLOAD_KIND_POST_INCIDENT = "post_incident"
+
+
+def _own_incident_options(db, barangay):
+    """Incidents this user may attach a report to — own barangay only."""
+    if not barangay:
+        return []
+    return (
+        db.query(Incident)
+        .filter(Incident.barangay_id == barangay.id)
+        .order_by(Incident.date_occurred.desc())
+        .limit(200)
+        .all()
+    )
+
+
+def _incident_label(inc) -> str:
+    dtype = inc.disaster_type.value.replace("_", " ").title() if inc.disaster_type else "Incident"
+    when = inc.date_occurred.strftime('%Y-%m-%d') if inc.date_occurred else "—"
+    return f"{dtype} — {when}"
+
+
+def _own_incident(db, barangay, incident_id):
+    """Fetch an incident only if it belongs to the user's barangay."""
+    if not barangay:
+        return None
+    return db.query(Incident).filter(
+        Incident.id == incident_id,
+        Incident.barangay_id == barangay.id,
+    ).first()
+
+
+def _own_incident_report(db, report_id, user):
+    """A post-incident report the current user filed themselves."""
+    r = db.query(IncidentReport).filter(IncidentReport.id == report_id).first()
+    if not r or r.submitted_by != user["id"]:
+        return None
+    return r
+
+
+@router.get("/incident-reports", response_class=HTMLResponse)
+def incident_report_list(
+    request: Request,
+    db: Session = Depends(get_db),
+    status: Optional[str] = None,
+    page: Optional[str] = None,
+    per_page: Optional[str] = None,
+):
+    user, barangay = _resolve_scope(request, db)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    query = db.query(IncidentReport).filter(
+        IncidentReport.submitted_by == user["id"]
+    )
+    if status in {s.value for s in ServiceabilityStatus}:
+        query = query.filter(IncidentReport.report_status == ServiceabilityStatus(status))
+
+    rows = []
+    for r in query.order_by(IncidentReport.created_at.desc()).all():
+        inc = r.incident
+        status_value = r.report_status.value if r.report_status else "draft"
+        rows.append({
+            "id": r.id,
+            "disaster_type": (inc.disaster_type.value.replace("_", " ").title()
+                              if inc and inc.disaster_type else "—"),
+            "date_occurred": inc.date_occurred if inc else None,
+            "personnel_count": r.personnel_count or 0,
+            "report_status": status_value,
+            "report_status_label": REPORT_WORKFLOW_LABELS.get(status_value, "Draft"),
+            "created_at": r.created_at,
+        })
+
+    page_obj = paginate(rows, parse_page(page), parse_per_page(per_page))
+    base_query = build_base_query({"status": status or ""})
+
+    return templates.TemplateResponse(
+        request=request,
+        name="bdrrmo/incident_report_list.html",
+        context={
+            "user": user,
+            "active_nav": "bdrrmo_incident_reports",
+            "barangay": barangay,
+            "rows": page_obj.items,
+            "page_obj": page_obj,
+            "base_query": base_query,
+            "statuses": [("draft", "Draft"), ("submitted", "Submitted")],
+            "f_status": status or "",
+        },
+    )
+
+
+@router.get("/incident-reports/new", response_class=HTMLResponse)
+def incident_report_new_form(request: Request, db: Session = Depends(get_db)):
+    user, barangay = _resolve_scope(request, db)
+    if isinstance(user, RedirectResponse):
+        return user
+    if not barangay:
+        return RedirectResponse(
+            url="/bdrrmo/incident-reports?error=No+barangay+is+assigned+to+your+account",
+            status_code=302,
+        )
+    return templates.TemplateResponse(
+        request=request,
+        name="bdrrmo/incident_report_form.html",
+        context={
+            "user": user,
+            "active_nav": "bdrrmo_incident_reports",
+            "barangay": barangay,
+            "edit_mode": False,
+            "target": None,
+            "incidents": [(i.id, _incident_label(i))
+                          for i in _own_incident_options(db, barangay)],
+            "error": None,
+        },
+    )
+
+
+@router.post("/incident-reports/new")
+def incident_report_create(
+    request: Request,
+    db: Session = Depends(get_db),
+    incident_id: int = Form(...),
+    operations_summary: str = Form(""),
+    actions_taken: str = Form(""),
+    equipment_used: str = Form(""),
+    personnel_count: int = Form(0),
+    personnel_notes: str = Form(""),
+    challenges_encountered: str = Form(""),
+    recommendations: str = Form(""),
+    action: str = Form("draft"),
+):
+    user, barangay = _resolve_scope(request, db)
+    if isinstance(user, RedirectResponse):
+        return user
+    if not barangay:
+        return RedirectResponse(
+            url="/bdrrmo/incident-reports?error=No+barangay+is+assigned+to+your+account",
+            status_code=302,
+        )
+
+    # An incident outside the user's barangay is not selectable, and is
+    # rejected here too — the dropdown is presentation, this is the guard.
+    incident = _own_incident(db, barangay, incident_id)
+    if not incident:
+        return templates.TemplateResponse(
+            request=request,
+            name="bdrrmo/incident_report_form.html",
+            context={
+                "user": user,
+                "active_nav": "bdrrmo_incident_reports",
+                "barangay": barangay,
+                "edit_mode": False,
+                "target": None,
+                "incidents": [(i.id, _incident_label(i))
+                              for i in _own_incident_options(db, barangay)],
+                "error": "Please select an incident recorded in your barangay.",
+            },
+        )
+
+    submitting = (action == "submit")
+    r = IncidentReport(
+        incident_id=incident.id,
+        submitted_by=user["id"],
+        operations_summary=operations_summary.strip() or None,
+        actions_taken=actions_taken.strip() or None,
+        equipment_used=equipment_used.strip() or None,
+        personnel_count=max(0, personnel_count or 0),
+        personnel_notes=personnel_notes.strip() or None,
+        challenges_encountered=challenges_encountered.strip() or None,
+        recommendations=recommendations.strip() or None,
+        report_status=ServiceabilityStatus.submitted if submitting else ServiceabilityStatus.draft,
+        submitted_at=datetime.utcnow() if submitting else None,
+    )
+    db.add(r)
+    db.commit()
+    db.refresh(r)
+
+    log_action(
+        db, user["id"], "submitted" if submitting else "created",
+        "incident_reports", r.id,
+        f"BDRRMO post-incident report for {_incident_label(incident)} in "
+        f"{barangay.name} {'submitted' if submitting else 'saved as draft'}",
+    )
+
+    msg = "Report+submitted" if submitting else "Draft+saved"
+    return RedirectResponse(url=f"/bdrrmo/incident-reports?success={msg}", status_code=302)
+
+
+# ── Upload path ───────────────────────────────────────────────────────
+# Same Bronze storage + extraction + AI summary + UploadedReport lifecycle
+# as every other upload in the app; converts into the SAME IncidentReport
+# model as the manual path above. Declared BEFORE /incident-reports/{id}
+# so the literal "upload" segment matches first.
+
+def _get_owned_report_upload(db, report_id, user):
+    """A post-incident upload the current user may act on (own only)."""
+    r = db.query(UploadedReport).filter(UploadedReport.id == report_id).first()
+    if not r or (r.extracted_data or {}).get("report_kind") != UPLOAD_KIND_POST_INCIDENT:
+        return None
+    if r.uploaded_by != user["id"]:
+        return None
+    return r
+
+
+@router.get("/incident-reports/upload", response_class=HTMLResponse)
+def incident_report_upload_form(request: Request, db: Session = Depends(get_db)):
+    user, barangay = _resolve_scope(request, db)
+    if isinstance(user, RedirectResponse):
+        return user
+    if not barangay:
+        return RedirectResponse(
+            url="/bdrrmo/incident-reports?error=No+barangay+is+assigned+to+your+account",
+            status_code=302,
+        )
+    return templates.TemplateResponse(
+        request=request,
+        name="bdrrmo/incident_report_upload_form.html",
+        context={
+            "user": user,
+            "active_nav": "bdrrmo_incident_reports",
+            "barangay": barangay,
+            "error": request.query_params.get("error"),
+            "ai_available": ai_available(),
+        },
+    )
+
+
+@router.post("/incident-reports/upload")
+async def incident_report_upload_submit(
+    request: Request,
+    db: Session = Depends(get_db),
+    file: UploadFile = File(...),
+):
+    user, barangay = _resolve_scope(request, db)
+    if isinstance(user, RedirectResponse):
+        return user
+    if not barangay:
+        return RedirectResponse(
+            url="/bdrrmo/incident-reports?error=No+barangay+is+assigned+to+your+account",
+            status_code=302,
+        )
+
+    original_name = file.filename or "report"
+    ext = _ext_of(original_name)
+    if ext not in ALLOWED_EXTS:
+        return RedirectResponse(
+            url="/bdrrmo/incident-reports/upload?error=Unsupported+file+type.+Allowed:+PDF,+XLSX,+XLS,+CSV.",
+            status_code=302,
+        )
+
+    os.makedirs(UPLOAD_SUBDIR, exist_ok=True)
+    stored_name = _safe_filename(original_name)
+    stored_path = os.path.join(UPLOAD_SUBDIR, stored_name)
+
+    ok, err = await save_validated_upload(file, ext, stored_path)
+    if not ok:
+        return RedirectResponse(
+            url="/bdrrmo/incident-reports/upload?error=" + quote_plus(err),
+            status_code=302,
+        )
+
+    file_type_enum = ALLOWED_EXTS[ext]
+    report = UploadedReport(
+        uploaded_by=user["id"],
+        file_name=original_name,
+        file_path=stored_path.replace("\\", "/"),
+        file_type=file_type_enum,
+        status=ReportStatus.processing,
+        lifecycle_status=LifecycleStatus.draft,
+        barangay_id=barangay.id,
+    )
+    db.add(report)
+    db.commit()
+    db.refresh(report)
+
+    add_upload_history(
+        db, report_id=report.id, user_id=user["id"],
+        event_type=UploadEvent.created,
+        new_value=f"BDRRMO uploaded post-incident document '{original_name}' "
+                  f"({file_type_enum.value.upper()}) for {barangay.name}",
+    )
+    db.commit()
+
+    # ── Silver: extract raw text/rows + pre-fill the report form ──────
+    # `report_fields` are the operational fields of IncidentReport; the
+    # incident triple is only used to pre-select an existing incident in
+    # the user's own barangay (uploads here never create incidents — that
+    # is what /bdrrmo/incidents/upload is for).
+    extracted = {
+        "report_kind": UPLOAD_KIND_POST_INCIDENT,
+        "raw_text": "", "rows": [], "columns": [], "error": None,
+        "report_fields": empty_incident_report_fields(),
+        "matched_incident_id": None,
+    }
+    core = {"disaster_type": "", "date_occurred": ""}
+    try:
+        if file_type_enum == FileType.pdf:
+            out = extract_pdf(stored_path)
+            extracted["raw_text"] = out.get("text", "")
+            known_barangays = [b.name for b in db.query(Barangay).all()]
+            core_row = structure_text(extracted["raw_text"], known_barangays)
+            core = {k: core_row.get(k, "") for k in core}
+            extracted["report_fields"] = structure_incident_report_text(
+                extracted["raw_text"]
+            )
+        elif file_type_enum in (FileType.excel, FileType.csv):
+            out = extract_excel(stored_path) if file_type_enum == FileType.excel \
+                else extract_csv(stored_path)
+            extracted["columns"] = out["columns"]
+            extracted["rows"] = out["rows"]
+            extracted["report_fields"] = structure_incident_report_rows(out["rows"])
+            core_rows = structure_rows(out["rows"])
+            if core_rows:
+                core = {k: core_rows[0].get(k, "") for k in core}
+        report.status = ReportStatus.reviewed
+    except Exception as e:
+        print(f"[bdrrmo] Extraction failed for report '{original_name}': {e}")
+        extracted["error"] = "Extraction failed. The file could not be read or was malformed."
+        report.status = ReportStatus.failed
+
+    # Optional AI summary — never blocks the flow.
+    ai_text = None
+    if extracted.get("raw_text"):
+        ai_text = ai_summarize(extracted["raw_text"])
+    elif extracted.get("rows"):
+        preview = "\n".join(
+            ", ".join(f"{k}={v}" for k, v in row.items())
+            for row in extracted["rows"][:25]
+        )
+        ai_text = ai_summarize(preview) if preview else None
+    if ai_text:
+        report.ai_summary = ai_text
+
+    # Keep a narrative upload from arriving completely blank.
+    if not extracted["report_fields"].get("operations_summary"):
+        if ai_text:
+            extracted["report_fields"]["operations_summary"] = ai_text
+        elif extracted.get("raw_text"):
+            extracted["report_fields"]["operations_summary"] = \
+                extracted["raw_text"].strip()[:2000]
+
+    # Strict incident match inside the LOCKED barangay — the document's own
+    # barangay is ignored, exactly as on the incident-upload path.
+    matched = find_matching_incident(
+        db, barangay.name, core.get("disaster_type"), core.get("date_occurred")
+    )
+    extracted["matched_incident_id"] = matched.id if matched else None
+
+    report.extracted_data = extracted
+    db.commit()
+
+    note = (f"Extraction failed: {extracted['error']}" if extracted.get("error")
+            else "Extraction completed — file ready as reference for the report form.")
+    add_upload_history(
+        db, report_id=report.id, user_id=user["id"],
+        event_type=UploadEvent.extracted, new_value=note,
+    )
+    db.commit()
+
+    return RedirectResponse(
+        url=f"/bdrrmo/incident-reports/upload/{report.id}/review", status_code=302
+    )
+
+
+@router.get("/incident-reports/upload/{report_id}/review", response_class=HTMLResponse)
+def incident_report_upload_review(
+    report_id: int, request: Request, db: Session = Depends(get_db)
+):
+    user, barangay = _resolve_scope(request, db)
+    if isinstance(user, RedirectResponse):
+        return user
+    report = _get_owned_report_upload(db, report_id, user)
+    if not report:
+        return RedirectResponse(url="/bdrrmo/incident-reports", status_code=302)
+
+    data = report.extracted_data or {}
+    produced_id = data.get("produced_incident_report_id")
+    # Already converted — send the user to the produced report.
+    if produced_id:
+        return RedirectResponse(
+            url=f"/bdrrmo/incident-reports/{produced_id}", status_code=302
+        )
+
+    # Only pre-select the matched incident if it still exists and is still
+    # in this user's barangay.
+    matched_id = data.get("matched_incident_id")
+    matched_incident = _own_incident(db, barangay, matched_id) if matched_id else None
+
+    return templates.TemplateResponse(
+        request=request,
+        name="bdrrmo/incident_report_upload_review.html",
+        context={
+            "user": user,
+            "active_nav": "bdrrmo_incident_reports",
+            "barangay": barangay,
+            "report": report,
+            "incidents": [(i.id, _incident_label(i))
+                          for i in _own_incident_options(db, barangay)],
+            "ai_summary": report.ai_summary,
+            "ai_available": ai_available(),
+            "raw_text_preview": (data.get("raw_text") or "")[:4000],
+            "rows_preview": (data.get("rows") or [])[:10],
+            "columns_preview": data.get("columns") or [],
+            "extraction_error": data.get("error"),
+            "error": request.query_params.get("error"),
+            "prefill": data.get("report_fields") or empty_incident_report_fields(),
+            "selected_incident_id": matched_incident.id if matched_incident else None,
+        },
+    )
+
+
+@router.get("/incident-reports/upload/{report_id}/file")
+def incident_report_upload_file(
+    report_id: int, request: Request, db: Session = Depends(get_db)
+):
+    user, _ = _resolve_scope(request, db)
+    if isinstance(user, RedirectResponse):
+        return user
+    report = _get_owned_report_upload(db, report_id, user)
+    if not report or not report.file_path or not os.path.exists(report.file_path):
+        return RedirectResponse(url="/bdrrmo/incident-reports", status_code=302)
+    return FileResponse(report.file_path, filename=report.file_name)
+
+
+@router.post("/incident-reports/upload/{report_id}/submit")
+def incident_report_upload_convert(
+    report_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    incident_id: int = Form(...),
+    operations_summary: str = Form(""),
+    actions_taken: str = Form(""),
+    equipment_used: str = Form(""),
+    # Blank means "not reported" — kept NULL rather than a misleading 0.
+    personnel_count: Optional[str] = Form(None),
+    personnel_notes: str = Form(""),
+    challenges_encountered: str = Form(""),
+    recommendations: str = Form(""),
+    action: str = Form("draft"),
+):
+    user, barangay = _resolve_scope(request, db)
+    if isinstance(user, RedirectResponse):
+        return user
+    if not barangay:
+        return RedirectResponse(
+            url="/bdrrmo/incident-reports?error=No+barangay+is+assigned+to+your+account",
+            status_code=302,
+        )
+    report = _get_owned_report_upload(db, report_id, user)
+    if not report:
+        return RedirectResponse(url="/bdrrmo/incident-reports", status_code=302)
+
+    data = dict(report.extracted_data or {})
+    if data.get("produced_incident_report_id"):
+        # Idempotency guard — already converted.
+        return RedirectResponse(
+            url=f"/bdrrmo/incident-reports/{data['produced_incident_report_id']}",
+            status_code=302,
+        )
+
+    incident = _own_incident(db, barangay, incident_id)
+    if not incident:
+        return RedirectResponse(
+            url=f"/bdrrmo/incident-reports/upload/{report.id}/review?error="
+                + quote_plus("Please select an incident recorded in your barangay."),
+            status_code=302,
+        )
+
+    _pc = (personnel_count or "").strip()
+    personnel_value = max(0, int(_pc)) if _pc.isdigit() else None
+
+    submitting = (action == "submit")
+    # Same model + fields as the manual path — both converge here.
+    r = IncidentReport(
+        incident_id=incident.id,
+        submitted_by=user["id"],
+        operations_summary=operations_summary.strip() or None,
+        actions_taken=actions_taken.strip() or None,
+        equipment_used=equipment_used.strip() or None,
+        personnel_count=personnel_value,
+        personnel_notes=personnel_notes.strip() or None,
+        challenges_encountered=challenges_encountered.strip() or None,
+        recommendations=recommendations.strip() or None,
+        report_status=ServiceabilityStatus.submitted if submitting else ServiceabilityStatus.draft,
+        submitted_at=datetime.utcnow() if submitting else None,
+    )
+    db.add(r)
+    db.commit()
+    db.refresh(r)
+
+    # Link the produced report back to the upload (JSON — same linkage the
+    # admin review list reads) and close the upload lifecycle as converted.
+    data["produced_incident_report_id"] = r.id
+    data["linked_incident_id"] = incident.id
+    report.extracted_data = data
+    report.incident_id = incident.id
+    report.lifecycle_status = LifecycleStatus.confirmed
+    report.status = ReportStatus.confirmed
+    db.commit()
+
+    add_upload_history(
+        db, report_id=report.id, user_id=user["id"],
+        event_type=UploadEvent.confirmed,
+        new_value=f"Converted to post-incident report #{r.id} "
+                  f"({'submitted' if submitting else 'draft'}) — "
+                  f"linked to incident #{incident.id}.",
+    )
+    db.commit()
+
+    log_action(
+        db, user["id"], "converted", "uploaded_reports", report.id,
+        f"BDRRMO converted upload '{report.file_name}' to post-incident report #{r.id}",
+    )
+    log_action(
+        db, user["id"], "submitted" if submitting else "created",
+        "incident_reports", r.id,
+        f"BDRRMO post-incident report for {_incident_label(incident)} in "
+        f"{barangay.name} {'submitted' if submitting else 'saved as draft'} "
+        f"(from upload #{report.id})",
+    )
+
+    msg = "Report+submitted+from+upload" if submitting else "Draft+saved+from+upload"
+    return RedirectResponse(url=f"/bdrrmo/incident-reports?success={msg}", status_code=302)
+
+
+def _find_source_upload(db, incident_report_id):
+    """Reverse-lookup the upload that produced this report via the existing
+    JSON linkage (no schema change). Scans only post-incident uploads."""
+    for up in db.query(UploadedReport).filter(
+        UploadedReport.extracted_data.isnot(None)
+    ).all():
+        data = up.extracted_data or {}
+        if (data.get("report_kind") == UPLOAD_KIND_POST_INCIDENT
+                and data.get("produced_incident_report_id") == incident_report_id):
+            return up
+    return None
+
+
+@router.get("/incident-reports/{report_id}", response_class=HTMLResponse)
+def incident_report_detail(report_id: int, request: Request, db: Session = Depends(get_db)):
+    user, barangay = _resolve_scope(request, db)
+    if isinstance(user, RedirectResponse):
+        return user
+    r = _own_incident_report(db, report_id, user)
+    if not r:
+        return RedirectResponse(url="/bdrrmo/incident-reports", status_code=302)
+
+    inc = r.incident
+    return templates.TemplateResponse(
+        request=request,
+        name="bdrrmo/incident_report_detail.html",
+        context={
+            "user": user,
+            "active_nav": "bdrrmo_incident_reports",
+            "barangay": barangay,
+            "r": r,
+            "incident": inc,
+            "disaster_type": (inc.disaster_type.value.replace("_", " ").title()
+                              if inc and inc.disaster_type else "—"),
+            "workflow_label": REPORT_WORKFLOW_LABELS.get(
+                r.report_status.value if r.report_status else "draft", "Draft"
+            ),
+            "can_edit": r.report_status == ServiceabilityStatus.draft,
+            "source_upload": _find_source_upload(db, r.id),
+        },
+    )
+
+
+@router.get("/incident-reports/{report_id}/edit", response_class=HTMLResponse)
+def incident_report_edit_form(report_id: int, request: Request, db: Session = Depends(get_db)):
+    user, barangay = _resolve_scope(request, db)
+    if isinstance(user, RedirectResponse):
+        return user
+    r = _own_incident_report(db, report_id, user)
+    if not r:
+        return RedirectResponse(url="/bdrrmo/incident-reports", status_code=302)
+    if r.report_status != ServiceabilityStatus.draft:
+        return RedirectResponse(
+            url=f"/bdrrmo/incident-reports/{report_id}?error=Only+drafts+can+be+edited",
+            status_code=302,
+        )
+    return templates.TemplateResponse(
+        request=request,
+        name="bdrrmo/incident_report_form.html",
+        context={
+            "user": user,
+            "active_nav": "bdrrmo_incident_reports",
+            "barangay": barangay,
+            "edit_mode": True,
+            "target": r,
+            "incidents": [(i.id, _incident_label(i))
+                          for i in _own_incident_options(db, barangay)],
+            "error": None,
+        },
+    )
+
+
+@router.post("/incident-reports/{report_id}/edit")
+def incident_report_edit(
+    report_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    incident_id: int = Form(...),
+    operations_summary: str = Form(""),
+    actions_taken: str = Form(""),
+    equipment_used: str = Form(""),
+    personnel_count: int = Form(0),
+    personnel_notes: str = Form(""),
+    challenges_encountered: str = Form(""),
+    recommendations: str = Form(""),
+    action: str = Form("draft"),
+):
+    user, barangay = _resolve_scope(request, db)
+    if isinstance(user, RedirectResponse):
+        return user
+    r = _own_incident_report(db, report_id, user)
+    if not r:
+        return RedirectResponse(url="/bdrrmo/incident-reports", status_code=302)
+    if r.report_status != ServiceabilityStatus.draft:
+        return RedirectResponse(
+            url=f"/bdrrmo/incident-reports/{report_id}?error=Only+drafts+can+be+edited",
+            status_code=302,
+        )
+
+    # Re-pointing the report is only allowed within the user's own barangay.
+    incident = _own_incident(db, barangay, incident_id)
+    if incident:
+        r.incident_id = incident.id
+    r.operations_summary = operations_summary.strip() or None
+    r.actions_taken = actions_taken.strip() or None
+    r.equipment_used = equipment_used.strip() or None
+    r.personnel_count = max(0, personnel_count or 0)
+    r.personnel_notes = personnel_notes.strip() or None
+    r.challenges_encountered = challenges_encountered.strip() or None
+    r.recommendations = recommendations.strip() or None
+
+    submitting = (action == "submit")
+    if submitting:
+        r.report_status = ServiceabilityStatus.submitted
+        r.submitted_at = datetime.utcnow()
+
+    db.commit()
+
+    log_action(
+        db, user["id"], "submitted" if submitting else "edited",
+        "incident_reports", r.id,
+        f"BDRRMO post-incident report #{r.id} "
+        f"{'submitted' if submitting else 'draft edited'}",
+    )
+
+    msg = "Report+submitted" if submitting else "Draft+updated"
+    return RedirectResponse(url=f"/bdrrmo/incident-reports?success={msg}", status_code=302)
+
+
+@router.post("/incident-reports/{report_id}/submit")
+def incident_report_submit(report_id: int, request: Request, db: Session = Depends(get_db)):
+    user, _ = _resolve_scope(request, db)
+    if isinstance(user, RedirectResponse):
+        return user
+    r = _own_incident_report(db, report_id, user)
+    if not r:
+        return RedirectResponse(url="/bdrrmo/incident-reports", status_code=302)
+    if r.report_status != ServiceabilityStatus.draft:
+        return RedirectResponse(
+            url="/bdrrmo/incident-reports?error=Only+drafts+can+be+submitted",
+            status_code=302,
+        )
+
+    r.report_status = ServiceabilityStatus.submitted
+    r.submitted_at = datetime.utcnow()
+    db.commit()
+
+    log_action(
+        db, user["id"], "submitted", "incident_reports", r.id,
+        f"BDRRMO post-incident report #{r.id} submitted",
+    )
+    return RedirectResponse(
+        url="/bdrrmo/incident-reports?success=Report+submitted", status_code=302
+    )
+
+
+# ══════════════════════════════════════════════════════════════════════
 # CRITICAL FACILITIES (barangay-scoped, add / update / manage)
 # ══════════════════════════════════════════════════════════════════════
 
 
-def _facility_map_json(f: Facility) -> dict:
+def _facility_map_json(f: Facility, own_barangay_id: int) -> dict:
     """Shape one Facility for the Leaflet popup on the BDRRMO map — the
     same field set admin/map.html's /admin/api/facilities-map-data exposes,
-    minus the barangay name (redundant here — the whole map is one
-    barangay) and the admin-only city-level/approximate-location badges."""
+    minus the admin-only city-level/approximate-location badges.
+
+    `is_own` drives the read-only presentation of other barangays'
+    facilities in the citywide view (muted marker, no Edit action). It is
+    presentation only — the write routes enforce scoping via
+    _own_facility()."""
     return {
         "id": f.id,
         "name": f.name,
+        "barangay": f.barangay.name if f.barangay else None,
+        "is_own": f.barangay_id == own_barangay_id,
         "facility_type": f.facility_type.value if f.facility_type else None,
         "facility_type_label": (
             f.facility_type.value.replace("_", " ").title() if f.facility_type else None
@@ -806,25 +1517,42 @@ def facilities(request: Request, db: Session = Depends(get_db)):
     if isinstance(user, RedirectResponse):
         return user
 
-    show_archived = request.query_params.get("archived") == "1"
+    # Default view is the user's own barangay (TR-BDR-10 scoping for every
+    # write); ?scope=city widens the *read* to all of San Pedro, matching
+    # what the admin map shows. Archiving stays an own-barangay concern, so
+    # the archived tab is not available in the citywide view.
+    citywide = request.query_params.get("scope") == "city"
+    show_archived = not citywide and request.query_params.get("archived") == "1"
     rows = []
     archived_count = 0
     active_facilities = []
+    barangays = []
     if barangay:
         archived_count = db.query(Facility).filter(
             Facility.barangay_id == barangay.id,
             Facility.is_archived == True,
         ).count()
-        rows = db.query(Facility).filter(
-            Facility.barangay_id == barangay.id,
-            Facility.is_archived == show_archived,
-        ).order_by(Facility.facility_type, Facility.name).all()
-        # The map always shows active facilities, regardless of which tab
-        # (Active/Archived) the table below is on.
-        active_facilities = rows if not show_archived else db.query(Facility).filter(
-            Facility.barangay_id == barangay.id,
-            Facility.is_archived == False,
-        ).order_by(Facility.facility_type, Facility.name).all()
+        if citywide:
+            rows = (
+                db.query(Facility)
+                .join(Barangay, Facility.barangay_id == Barangay.id)
+                .filter(Facility.is_archived == False)
+                .order_by(Barangay.name, Facility.name)
+                .all()
+            )
+            active_facilities = rows
+            barangays = db.query(Barangay).order_by(Barangay.name).all()
+        else:
+            rows = db.query(Facility).filter(
+                Facility.barangay_id == barangay.id,
+                Facility.is_archived == show_archived,
+            ).order_by(Facility.facility_type, Facility.name).all()
+            # The map always shows active facilities, regardless of which tab
+            # (Active/Archived) the table below is on.
+            active_facilities = rows if not show_archived else db.query(Facility).filter(
+                Facility.barangay_id == barangay.id,
+                Facility.is_archived == False,
+            ).order_by(Facility.facility_type, Facility.name).all()
 
     summary = {
         "total": len(active_facilities),
@@ -847,7 +1575,12 @@ def facilities(request: Request, db: Session = Depends(get_db)):
             "active_nav": "bdrrmo_facilities",
             "barangay": barangay,
             "facilities": rows,
-            "map_facilities": [_facility_map_json(f) for f in active_facilities],
+            "map_facilities": [
+                _facility_map_json(f, barangay.id if barangay else None)
+                for f in active_facilities
+            ],
+            "citywide": citywide,
+            "barangays": barangays,
             "sp_bounds": get_san_pedro_bounds(),
             "sp_boundary": get_san_pedro_boundary(),
             "summary": summary,

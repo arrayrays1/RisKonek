@@ -893,3 +893,159 @@ body.facility-location-picking .map-area .leaflet-container {
 .popup-badge.approx { background: #fef3cd; color: #856404; }
 .popup-badge.city   { background: #e8f0fe; color: #1a4fb0; }
 .popup-actions { margin-top: 8px; display: flex; gap: 6px; }
+
+/* ── Simulation results page ───────────────────────────────────
+   Components for admin/_simulator_result.html. Neutral card surfaces with a
+   thin status accent (colour is never the only status indicator — a text pill
+   always accompanies it), generous section spacing, and tabular figures. */
+
+.rk-section { padding: 20px; }
+@media (max-width: 575.98px) { .rk-section { padding: 16px; } }
+
+/* Section heading level, matching the .card-title-row h6 scale it replaces */
+.rk-h-section {
+    font-size: 14px; font-weight: 600; color: var(--rk-text); margin: 0;
+}
+
+/* Lining/tabular figures so columns of numbers align */
+.rk-num { font-variant-numeric: tabular-nums; }
+
+/* Status accents — a left border only, so red never fills a whole block */
+.rk-accent-crit { border-left: 4px solid #dc2626; }
+.rk-accent-warn { border-left: 4px solid #f59e0b; }
+.rk-accent-ok   { border-left: 4px solid #047857; }
+
+/* Readiness hero: neutral surface, status shown by the accent + the band text */
+.rk-hero {
+    background: #f9fafb; border-radius: 10px;
+    padding: 16px 18px;
+}
+
+/* Compact readiness-dimension / concern / action cards */
+.rk-mini-card,
+.rk-concern-card,
+.rk-action-card,
+.rk-consequence {
+    background: #fff; border: 1px solid #eef0f2;
+    border-radius: 10px; padding: 12px 14px;
+}
+.rk-consequence + .rk-consequence { margin-top: 8px; }
+
+/* Key-figure cards: flat, minimal shadow, readable when stacked */
+.rk-figure { padding: 16px 18px; }
+
+/* Resource-coverage rows */
+.rk-coverage-row { padding: 10px 0; }
+.rk-coverage-row + .rk-coverage-row { border-top: 1px solid #f1f3f5; }
+
+/* Detailed calculations table — roomier rows, subtle status accent */
+.rk-detail-table > tbody > tr > th,
+.rk-detail-table > tbody > tr > td { padding-top: 10px; padding-bottom: 10px; }
+.rk-detail-table > tbody > tr > :first-child { border-left-width: 4px; border-left-style: solid; }
+.rk-detail-table > tbody > tr.rk-accent-crit { border-left: 0; }
+.rk-detail-table > tbody > tr.rk-accent-warn { border-left: 0; }
+.rk-detail-table > tbody > tr.rk-accent-ok   { border-left: 0; }
+.rk-detail-table > tbody > tr.rk-accent-crit > :first-child { border-left-color: #dc2626; }
+.rk-detail-table > tbody > tr.rk-accent-warn > :first-child { border-left-color: #f59e0b; }
+.rk-detail-table > tbody > tr.rk-accent-ok   > :first-child { border-left-color: #047857; }
+
+/* AI output panel — visibly separate from the verified calculations */
+.rk-ai-panel {
+    background: #f8fafc; border: 1px dashed #dde3ea;
+    border-radius: 10px; padding: 14px 16px;
+}
+
+/* Collapse chevrons rotate when open; suppressed under reduced-motion */
+[data-bs-toggle="collapse"] .bi-chevron-down { transition: transform 0.15s ease; }
+[data-bs-toggle="collapse"][aria-expanded="true"] .bi-chevron-down { transform: rotate(180deg); }
+@media (prefers-reduced-motion: reduce) {
+    [data-bs-toggle="collapse"] .bi-chevron-down { transition: none; }
+}
+
+/* Scenario context bar: three items that stack cleanly on small screens */
+@media (max-width: 767.98px) {
+    .rk-scenario-bar > [class^="col-"] + [class^="col-"] {
+        border-top: 1px solid #f1f3f5; padding-top: 10px;
+    }
+}
+
+/* Collapse trigger labels — Bootstrap keeps `.collapsed` on a closed trigger,
+   so the label swaps with CSS alone (no JS, no inline handler). */
+[data-bs-toggle="collapse"] .rk-when-collapsed { display: none; }
+[data-bs-toggle="collapse"].collapsed .rk-when-collapsed { display: inline; }
+[data-bs-toggle="collapse"].collapsed .rk-when-open { display: none; }
+
+/* Top-of-page assumptions disclaimer — same amber language as .alert-banner,
+   but a block (heading + list) rather than a single-line strip. */
+.rk-disclaimer {
+    background: #fff8e1; border: 1px solid #ffe0a3;
+    border-left: 4px solid #ffc107; border-radius: 10px;
+    padding: 14px 18px; color: #856404;
+}
+.rk-disclaimer-title { color: #7a5b00; margin-bottom: 8px; }
+.rk-disclaimer ul { padding-left: 20px; }
+.rk-disclaimer strong { color: #6b4e00; }
+
+/* ── Readiness hero (status-tinted) ────────────────────────────
+   Light status tints so the situation reads at a glance. Kept pale (not a
+   saturated fill) and always paired with the status word + an icon, so colour
+   is never the only indicator and the page still has one focal point. */
+.rk-hero-crit { background: #fef2f2; border: 1px solid #fbd5d5; border-left: 4px solid #dc2626; }
+.rk-hero-warn { background: #fffbeb; border: 1px solid #fde9b6; border-left: 4px solid #f59e0b; }
+.rk-hero-ok   { background: #f0fdf4; border: 1px solid #c9ecd7; border-left: 4px solid #047857; }
+
+.rk-hero-crit .rk-hero-icon { background: #fde2e2; color: #b91c1c; }
+.rk-hero-warn .rk-hero-icon { background: #fdf0cf; color: #b45309; }
+.rk-hero-ok   .rk-hero-icon { background: #d1fae5; color: #047857; }
+.rk-hero-icon {
+    width: 42px; height: 42px; border-radius: 12px; flex: 0 0 auto;
+    display: flex; align-items: center; justify-content: center; font-size: 20px;
+}
+
+/* Band wording — darker than the Bootstrap text-* utilities for contrast on
+   the tinted surface (text-warning on cream fails AA). */
+.rk-band-crit { color: #b91c1c; }
+.rk-band-warn { color: #b45309; }
+.rk-band-ok   { color: #047857; }
+.rk-hero-label { letter-spacing: 0.02em; }
+.rk-hero-note  { color: #6b7280; }
+.rk-hero-crit .rk-hero-note { color: #8a5a5a; }
+.rk-hero-warn .rk-hero-note { color: #8a7448; }
+.rk-hero-ok   .rk-hero-note { color: #5b7a68; }
+
+/* ── Key-figure cards ──────────────────────────────────────────
+   Label and category icon share the top row; a thin proportion bar (or a dot
+   per resource class) makes the scale readable without arithmetic. */
+.rk-figure-head {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 8px; margin-bottom: 6px;
+}
+.rk-figure-head .stat-label { font-size: 12px; color: var(--rk-muted); }
+/* .stat-icon's box is scoped to .stat-card upstream, so restate it here. */
+.rk-figure-head .stat-icon {
+    width: 32px; height: 32px; border-radius: 10px; flex: 0 0 auto;
+    display: flex; align-items: center; justify-content: center; font-size: 14px;
+}
+.rk-figure-dots { display: flex; gap: 5px; flex-wrap: wrap; }
+.rk-dot { width: 100%; max-width: 26px; height: 6px; border-radius: 3px; flex: 1 1 auto; }
+
+/* ── Section tints (What Needs Attention / Suggested Planning Actions) ──
+   The two sections planners act on are tinted so they're findable while
+   scrolling. Pale surfaces only: the cards inside stay white, so their own
+   status accents and text keep full contrast. */
+.rk-section-warn {
+    background: #fffbeb; border: 1px solid #fde9b6; border-left: 4px solid #f59e0b;
+}
+.rk-section-ok {
+    background: #f2fbf5; border: 1px solid #cdeddb; border-left: 4px solid #047857;
+}
+.rk-section-warn .rk-h-section { color: #92620b; }
+.rk-section-ok   .rk-h-section { color: #046c4e; }
+
+/* Detailed-calculations rows tinted by status. Bootstrap 5.3 cells paint
+   var(--bs-table-bg), so setting it on the row is what actually tints the
+   cells. Pale tints only — the left accent and the status pill stay the
+   primary signals, and the text keeps AA contrast. */
+.rk-detail-table > tbody > tr.rk-accent-crit { --bs-table-bg: #fef2f2; }
+.rk-detail-table > tbody > tr.rk-accent-warn { --bs-table-bg: #fffbeb; }
+.rk-detail-table > tbody > tr.rk-accent-ok   { --bs-table-bg: #f2fbf5; }

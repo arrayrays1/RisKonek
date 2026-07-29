@@ -45,6 +45,22 @@
     </div>
 </div>
 
+<!-- ── Movement details (logistics stock / equipment status changes) ── -->
+{% if log.reason or log.deployed_to or log.occurred_at %}
+<div class="dash-card mb-3">
+    <div class="card-title-row">
+        <i class="bi bi-clipboard-check"></i>
+        <h6>Movement Details</h6>
+    </div>
+    <div class="kv d-flex flex-column gap-2">
+        <div><span class="k">Reason</span><span class="v">{{ log.reason or '—' }}</span></div>
+        <div><span class="k">Deployed to / Location</span><span class="v">{{ log.deployed_to or '—' }}</span></div>
+        <div><span class="k">Actually occurred</span>
+            <span class="v">{{ log.occurred_at | pht if log.occurred_at else '—' }}</span></div>
+    </div>
+</div>
+{% endif %}
+
 <!-- ── Related entity links ───────────────────────────────────────── -->
 {% if related_upload %}
 <div class="dash-card mb-3">

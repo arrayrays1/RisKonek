@@ -4,14 +4,327 @@
 
 {% set active_nav = 'cfau_dashboard' %}
 
+{% block head_extra %}
+<style nonce="{{ request.state.csp_nonce }}">
+    .alert-banner {
+        background: #fff8e1; border-left: 4px solid #ffc107;
+        border-radius: 6px; padding: 10px 14px;
+        font-size: 13px; color: #856404; margin-bottom: 16px;
+        display: flex; align-items: center; gap: 8px;
+    }
+    .attn-item {
+        display: flex; align-items: center; gap: 12px;
+        padding: 10px 0; border-bottom: 1px solid #f0f0f0;
+    }
+    .attn-item:last-child { border-bottom: none; }
+    .attn-name { font-size: 14px; font-weight: 600; color: var(--rk-text); }
+    .attn-sub { font-size: 11px; color: var(--rk-muted); }
+
+    /* A doughnut keeps a 1:1 aspect ratio and would otherwise grow to the
+       full column width — the wrapper caps its drawing area instead. */
+    .chart-donut { position: relative; height: 190px; }
+
+    .fleet-row {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 8px 0; border-bottom: 1px solid #f0f0f0;
+    }
+    .fleet-row:last-child { border-bottom: none; }
+    .fleet-count { font-size: 15px; font-weight: 700; color: var(--rk-text); }
+
+    .feed-item {
+        display: flex; gap: 12px; align-items: flex-start;
+        padding: 10px 0; border-bottom: 1px solid #f0f0f0;
+    }
+    .feed-item:last-child { border-bottom: none; }
+    .feed-icon {
+        width: 34px; height: 34px; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 14px; flex-shrink: 0;
+    }
+    .feed-text { font-size: 13px; color: var(--rk-text); }
+    .feed-time { font-size: 11px; color: #aaa; margin-top: 2px; }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="page-header">
-    <h1>CFAU / Operations Dashboard</h1>
-    <p>Welcome, {{ user.username }}. Manage equipment serviceability and post-incident operational reporting here.</p>
+<div class="d-flex justify-content-between align-items-start page-header">
+    <div>
+        <h1>CFAU / Operations Dashboard</h1>
+        <p>Your reporting workload, scheduled repairs, and the shared equipment fleet.</p>
+    </div>
+    <div class="last-updated">
+        Last updated<br>
+        <strong id="currentDateTime"></strong>
+    </div>
 </div>
 
-<div class="row g-3 mb-3">
-    <!-- ── Serviceability Reports module ──────────────────────────── -->
+{% if action_total > 0 %}
+<div class="alert-banner">
+    <i class="bi bi-exclamation-triangle-fill rk-fs-16"></i>
+    <span>
+        <strong>{{ action_total }} report{{ 's' if action_total != 1 else '' }} need{{ '' if action_total != 1 else 's' }} your attention</strong>
+        — {{ svc_draft }} draft{{ 's' if svc_draft != 1 else '' }} to finish,
+        and urgent findings awaiting review.
+    </span>
+</div>
+{% endif %}
+
+<!-- ── STAT CARDS ─────────────────────────────────────────────── -->
+<div class="row g-3 mb-4">
+
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-start">
+                <div class="stat-label">My Serviceability Reports</div>
+                <div class="stat-icon rk-tint-green"><i class="bi bi-clipboard2-check"></i></div>
+            </div>
+            <div class="stat-value">{{ svc_total }}</div>
+            <div class="stat-change text-muted">{{ svc_resolved }} resolved to date</div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-start">
+                <div class="stat-label">Awaiting Admin Review</div>
+                <div class="stat-icon rk-tint-blue"><i class="bi bi-hourglass-split"></i></div>
+            </div>
+            <div class="stat-value">{{ svc_submitted }}</div>
+            <div class="stat-change text-muted">Submitted, not yet reviewed</div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-start">
+                <div class="stat-label">My Drafts</div>
+                <div class="stat-icon rk-tint-orange"><i class="bi bi-pencil-square"></i></div>
+            </div>
+            <div class="stat-value {{ 'rk-text-high' if svc_draft + inc_draft > 0 else 'rk-text-ok' }}">
+                {{ svc_draft + inc_draft }}
+            </div>
+            <div class="stat-change text-muted">
+                {{ svc_draft }} serviceability · {{ inc_draft }} post-incident
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-start">
+                <div class="stat-label">Units Out of Service</div>
+                <div class="stat-icon rk-tint-red"><i class="bi bi-tools"></i></div>
+            </div>
+            <div class="stat-value {{ 'rk-text-crit' if fleet.counts.unserviceable > 0 else 'rk-text-ok' }}">
+                {{ fleet.counts.under_repair + fleet.counts.unserviceable }}/{{ fleet.total }}
+            </div>
+            <div class="stat-change text-muted">
+                {{ fleet.counts.under_repair }} under repair · {{ fleet.counts.unserviceable }} unserviceable
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- ── ROW 2: Action needed + Fleet status ────────────────────── -->
+<div class="row g-3 mb-4">
+
+    <div class="col-md-7">
+        <div class="dash-card">
+            <div class="card-title-row">
+                <i class="bi bi-list-check text-danger"></i>
+                <h6>Needs Your Attention</h6>
+                <a href="/cfau/serviceability" class="ms-auto rk-fs-12 rk-text-green text-decoration-none">
+                    All Reports <i class="bi bi-arrow-right"></i>
+                </a>
+            </div>
+
+            {% if action_items %}
+                {% for r in action_items %}
+                <div class="attn-item">
+                    <div class="flex-grow-1">
+                        <div class="attn-name">{{ r.title }}</div>
+                        <div class="attn-sub">{{ r.equipment }} · {{ r.reason }}</div>
+                    </div>
+                    {% if r.urgency == 'critical' %}
+                        <span class="status-pill status-unavailable">Critical</span>
+                    {% elif r.urgency == 'high' %}
+                        <span class="status-pill status-maintenance">High</span>
+                    {% else %}
+                        <span class="badge bg-light text-dark border">{{ r.urgency.title() }}</span>
+                    {% endif %}
+                    <a href="{{ '/cfau/serviceability/' ~ r.id ~ '/edit' if r.is_draft else '/cfau/serviceability/' ~ r.id }}"
+                       class="rk-fs-12 rk-text-green text-decoration-none rk-nowrap">
+                        {{ 'Continue' if r.is_draft else 'View' }} <i class="bi bi-arrow-right"></i>
+                    </a>
+                </div>
+                {% endfor %}
+
+                {% if action_total > action_items | length %}
+                <a href="/cfau/serviceability?status=draft"
+                   class="btn-soft w-100 justify-content-center mt-3 rk-text-green">
+                    View all {{ action_total }} items <i class="bi bi-arrow-right"></i>
+                </a>
+                {% endif %}
+            {% else %}
+                <div class="text-center text-muted py-4 rk-fs-13">
+                    <i class="bi bi-check-circle rk-text-ok"></i>
+                    Nothing pending — no drafts and no urgent findings awaiting review.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="col-md-5">
+        <div class="dash-card">
+            <div class="card-title-row">
+                <i class="bi bi-wrench-adjustable rk-text-green"></i>
+                <h6>Fleet Status</h6>
+                <a href="/admin/equipment" class="ms-auto rk-fs-12 rk-text-green text-decoration-none">
+                    Open <i class="bi bi-arrow-right"></i>
+                </a>
+            </div>
+
+            {% if fleet.total %}
+                <div class="chart-donut"><canvas id="fleetChart"></canvas></div>
+                <div class="mt-3">
+                    {% for value, count in fleet.counts.items() %}
+                    <div class="fleet-row">
+                        <a href="/admin/equipment?status={{ value }}" class="text-decoration-none">
+                            {% if value == 'available' %}
+                                <span class="status-pill status-operational">{{ fleet_labels[value] }}</span>
+                            {% elif value == 'deployed' %}
+                                <span class="badge bg-info text-dark">{{ fleet_labels[value] }}</span>
+                            {% elif value == 'under_repair' %}
+                                <span class="status-pill status-maintenance">{{ fleet_labels[value] }}</span>
+                            {% else %}
+                                <span class="status-pill status-unavailable">{{ fleet_labels[value] }}</span>
+                            {% endif %}
+                        </a>
+                        <span class="fleet-count">{{ count }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="text-center text-muted py-4 rk-fs-13">
+                    No equipment recorded yet.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+
+<!-- ── ROW 3: Repair schedule + Report workflow chart ─────────── -->
+<div class="row g-3 mb-4">
+
+    <div class="col-md-6">
+        <div class="dash-card">
+            <div class="card-title-row">
+                <i class="bi bi-calendar-check rk-text-info"></i>
+                <h6>Repair Schedule</h6>
+            </div>
+            <p class="text-muted rk-fs-11 mb-2">
+                Scheduled repairs on your reports whose unit is still out of service.
+                A reminder clears itself once the unit returns to service.
+            </p>
+
+            {% if repair_rows %}
+                {% for r in repair_rows %}
+                <div class="attn-item">
+                    <div class="flex-grow-1">
+                        <div class="attn-name">{{ r.equipment }}</div>
+                        <div class="attn-sub">
+                            {{ r.title }} · scheduled {{ r.scheduled.strftime('%b %d, %Y') }}
+                        </div>
+                    </div>
+                    {% if r.state == 'overdue' %}
+                        <span class="status-pill status-unavailable">Overdue</span>
+                    {% elif r.state == 'due_today' %}
+                        <span class="status-pill status-maintenance">Due Today</span>
+                    {% else %}
+                        <span class="badge bg-light text-dark border">Upcoming</span>
+                    {% endif %}
+                    <a href="/cfau/serviceability/{{ r.id }}"
+                       class="rk-fs-12 rk-text-green text-decoration-none rk-nowrap">
+                        View <i class="bi bi-arrow-right"></i>
+                    </a>
+                </div>
+                {% endfor %}
+
+                {% if repair_total > repair_rows | length %}
+                <div class="text-muted rk-fs-12 mt-2">
+                    Showing {{ repair_rows | length }} of {{ repair_total }} scheduled repairs.
+                </div>
+                {% endif %}
+            {% else %}
+                <div class="text-center text-muted py-4 rk-fs-13">
+                    No repairs scheduled on your reports.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="dash-card">
+            <div class="card-title-row">
+                <i class="bi bi-bar-chart-fill rk-text-info"></i>
+                <h6>My Reports by Workflow Stage</h6>
+            </div>
+            {% if svc_total %}
+                <canvas id="workflowChart" height="190"></canvas>
+            {% else %}
+                <div class="text-center text-muted py-4 rk-fs-13">
+                    You haven't filed any serviceability reports yet.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+
+<!-- ── ROW 4: Recent equipment activity ───────────────────────── -->
+<div class="dash-card mb-4">
+    <div class="card-title-row">
+        <i class="bi bi-clock-history text-warning"></i>
+        <h6>Recent Equipment Activity</h6>
+        <a href="/cfau/equipment-audit" class="ms-auto rk-fs-12 rk-text-green text-decoration-none">
+            Full Audit Log <i class="bi bi-arrow-right"></i>
+        </a>
+    </div>
+
+    {% if recent_activity %}
+        {% for it in recent_activity %}
+        {% set fa = it.action if it.action in ['created','updated','deleted'] else 'default' %}
+        <div class="feed-item">
+            <div class="feed-icon feed-{{ fa }}">
+                {% if it.action == 'created' %}<i class="bi bi-plus-circle-fill"></i>
+                {% elif it.action == 'updated' %}<i class="bi bi-pencil-fill"></i>
+                {% elif it.action == 'status_changed' %}<i class="bi bi-arrow-left-right"></i>
+                {% elif it.action == 'archived' %}<i class="bi bi-archive-fill"></i>
+                {% else %}<i class="bi bi-file-text-fill"></i>{% endif %}
+            </div>
+            <div class="flex-grow-1">
+                <div class="feed-text">
+                    <span class="fw-semibold">{{ it.unit_name }}</span> — {{ it.description }}
+                    {%- if it.deployed_to %} <span class="text-muted">(to {{ it.deployed_to }})</span>{% endif %}
+                </div>
+                <div class="feed-time">
+                    {{ it.action_label }} · {{ it.username }}
+                    · {{ it.timestamp | pht if it.timestamp else 'Just now' }}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="text-center text-muted py-4 rk-fs-13">
+            No equipment activity yet. Additions, edits, and status movements will appear here.
+        </div>
+    {% endif %}
+</div>
+
+<!-- ── ROW 5: Module quick links ──────────────────────────────── -->
+<div class="row g-3">
     <div class="col-md-6">
         <div class="dash-card h-100">
             <div class="card-title-row">
@@ -40,7 +353,6 @@
         </div>
     </div>
 
-    <!-- ── Post-Incident Reports module ───────────────────────────── -->
     <div class="col-md-6">
         <div class="dash-card h-100">
             <div class="card-title-row">
@@ -68,18 +380,86 @@
         </div>
     </div>
 </div>
+{% endblock %}
 
-<div class="dash-card">
-    <div class="card-title-row">
-        <i class="bi bi-wrench-adjustable rk-text-green rk-fs-18"></i>
-        <h6>Vehicle &amp; Equipment Monitoring</h6>
-    </div>
-    <p class="text-muted small mb-3">
-        You also share the live equipment monitoring module with CDRRMO Logistics Staff —
-        change unit status (Available, Deployed, Under Repair, Unserviceable) and view the fleet.
-    </p>
-    <a href="/admin/equipment" class="btn btn-outline-secondary">
-        <i class="bi bi-list-ul"></i> Open Equipment Monitoring
-    </a>
-</div>
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"
+        integrity="sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4" crossorigin="anonymous"></script>
+<script nonce="{{ request.state.csp_nonce }}">
+// ── Current date/time ─────────────────────────────────────────────
+(function () {
+    const now = new Date();
+    document.getElementById('currentDateTime').textContent =
+        now.toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })
+        + ' · ' + now.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' });
+})();
+
+// ── Fleet status doughnut ─────────────────────────────────────────
+// tojson HTML-escapes <, > and & so values can't break out of this block.
+// Order and colour are keyed by status name, never by position — tojson
+// serialises the dict with sorted keys.
+const fleetLabels = {{ fleet_labels | tojson }};
+const fleetData = {{ fleet.counts | tojson }};
+const fleetOrder = ['available', 'deployed', 'under_repair', 'unserviceable'];
+const fleetColors = {
+    available: '#047857', deployed: '#2980b9',
+    under_repair: '#b45309', unserviceable: '#dc2626'
+};
+const fleetKeys = fleetOrder.filter(k => k in fleetData);
+const fleetCanvas = document.getElementById('fleetChart');
+if (fleetCanvas) {
+    new Chart(fleetCanvas, {
+        type: 'doughnut',
+        data: {
+            labels: fleetKeys.map(k => fleetLabels[k] || k),
+            datasets: [{
+                data: fleetKeys.map(k => fleetData[k]),
+                backgroundColor: fleetKeys.map(k => fleetColors[k]),
+                borderWidth: 0,
+            }]
+        },
+        options: {
+            responsive: true,
+            // Fill the capped wrapper rather than forcing a square.
+            maintainAspectRatio: false,
+            cutout: '62%',
+            plugins: { legend: { display: false } }
+        }
+    });
+}
+
+// ── My reports by workflow stage ──────────────────────────────────
+// Lifecycle order, keyed by stage name — tojson sorts the dict's keys.
+const workflowLabels = {{ workflow_labels | tojson }};
+const workflowData = {{ svc_counts | tojson }};
+const workflowOrder = ['draft', 'submitted', 'reviewed', 'resolved'];
+const workflowColors = {
+    draft: '#b45309', submitted: '#2980b9',
+    reviewed: '#8e44ad', resolved: '#047857'
+};
+const workflowKeys = workflowOrder.filter(k => k in workflowData);
+const workflowCanvas = document.getElementById('workflowChart');
+if (workflowCanvas) {
+    new Chart(workflowCanvas, {
+        type: 'bar',
+        data: {
+            labels: workflowKeys.map(k => workflowLabels[k] || k),
+            datasets: [{
+                label: 'Reports',
+                data: workflowKeys.map(k => workflowData[k]),
+                backgroundColor: workflowKeys.map(k => workflowColors[k]),
+                borderRadius: 6,
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#f5f5f5' } },
+                x: { grid: { display: false } }
+            }
+        }
+    });
+}
+</script>
 {% endblock %}

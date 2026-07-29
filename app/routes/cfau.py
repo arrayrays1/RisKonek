@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Request, Depends, Form, UploadFile, File
-from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse, Response
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from app.database import get_db
@@ -10,15 +10,30 @@ from app.models import (
     DisasterType, log_action,
     UploadedReport, UploadHistory, ReportStatus, FileType,
     LifecycleStatus, UploadEvent, add_upload_history,
+    AuditLog, User,
 )
 from app.utils.pagination import (
     paginate, parse_per_page, parse_page, build_base_query,
 )
 from app.services.contact_directory import build_directory_context
 from typing import Optional
-from datetime import datetime, timezone, timedelta
+from datetime import date, datetime, timezone, timedelta
+import csv
+import io
 import os
 from urllib.parse import quote_plus
+
+# Audit-trail helpers + equipment vocabulary already built for the admin
+# side. The Vehicle & Equipment log is a scoped projection of the SAME
+# AuditLog rows, so it reuses these rather than restating them.
+# (admin.py does not import cfau.py — no circular import.)
+from app.routes.admin import (
+    _parse_audit_date, _audit_day_label, _audit_export_time, _pdf_safe,
+    EQUIPMENT_TYPE_LABELS, EQUIPMENT_STATUS_LABELS,
+    # Dashboard: the fleet snapshot and the repair-reminder rule are owned
+    # by the admin module — the dashboard reads them, never restates them.
+    equipment_status_breakdown, repair_reminder_state, _REPAIR_OPEN_STATUSES,
+)
 
 # Reuse the Week 6 ETL building blocks rather than rebuilding them.
 from app.routes.uploads import (
@@ -103,19 +118,88 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
     def _count(rows, status):
         return sum(1 for r in rows if r.report_status == status)
 
+    # ── Action needed ─────────────────────────────────────────────────
+    # Two things stall a report: a draft the reporter never submitted, and
+    # an urgent finding still sitting unreviewed. Drafts come first — they
+    # are the only ones this user can move on their own.
+    action_items = []
+    for r in my_serviceability:
+        if r.report_status == ServiceabilityStatus.draft:
+            reason = "Draft — not yet submitted"
+        elif (r.report_status == ServiceabilityStatus.submitted
+              and r.urgency in (Urgency.high, Urgency.critical)):
+            reason = f"{(r.urgency.value or '').title()} urgency — awaiting admin review"
+        else:
+            continue
+        action_items.append({
+            "id": r.id,
+            "title": r.title or "(untitled)",
+            "equipment": r.equipment.name if r.equipment else "—",
+            "urgency": r.urgency.value if r.urgency else "moderate",
+            "is_draft": r.report_status == ServiceabilityStatus.draft,
+            "reason": reason,
+            "reported_at": r.reported_at,
+        })
+    action_items.sort(key=lambda x: (not x["is_draft"], x["reported_at"] or datetime.min))
+
+    # ── Repair schedule ───────────────────────────────────────────────
+    # Scheduled repairs on this user's reports whose unit is still out of
+    # service. repair_reminder_state() owns the overdue / due-today rule;
+    # anything still ahead of today is listed as upcoming.
+    today = date.today()
+    repair_rows = []
+    for r in my_serviceability:
+        if not r.repair_scheduled_date or not r.equipment:
+            continue
+        state = repair_reminder_state(r, today)
+        if state is None:
+            unit_status = r.equipment.status.value if r.equipment.status else ""
+            if (r.repair_scheduled_date <= today
+                    or unit_status not in _REPAIR_OPEN_STATUSES):
+                continue
+            state = "upcoming"
+        repair_rows.append({
+            "id": r.id,
+            "title": r.title or "(untitled)",
+            "equipment": r.equipment.name,
+            "scheduled": r.repair_scheduled_date,
+            "state": state,
+        })
+    # Overdue first, then due today, then the nearest upcoming date.
+    _state_rank = {"overdue": 0, "due_today": 1, "upcoming": 2}
+    repair_rows.sort(key=lambda x: (_state_rank[x["state"]], x["scheduled"]))
+
+    # ── Shared fleet + recent equipment activity ──────────────────────
+    fleet = equipment_status_breakdown(db)
+    recent_activity = _equipment_audit_items(db, None, None, None, None, None)[:8]
+
+    svc_counts = {
+        s.value: _count(my_serviceability, s) for s in ServiceabilityStatus
+    }
+
     return templates.TemplateResponse(
         request=request,
         name="cfau/dashboard.html",
         context={
             "user": user,
+            "active_nav": "cfau_dashboard",
             "svc_total": len(my_serviceability),
-            "svc_draft": _count(my_serviceability, ServiceabilityStatus.draft),
-            "svc_submitted": _count(my_serviceability, ServiceabilityStatus.submitted),
-            "svc_reviewed": _count(my_serviceability, ServiceabilityStatus.reviewed),
-            "svc_resolved": _count(my_serviceability, ServiceabilityStatus.resolved),
+            "svc_draft": svc_counts["draft"],
+            "svc_submitted": svc_counts["submitted"],
+            "svc_reviewed": svc_counts["reviewed"],
+            "svc_resolved": svc_counts["resolved"],
+            "svc_counts": svc_counts,
             "inc_total": len(my_incident),
             "inc_draft": _count(my_incident, ServiceabilityStatus.draft),
             "inc_submitted": _count(my_incident, ServiceabilityStatus.submitted),
+            "action_items": action_items[:8],
+            "action_total": len(action_items),
+            "repair_rows": repair_rows[:6],
+            "repair_total": len(repair_rows),
+            "fleet": fleet,
+            "fleet_labels": EQUIPMENT_STATUS_LABELS,
+            "workflow_labels": WORKFLOW_LABELS,
+            "recent_activity": recent_activity,
         },
     )
 
@@ -1216,4 +1300,350 @@ def incident_report_submit(report_id: int, request: Request, db: Session = Depen
     )
     return RedirectResponse(
         url="/cfau/incident-reports?success=Report+submitted", status_code=302
+    )
+
+
+# ══════════════════════════════════════════════════════════════════════
+# MODULE D — VEHICLE & EQUIPMENT AUDIT LOG (read-only)
+#
+# A dedicated trail for the Vehicle & Equipment module: every change made
+# to a unit, attributed to the unit it concerns. This is a READ-ONLY
+# projection of AuditLog rows the equipment routes already write — no new
+# table, no new logging, no schema change.
+#
+# Two source tables feed it:
+#   * "equipment"         — created / updated / status_changed / archived /
+#                           restored, target_id = the unit's id
+#   * "equipment_reports" — serviceability reports, target_id = the report
+#                           id, so the unit is resolved via report→unit
+#
+# Movement accountability (reason / deployed_to / occurred_at) is already
+# captured on AuditLog by the status-change modal, so the log answers WHY
+# a unit changed state, WHERE it went, and WHEN it actually happened.
+# ══════════════════════════════════════════════════════════════════════
+
+EQUIPMENT_AUDIT_TABLES = ("equipment", "equipment_reports")
+
+# Friendly names for the raw audit verbs. Serviceability entries are
+# prefixed at render time so "created" reads as "Report Filed", never as
+# "a new unit was added".
+EQUIPMENT_ACTION_LABELS = {
+    "created": "Unit Added",
+    "updated": "Details Updated",
+    "status_changed": "Status Changed",
+    "archived": "Archived",
+    "restored": "Restored",
+}
+REPORT_ACTION_LABELS = {
+    "created": "Report Drafted",
+    "submitted": "Report Submitted",
+    "edited": "Report Edited",
+    "reviewed": "Report Reviewed",
+    "resolved": "Report Resolved",
+    "reopened": "Report Reopened",
+}
+
+
+def _equipment_action_label(action: str, target_table: str) -> str:
+    """Display label for an audit verb, disambiguated by source table."""
+    a = (action or "").lower()
+    if target_table == "equipment_reports":
+        return REPORT_ACTION_LABELS.get(a, a.replace("_", " ").title())
+    return EQUIPMENT_ACTION_LABELS.get(a, a.replace("_", " ").title())
+
+
+def _report_unit_map(db) -> dict:
+    """report id → equipment id, so serviceability entries can be
+    attributed to the unit they concern."""
+    return {
+        row.id: row.equipment_id
+        for row in db.query(EquipmentReport.id, EquipmentReport.equipment_id).all()
+    }
+
+
+def _equipment_audit_items(db, q, equipment_id, action, date_from, date_to):
+    """Vehicle & Equipment audit entries, newest-first, as view dicts.
+
+    Shared by the list view and the export endpoint so both see exactly the
+    same set. The unit filter is applied in Python because serviceability
+    rows only reveal their unit after the report→unit mapping.
+    """
+    query = (
+        db.query(AuditLog)
+        .outerjoin(User, AuditLog.user_id == User.id)
+        .filter(AuditLog.target_table.in_(EQUIPMENT_AUDIT_TABLES))
+    )
+
+    if action:
+        query = query.filter(AuditLog.action == action)
+    if q:
+        like = f"%{q.strip()}%"
+        query = query.filter(
+            (AuditLog.description.ilike(like))
+            | (AuditLog.reason.ilike(like))
+            | (AuditLog.deployed_to.ilike(like))
+            | (User.username.ilike(like))
+        )
+    df = _parse_audit_date(date_from)
+    if df:
+        query = query.filter(AuditLog.timestamp >= df)
+    dt_to = _parse_audit_date(date_to)
+    if dt_to:
+        query = query.filter(AuditLog.timestamp < dt_to + timedelta(days=1))
+
+    logs = query.order_by(AuditLog.timestamp.desc(), AuditLog.id.desc()).all()
+
+    units = {e.id: e for e in db.query(Equipment).all()}
+    report_unit = _report_unit_map(db)
+
+    items = []
+    for log in logs:
+        if log.target_table == "equipment":
+            unit_id = log.target_id
+        else:
+            unit_id = report_unit.get(log.target_id)
+
+        if equipment_id and unit_id != equipment_id:
+            continue
+
+        unit = units.get(unit_id) if unit_id else None
+        items.append({
+            "id": log.id,
+            "timestamp": log.timestamp,
+            "occurred_at": log.occurred_at,
+            "username": log.user.username if log.user else "—",
+            "action": log.action,
+            "action_label": _equipment_action_label(log.action, log.target_table),
+            "source": log.target_table,
+            "unit_id": unit_id,
+            # A deleted unit still leaves its history behind — label it
+            # rather than dropping the entry.
+            "unit_name": unit.name if unit else (
+                f"Unit #{unit_id}" if unit_id else "—"
+            ),
+            "unit_type": EQUIPMENT_TYPE_LABELS.get(
+                unit.equipment_type.value if (unit and unit.equipment_type) else "", "—"
+            ),
+            "unit_status": EQUIPMENT_STATUS_LABELS.get(
+                unit.status.value if (unit and unit.status) else "", "—"
+            ),
+            "plate_or_serial": (unit.plate_or_serial if unit else None) or "—",
+            "description": log.description,
+            "reason": log.reason,
+            "deployed_to": log.deployed_to,
+        })
+    return items
+
+
+@router.get("/equipment-audit", response_class=HTMLResponse)
+def equipment_audit(
+    request: Request,
+    db: Session = Depends(get_db),
+    q: Optional[str] = None,
+    equipment_id: Optional[str] = None,
+    action: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    page: Optional[str] = None,
+    per_page: Optional[str] = None,
+):
+    user = require_role(request, CFAU_ROLES)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    # Blank selects arrive as "" — coerce safely, never parse "" as int.
+    eq_id = int(equipment_id) if (equipment_id or "").strip().isdigit() else None
+
+    items = _equipment_audit_items(db, q, eq_id, action, date_from, date_to)
+    page_obj = paginate(items, parse_page(page), parse_per_page(per_page))
+
+    # Group the current page by PHT day, preserving newest-first order.
+    grouped = []
+    current_label, current_items = None, None
+    for it in page_obj.items:
+        label = _audit_day_label(it["timestamp"])
+        if label != current_label:
+            current_label, current_items = label, []
+            grouped.append((label, current_items))
+        current_items.append(it)
+
+    # The dropdown filters on the raw verb, but a verb can mean different
+    # things per source table ("created" = unit added OR report drafted), so
+    # label it with every meaning actually present in the data.
+    pairs = (
+        db.query(AuditLog.action, AuditLog.target_table)
+        .filter(AuditLog.target_table.in_(EQUIPMENT_AUDIT_TABLES))
+        .distinct().all()
+    )
+    action_labels = {}
+    for a, table in pairs:
+        if not a:
+            continue
+        action_labels.setdefault(a, []).append(_equipment_action_label(a, table))
+    action_labels = {
+        a: " / ".join(sorted(set(labels))) for a, labels in action_labels.items()
+    }
+    actions = sorted(action_labels)
+    # Archived units are included — their history stays readable.
+    units = db.query(Equipment).order_by(Equipment.name).all()
+    focus_unit = db.query(Equipment).filter(Equipment.id == eq_id).first() if eq_id else None
+
+    base_query = build_base_query({
+        "q": q or "", "equipment_id": eq_id or "", "action": action or "",
+        "date_from": date_from or "", "date_to": date_to or "",
+    })
+
+    return templates.TemplateResponse(
+        request=request,
+        name="cfau/equipment_audit.html",
+        context={
+            "user": user,
+            "active_nav": "equipment_audit",
+            "grouped": grouped,
+            "total": page_obj.total,
+            "page_obj": page_obj,
+            "base_query": base_query,
+            "units": units,
+            "focus_unit": focus_unit,
+            "actions": actions,
+            "action_labels": action_labels,
+            "f_q": q or "",
+            "f_equipment_id": eq_id or "",
+            "f_action": action or "",
+            "f_date_from": date_from or "",
+            "f_date_to": date_to or "",
+        },
+    )
+
+
+def _equipment_audit_records(items):
+    """Flatten view items into export rows (shared by CSV + PDF)."""
+    return [{
+        "time": _audit_export_time(it["timestamp"]),
+        "occurred": _audit_export_time(it["occurred_at"]),
+        "unit": it["unit_name"],
+        "type": it["unit_type"],
+        "plate": it["plate_or_serial"],
+        "user": it["username"],
+        "action": it["action_label"],
+        "description": it["description"] or "",
+        "reason": it["reason"] or "",
+        "deployed_to": it["deployed_to"] or "",
+    } for it in items]
+
+
+EQUIPMENT_AUDIT_COLUMNS = [
+    "Logged (PHT)", "Occurred (PHT)", "Unit", "Type", "Plate / Serial",
+    "User", "Action", "Description", "Reason", "Deployed To",
+]
+
+
+def _equipment_audit_filter_summary(db, q, eq_id, action, date_from, date_to) -> str:
+    """Human-readable description of the active filters, for the PDF header."""
+    parts = []
+    if q:
+        parts.append(f'search "{q.strip()}"')
+    if eq_id:
+        e = db.query(Equipment).filter(Equipment.id == eq_id).first()
+        parts.append(f"unit {e.name}" if e else f"unit #{eq_id}")
+    if action:
+        parts.append(f"action {_equipment_action_label(action, 'equipment')}")
+    if date_from:
+        parts.append(f"from {date_from}")
+    if date_to:
+        parts.append(f"to {date_to}")
+    return ", ".join(parts) if parts else "none (all entries)"
+
+
+def _equipment_audit_pdf_bytes(records, filter_summary) -> bytes:
+    """Same layout as the admin trail export, with the equipment-specific
+    columns (unit, reason, deployed-to) this module needs."""
+    from fpdf import FPDF
+    from fpdf.enums import XPos, YPos
+
+    pdf = FPDF(orientation="L", unit="mm", format="A4")
+    pdf.set_auto_page_break(auto=True, margin=12)
+    pdf.add_page()
+
+    pdf.set_font("Helvetica", "B", 16)
+    pdf.cell(0, 9, _pdf_safe("RisKonek — Vehicle & Equipment Audit Log"),
+             new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+
+    n = len(records)
+    stamp = datetime.now(_PHT).strftime("%B %d, %Y at %I:%M %p")
+    pdf.set_font("Helvetica", "", 9)
+    pdf.set_text_color(90, 90, 90)
+    pdf.cell(0, 5, _pdf_safe(f"Generated {stamp} PHT - {n} entr"
+                             f"{'y' if n == 1 else 'ies'}"),
+             new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    pdf.multi_cell(0, 5, _pdf_safe(f"Filters: {filter_summary}"),
+                   new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    pdf.set_text_color(0, 0, 0)
+    pdf.ln(2)
+
+    pdf.set_font("Helvetica", "", 7)
+    with pdf.table(col_widths=(13, 13, 16, 11, 11, 10, 13, 28, 17, 13),
+                   text_align="LEFT", line_height=4.4) as table:
+        head = table.row()
+        for h in EQUIPMENT_AUDIT_COLUMNS:
+            head.cell(h)
+        for r in records:
+            row = table.row()
+            for key in ("time", "occurred", "unit", "type", "plate",
+                        "user", "action", "description", "reason", "deployed_to"):
+                row.cell(_pdf_safe(r[key]))
+
+    return bytes(pdf.output())
+
+
+@router.get("/equipment-audit/export")
+def equipment_audit_export(
+    request: Request,
+    db: Session = Depends(get_db),
+    q: Optional[str] = None,
+    equipment_id: Optional[str] = None,
+    action: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    format: str = "csv",
+):
+    """Export the currently-filtered equipment log as CSV or PDF — the full
+    filtered set (all pages), newest-first, mirroring the list filters."""
+    user = require_role(request, CFAU_ROLES)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    eq_id = int(equipment_id) if (equipment_id or "").strip().isdigit() else None
+    items = _equipment_audit_items(db, q, eq_id, action, date_from, date_to)
+    records = _equipment_audit_records(items)
+
+    stamp = datetime.now(_PHT).strftime("%Y-%m-%d")
+    fmt = (format or "csv").lower()
+
+    if fmt == "pdf":
+        summary = _equipment_audit_filter_summary(
+            db, q, eq_id, action, date_from, date_to
+        )
+        return Response(
+            content=_equipment_audit_pdf_bytes(records, summary),
+            media_type="application/pdf",
+            headers={"Content-Disposition":
+                     f'attachment; filename="equipment-audit-{stamp}.pdf"'},
+        )
+
+    # CSV (default). UTF-8 BOM so Excel renders accented names correctly.
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(EQUIPMENT_AUDIT_COLUMNS)
+    for r in records:
+        writer.writerow([
+            r["time"], r["occurred"], r["unit"], r["type"], r["plate"],
+            r["user"], r["action"], r["description"], r["reason"], r["deployed_to"],
+        ])
+    content = ("﻿" + buf.getvalue()).encode("utf-8")
+    return Response(
+        content=content,
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition":
+                 f'attachment; filename="equipment-audit-{stamp}.csv"'},
     )

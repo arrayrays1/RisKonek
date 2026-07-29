@@ -1,5 +1,5 @@
 """
-Unit tests for the Disaster Simulator engine (app/simulation/engine.py).
+Unit tests for the Resource Simulator engine (app/simulation/engine.py).
 
 The engine is pure, so these tests need no DB, app, or fixtures — just made-up
 numbers and hand-computed expectations. Run with:  pytest app/tests/test_engine.py

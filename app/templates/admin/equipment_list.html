@@ -159,6 +159,14 @@
                     <td class="text-muted">{{ e.plate_or_serial }}</td>
                     <td class="text-muted">{{ e.last_inspected.strftime('%Y-%m-%d') if e.last_inspected else '—' }}</td>
                     <td class="text-end px-3">
+                        {# History stays available for archived units too. #}
+                        {% if user.role in ('cfau_oic', 'admin') %}
+                        <a href="/cfau/equipment-audit?equipment_id={{ e.id }}"
+                           class="btn btn-outline-secondary btn-sm"
+                           title="View this unit's audit log">
+                            <i class="bi bi-clock-history"></i>
+                        </a>
+                        {% endif %}
                         {% if not e.is_archived %}
                         <button type="button" class="btn btn-outline-primary btn-sm"
                                 data-bs-toggle="modal" data-bs-target="#statusModal-{{ e.id }}">
@@ -207,7 +215,7 @@
 {% if not e.is_archived %}
 <div class="modal fade" id="statusModal-{{ e.id }}" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog">
-    <form method="POST" action="/admin/equipment/{{ e.id }}/status" class="modal-content">
+    <form method="POST" action="/admin/equipment/{{ e.id }}/status" class="modal-content" data-validate>
             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
       <div class="modal-header">
         <h6 class="modal-title">Change status — {{ e.name }}</h6>
@@ -224,9 +232,28 @@
             {% endfor %}
         </select>
         <div class="mt-2">
-          <label class="form-label small">Reason (optional)</label>
+          <label class="form-label small">Reason <span class="text-danger">*</span></label>
           <input type="text" name="reason" class="form-control form-control-sm"
+                 minlength="3" required
+                 data-error="Reason is required (at least 3 characters)."
                  placeholder="e.g. deployed to flood response / sent for engine repair">
+        </div>
+        <div class="mt-2">
+          <label class="form-label small">
+            Deployed to / Location
+            <span class="text-muted rk-fs-11">(required when status is Deployed)</span>
+          </label>
+          <input type="text" name="deployed_to" class="form-control form-control-sm"
+                 data-require-if="status" data-require-if-value="deployed"
+                 data-error="Deployment location is required when deploying a unit."
+                 placeholder="e.g. Brgy. San Antonio riverside">
+        </div>
+        <div class="mt-2">
+          <label class="form-label small">Date &amp; time <span class="text-danger">*</span></label>
+          <input type="datetime-local" name="occurred_at" class="form-control form-control-sm"
+                 value="{{ now_local }}" max="{{ now_local }}"
+                 data-rule="not-future" required>
+          <div class="form-text rk-fs-11">When the change actually happened (Philippine time).</div>
         </div>
       </div>
       <div class="modal-footer">

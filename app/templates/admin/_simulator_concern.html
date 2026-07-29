@@ -1,0 +1,26 @@
+{# ── One "What Needs Attention" concern card ────────────────────────────────
+   Included from admin/_simulator_result.html inside a loop; consumes the loop
+   variable `c` (a row from app/simulation/presenter.build_view). Neutral card
+   surface with a status accent border — colour is never the only indicator, the
+   status pill always carries the text. #}
+<div class="rk-concern-card {{ c.accent }} mb-2">
+    <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap mb-1">
+        <span class="fw-semibold rk-fs-14">
+            {{ c.label }}
+            <span class="d-block text-muted rk-fs-11">{{ c.technical_label }}</span>
+        </span>
+        <span class="d-flex align-items-center gap-2">
+            <span class="rk-fs-12 text-muted rk-num">{{ c.pct_label }} available</span>
+            <span class="status-pill {{ c.pill }}">{{ c.status_label }}</span>
+        </span>
+    </div>
+    <div class="progress rk-h-10 mb-2">
+        <div class="progress-bar {{ c.bar }} rk-w-p{{ c.pct }}" role="progressbar"
+             aria-label="{{ c.label }} coverage"
+             aria-valuenow="{{ c.pct }}" aria-valuemin="0" aria-valuemax="100"></div>
+    </div>
+    <p class="rk-fs-13 mb-1 rk-num">
+        {{ "{:,}".format(c.available) }} of {{ "{:,}".format(c.need) }} {{ c.unit }} available.
+    </p>
+    <p class="text-muted rk-fs-13 mb-0 rk-lh-16">{{ c.note }}</p>
+</div>

@@ -1,0 +1,195 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Review Uploaded Report — RisKonek{% endblock %}
+
+{% set active_nav = 'bdrrmo_incident_reports' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start page-header">
+    <div>
+        <h1>Review Uploaded Report</h1>
+        <p>Preview from <strong>{{ report.file_name }}</strong>. Use the extracted content below
+           as reference, then complete and verify the post-incident report form and save as a
+           draft or submit.</p>
+    </div>
+    <a href="/bdrrmo/incident-reports" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Back
+    </a>
+</div>
+
+{% if error %}
+<div class="alert alert-danger alert-dismissible fade show">
+    <i class="bi bi-exclamation-triangle-fill me-1"></i>{{ error | replace('+', ' ') }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+{% if extraction_error %}
+<div class="alert alert-warning">
+    <strong>Extraction failed:</strong> {{ extraction_error }}<br>
+    The file was stored, but no content could be extracted. You can still complete the report manually below.
+</div>
+{% endif %}
+
+<!-- ── Upload Metadata ─────────────────────────────────────────────── -->
+<div class="dash-card mb-3">
+    <div class="row g-3">
+        <div class="col-md-3">
+            <div class="text-muted small">File</div>
+            <div class="fw-semibold">{{ report.file_name }}</div>
+            <div class="small"><span class="badge bg-light text-dark border">{{ report.file_type.value | upper }}</span></div>
+        </div>
+        <div class="col-md-3">
+            <div class="text-muted small">Uploaded</div>
+            <div>{{ report.uploaded_at | pht }}</div>
+            <div class="small text-muted">for {{ barangay.name if barangay else '—' }}</div>
+        </div>
+        <div class="col-md-3">
+            <div class="text-muted small">Lifecycle</div>
+            <div>
+                {% set ls = report.lifecycle_status.value %}
+                {% if ls == 'draft' %}
+                    <span class="status-pill status-maintenance">Draft</span>
+                {% elif ls == 'confirmed' %}
+                    <span class="status-pill status-operational">Confirmed</span>
+                {% elif ls == 'archived' %}
+                    <span class="badge bg-secondary"><i class="bi bi-archive me-1"></i>Archived</span>
+                {% elif ls == 'discarded' %}
+                    <span class="status-pill status-unavailable">Discarded</span>
+                {% endif %}
+            </div>
+        </div>
+        <div class="col-md-3 d-flex flex-column gap-2">
+            <a href="/bdrrmo/incident-reports/upload/{{ report.id }}/file" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-download"></i> View Original File
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- ── AI summary ──────────────────────────────────────────────────── -->
+<div class="dash-card mb-3">
+    <div class="card-title-row">
+        <i class="bi bi-robot"></i>
+        <h6>AI Summary</h6>
+    </div>
+    {% if ai_summary %}
+        <p class="mb-0 rk-pre-line">{{ ai_summary }}</p>
+    {% elif not ai_available %}
+        <p class="text-muted mb-0 small">AI summary unavailable (GROQ_API_KEY not configured).</p>
+    {% else %}
+        <p class="text-muted mb-0 small">No AI summary generated for this file.</p>
+    {% endif %}
+</div>
+
+<!-- ── Extracted preview ───────────────────────────────────────────── -->
+<div class="dash-card mb-3">
+    <div class="card-title-row">
+        <i class="bi bi-file-text"></i>
+        <h6>Extracted Preview</h6>
+    </div>
+    {% if columns_preview and rows_preview %}
+        <div class="table-responsive rk-mh-380">
+            <table class="table table-sm table-bordered mb-0 rk-fs-12">
+                <thead class="rk-th-sticky">
+                    <tr>{% for c in columns_preview %}<th>{{ c }}</th>{% endfor %}</tr>
+                </thead>
+                <tbody>
+                    {% for row in rows_preview %}
+                    <tr>
+                        {% for c in columns_preview %}
+                        <td>{{ row.get(c) if row.get(c) is not none else '' }}</td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="form-text">Showing first {{ rows_preview | length }} rows — reference only.</div>
+    {% elif raw_text_preview %}
+        <pre class="rk-raw-preview rk-mh-380">{{ raw_text_preview }}</pre>
+        <div class="form-text">Reference only.</div>
+    {% else %}
+        <p class="text-muted mb-0 small">No preview available.</p>
+    {% endif %}
+</div>
+
+<!-- ── Post-Incident Report form (same fields as the manual path) ───── -->
+<div class="dash-card mb-3">
+    <div class="card-title-row">
+        <i class="bi bi-pencil-square"></i>
+        <h6>Post-Incident Report — Complete &amp; Verify</h6>
+    </div>
+    <form method="POST" action="/bdrrmo/incident-reports/upload/{{ report.id }}/submit" class="row g-3" data-validate>
+        <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+
+        <div class="col-12">
+            <label class="form-label small fw-semibold">Incident *</label>
+            <select name="incident_id" required class="form-select">
+                <option value="">— Select the disaster incident this report covers —</option>
+                {% for iid, label in incidents %}
+                <option value="{{ iid }}"
+                    {% if selected_incident_id == iid %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+            <div class="form-text small">
+                {% if selected_incident_id %}
+                A matching incident in your barangay was detected and pre-selected — verify it before saving.
+                {% else %}
+                No matching incident? Record it first in
+                <a href="/bdrrmo/incidents">Incident History</a> —
+                this avoids creating duplicate disaster records.
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="col-12">
+            <label class="form-label small fw-semibold">Operations Summary</label>
+            <textarea name="operations_summary" rows="3" class="form-control"
+                      placeholder="Overview of the response operation…">{{ prefill.operations_summary or '' }}</textarea>
+        </div>
+        <div class="col-12">
+            <label class="form-label small fw-semibold">Actions Taken</label>
+            <textarea name="actions_taken" rows="3" class="form-control"
+                      placeholder="Concrete actions carried out during the response…">{{ prefill.actions_taken or '' }}</textarea>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label small fw-semibold">Equipment Used</label>
+            <textarea name="equipment_used" rows="2" class="form-control"
+                      placeholder="e.g. Rescue Truck 02, 2 rescue boats…">{{ prefill.equipment_used or '' }}</textarea>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small fw-semibold">Personnel Deployed</label>
+            <input type="number" name="personnel_count" min="0" class="form-control"
+                   value="{{ prefill.personnel_count or '' }}">
+        </div>
+        <div class="col-md-4">
+            <label class="form-label small fw-semibold">Personnel Notes</label>
+            <input type="text" name="personnel_notes" class="form-control"
+                   value="{{ prefill.personnel_notes or '' }}"
+                   placeholder="e.g. 2 medics, 1 driver">
+        </div>
+        <div class="col-12">
+            <label class="form-label small fw-semibold">Challenges Encountered</label>
+            <textarea name="challenges_encountered" rows="3" class="form-control"
+                      placeholder="Obstacles, field risks, resource gaps…">{{ prefill.challenges_encountered or '' }}</textarea>
+        </div>
+        <div class="col-12">
+            <label class="form-label small fw-semibold">Recommendations</label>
+            <textarea name="recommendations" rows="3" class="form-control"
+                      placeholder="Suggested improvements for future responses…">{{ prefill.recommendations or '' }}</textarea>
+        </div>
+
+        <div class="col-12 d-flex justify-content-end gap-2 pt-2">
+            <a href="/bdrrmo/incident-reports" class="btn btn-outline-secondary">Cancel</a>
+            <button type="submit" name="action" value="draft" class="btn btn-outline-primary">
+                <i class="bi bi-save"></i> Save Draft
+            </button>
+            <button type="submit" name="action" value="submit" class="btn btn-rk"
+                    data-confirm='Submit this report? You will no longer be able to edit it.'>
+                <i class="bi bi-send"></i> Submit
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

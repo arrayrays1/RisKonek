@@ -4,12 +4,281 @@
 
 {% set active_nav = 'staff_dashboard' %}
 
+{% block head_extra %}
+<style nonce="{{ request.state.csp_nonce }}">
+    .alert-banner {
+        background: #fff8e1; border-left: 4px solid #ffc107;
+        border-radius: 6px; padding: 10px 14px;
+        font-size: 13px; color: #856404; margin-bottom: 16px;
+        display: flex; align-items: center; gap: 8px;
+    }
+    .attn-item {
+        display: flex; align-items: center; gap: 12px;
+        padding: 10px 0; border-bottom: 1px solid #f0f0f0;
+    }
+    .attn-item:last-child { border-bottom: none; }
+    .attn-name { font-size: 14px; font-weight: 600; color: var(--rk-text); }
+    .attn-sub { font-size: 11px; color: var(--rk-muted); }
+
+    /* A doughnut keeps a 1:1 aspect ratio and would otherwise grow to the
+       full column width — the wrapper caps its drawing area instead. */
+    .chart-donut { position: relative; height: 190px; }
+
+    .fleet-row {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 8px 0; border-bottom: 1px solid #f0f0f0;
+    }
+    .fleet-row:last-child { border-bottom: none; }
+    .fleet-count { font-size: 15px; font-weight: 700; color: var(--rk-text); }
+
+    .feed-item {
+        display: flex; gap: 12px; align-items: flex-start;
+        padding: 10px 0; border-bottom: 1px solid #f0f0f0;
+    }
+    .feed-item:last-child { border-bottom: none; }
+    .feed-icon {
+        width: 34px; height: 34px; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 14px; flex-shrink: 0;
+    }
+    .feed-text { font-size: 13px; color: var(--rk-text); }
+    .feed-time { font-size: 11px; color: #aaa; margin-top: 2px; }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="page-header">
-    <h1>CDRRMO Logistics Dashboard</h1>
-    <p>Welcome, {{ user.username }}. You manage stockpile resources and share the Vehicle &amp; Equipment module with CFAU / Operations.</p>
+<div class="d-flex justify-content-between align-items-start page-header">
+    <div>
+        <h1>CDRRMO Logistics Dashboard</h1>
+        <p>Stockpile readiness, equipment availability, and recent logistics activity.</p>
+    </div>
+    <div class="last-updated">
+        Last updated<br>
+        <strong id="currentDateTime"></strong>
+    </div>
 </div>
 
+{% if active_alerts > 0 %}
+<div class="alert-banner">
+    <i class="bi bi-exclamation-triangle-fill rk-fs-16"></i>
+    <span>
+        <strong>{{ active_alerts }} item{{ 's' if active_alerts != 1 else '' }} need attention:</strong>
+        {{ summary.expired }} expired, {{ summary.near_expiry }} near expiry,
+        {{ summary.low_stock }} low on stock,
+        {{ repair_attention }} unit{{ 's' if repair_attention != 1 else '' }} with a due repair.
+    </span>
+</div>
+{% endif %}
+
+<!-- ── STAT CARDS ─────────────────────────────────────────────── -->
+<div class="row g-3 mb-4">
+
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-start">
+                <div class="stat-label">Active Resource Items</div>
+                <div class="stat-icon rk-tint-green"><i class="bi bi-box-seam-fill"></i></div>
+            </div>
+            <div class="stat-value">{{ summary.total }}</div>
+            <div class="stat-change text-muted">Stockpile goods in inventory</div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-start">
+                <div class="stat-label">Low on Stock</div>
+                <div class="stat-icon rk-tint-orange"><i class="bi bi-graph-down-arrow"></i></div>
+            </div>
+            <div class="stat-value {{ 'rk-text-high' if summary.low_stock > 0 else 'rk-text-ok' }}">
+                {{ summary.low_stock }}
+            </div>
+            <div class="stat-change text-muted">At or below restock threshold</div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-start">
+                <div class="stat-label">Expiry Alerts</div>
+                <div class="stat-icon rk-tint-red"><i class="bi bi-calendar-x-fill"></i></div>
+            </div>
+            <div class="stat-value {{ 'rk-text-crit' if summary.expired > 0 else ('rk-text-high' if summary.near_expiry > 0 else 'rk-text-ok') }}">
+                {{ summary.expired + summary.near_expiry }}
+            </div>
+            <div class="stat-change text-muted">
+                {{ summary.expired }} expired · {{ summary.near_expiry }} within 30 days
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-start">
+                <div class="stat-label">Equipment Available</div>
+                <div class="stat-icon rk-tint-blue"><i class="bi bi-wrench-adjustable"></i></div>
+            </div>
+            <div class="stat-value">{{ fleet.counts.available }}/{{ fleet.total }}</div>
+            <div class="stat-change text-muted">
+                {{ repair_attention }} unit{{ 's' if repair_attention != 1 else '' }} with a due repair
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- ── ROW 2: Needs attention + Fleet status ──────────────────── -->
+<div class="row g-3 mb-4">
+
+    <div class="col-md-7">
+        <div class="dash-card">
+            <div class="card-title-row">
+                <i class="bi bi-exclamation-triangle-fill text-danger"></i>
+                <h6>Stock Needing Attention</h6>
+                <a href="/admin/resources" class="ms-auto rk-fs-12 rk-text-green text-decoration-none">
+                    Open Inventory <i class="bi bi-arrow-right"></i>
+                </a>
+            </div>
+
+            {% if attention %}
+                {% for r in attention %}
+                <div class="attn-item">
+                    <div class="flex-grow-1">
+                        <div class="attn-name">{{ r.name }}</div>
+                        <div class="attn-sub">
+                            {{ r.quantity }}{{ ' ' ~ r.unit if r.unit else '' }}
+                            · threshold {{ r.restock_threshold }}
+                            · {{ r.storage_location }}
+                            {%- if r.expiry_date %} · expires {{ r.expiry_date.strftime('%b %d, %Y') }}{% endif %}
+                        </div>
+                    </div>
+                    {% if r.alert == 'expired' %}
+                        <span class="status-pill status-unavailable">{{ r.alert_label }}</span>
+                    {% elif r.alert == 'near_expiry' %}
+                        <span class="status-pill status-maintenance">{{ r.alert_label }}</span>
+                    {% else %}
+                        <span class="badge bg-light text-dark border">{{ r.alert_label }}</span>
+                    {% endif %}
+                    <a href="/admin/resources/{{ r.id }}/edit"
+                       class="rk-fs-12 rk-text-green text-decoration-none rk-nowrap">
+                        Update <i class="bi bi-arrow-right"></i>
+                    </a>
+                </div>
+                {% endfor %}
+
+                {% if attention_total > attention | length %}
+                <a href="/admin/resources?alert=low_stock"
+                   class="btn-soft w-100 justify-content-center mt-3 rk-text-green">
+                    View all {{ attention_total }} flagged items <i class="bi bi-arrow-right"></i>
+                </a>
+                {% endif %}
+            {% else %}
+                <div class="text-center text-muted py-4 rk-fs-13">
+                    <i class="bi bi-check-circle rk-text-ok"></i>
+                    All stock is above threshold and within expiry.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="col-md-5">
+        <div class="dash-card">
+            <div class="card-title-row">
+                <i class="bi bi-wrench-adjustable rk-text-green"></i>
+                <h6>Equipment Status</h6>
+                <a href="/admin/equipment" class="ms-auto rk-fs-12 rk-text-green text-decoration-none">
+                    Open <i class="bi bi-arrow-right"></i>
+                </a>
+            </div>
+
+            {% if fleet.total %}
+                <div class="chart-donut"><canvas id="fleetChart"></canvas></div>
+                <div class="mt-3">
+                    {% for value, count in fleet.counts.items() %}
+                    <div class="fleet-row">
+                        <a href="/admin/equipment?status={{ value }}" class="text-decoration-none">
+                            {% if value == 'available' %}
+                                <span class="status-pill status-operational">{{ fleet_labels[value] }}</span>
+                            {% elif value == 'deployed' %}
+                                <span class="badge bg-info text-dark">{{ fleet_labels[value] }}</span>
+                            {% elif value == 'under_repair' %}
+                                <span class="status-pill status-maintenance">{{ fleet_labels[value] }}</span>
+                            {% else %}
+                                <span class="status-pill status-unavailable">{{ fleet_labels[value] }}</span>
+                            {% endif %}
+                        </a>
+                        <span class="fleet-count">{{ count }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="text-center text-muted py-4 rk-fs-13">
+                    No equipment recorded yet.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+
+<!-- ── ROW 3: Category chart + Recent activity ────────────────── -->
+<div class="row g-3 mb-4">
+
+    <div class="col-md-6">
+        <div class="dash-card">
+            <div class="card-title-row">
+                <i class="bi bi-bar-chart-fill rk-text-info"></i>
+                <h6>Inventory Items by Category</h6>
+            </div>
+            <canvas id="categoryChart" height="190"></canvas>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="dash-card">
+            <div class="card-title-row">
+                <i class="bi bi-clock-history text-warning"></i>
+                <h6>Recent Logistics Activity</h6>
+                <a href="/staff/audit" class="ms-auto rk-fs-12 rk-text-green text-decoration-none">
+                    Full Trail <i class="bi bi-arrow-right"></i>
+                </a>
+            </div>
+
+            {% if recent_logs %}
+                {% for log in recent_logs %}
+                {% set fa = log.action if log.action in ['created','updated','deleted','deactivated'] else 'default' %}
+                <div class="feed-item">
+                    <div class="feed-icon feed-{{ fa }}">
+                        {% if log.action == 'created' %}<i class="bi bi-plus-circle-fill"></i>
+                        {% elif log.action == 'updated' %}<i class="bi bi-pencil-fill"></i>
+                        {% elif log.action == 'deleted' %}<i class="bi bi-trash-fill"></i>
+                        {% elif log.action == 'status_changed' %}<i class="bi bi-arrow-left-right"></i>
+                        {% elif log.action == 'archived' %}<i class="bi bi-archive-fill"></i>
+                        {% else %}<i class="bi bi-file-text-fill"></i>{% endif %}
+                    </div>
+                    <div class="flex-grow-1">
+                        <div class="feed-text">
+                            <a href="/staff/audit/{{ log.id }}"
+                               class="text-decoration-none rk-text-note">{{ log.description }}</a>
+                        </div>
+                        <div class="feed-time">
+                            {{ log.user.username if log.user else '—' }}
+                            · {{ log.timestamp | pht if log.timestamp else 'Just now' }}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="text-center text-muted py-4 rk-fs-13">
+                    No logistics activity yet. Changes to resources and equipment will appear here.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+
+<!-- ── ROW 4: Module quick links ──────────────────────────────── -->
 <div class="row g-3">
     <div class="col-md-6">
         <div class="dash-card h-100">
@@ -55,4 +324,75 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"
+        integrity="sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4" crossorigin="anonymous"></script>
+<script nonce="{{ request.state.csp_nonce }}">
+// ── Current date/time ─────────────────────────────────────────────
+(function () {
+    const now = new Date();
+    document.getElementById('currentDateTime').textContent =
+        now.toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })
+        + ' · ' + now.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' });
+})();
+
+// ── Inventory by category ─────────────────────────────────────────
+// tojson HTML-escapes <, > and & so values can't break out of this block.
+const categoryData = {{ category_counts | tojson }};
+new Chart(document.getElementById('categoryChart'), {
+    type: 'bar',
+    data: {
+        labels: Object.keys(categoryData).map(k => k.charAt(0).toUpperCase() + k.slice(1)),
+        datasets: [{
+            label: 'Items',
+            data: Object.values(categoryData),
+            backgroundColor: '#047857',
+            borderRadius: 6,
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+            y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#f5f5f5' } },
+            x: { grid: { display: false } }
+        }
+    }
+});
+
+// ── Fleet status doughnut ─────────────────────────────────────────
+// Order and colour are keyed by status name, never by position — tojson
+// serialises the dict with sorted keys.
+const fleetLabels = {{ fleet_labels | tojson }};
+const fleetData = {{ fleet.counts | tojson }};
+const fleetOrder = ['available', 'deployed', 'under_repair', 'unserviceable'];
+const fleetColors = {
+    available: '#047857', deployed: '#2980b9',
+    under_repair: '#b45309', unserviceable: '#dc2626'
+};
+const fleetKeys = fleetOrder.filter(k => k in fleetData);
+const fleetCanvas = document.getElementById('fleetChart');
+if (fleetCanvas) {
+    new Chart(fleetCanvas, {
+        type: 'doughnut',
+        data: {
+            labels: fleetKeys.map(k => fleetLabels[k] || k),
+            datasets: [{
+                data: fleetKeys.map(k => fleetData[k]),
+                backgroundColor: fleetKeys.map(k => fleetColors[k]),
+                borderWidth: 0,
+            }]
+        },
+        options: {
+            responsive: true,
+            // Fill the capped wrapper rather than forcing a square.
+            maintainAspectRatio: false,
+            cutout: '62%',
+            plugins: { legend: { display: false } }
+        }
+    });
+}
+</script>
 {% endblock %}

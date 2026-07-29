@@ -238,7 +238,7 @@
 {% if not r.is_archived %}
 <div class="modal fade" id="stockModal-{{ r.id }}" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog">
-    <form method="POST" action="/admin/resources/{{ r.id }}/stock" class="modal-content">
+    <form method="POST" action="/admin/resources/{{ r.id }}/stock" class="modal-content" data-validate>
             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
       <div class="modal-header">
         <h6 class="modal-title">Stock change — {{ r.name }}</h6>
@@ -258,13 +258,33 @@
           </div>
           <div class="col-7">
             <label class="form-label small">Amount</label>
-            <input type="number" name="amount" min="1" class="form-control form-control-sm" required>
+            <input type="number" name="amount" min="1" class="form-control form-control-sm"
+                   data-rule="stock-amount" data-max-stock="{{ r.quantity }}" required>
           </div>
         </div>
         <div class="mt-2">
-          <label class="form-label small">Reason (optional)</label>
+          <label class="form-label small">Reason <span class="text-danger">*</span></label>
           <input type="text" name="reason" class="form-control form-control-sm"
+                 minlength="3" required
+                 data-error="Reason is required (at least 3 characters)."
                  placeholder="e.g. delivered by supplier / distributed to barangay">
+        </div>
+        <div class="mt-2">
+          <label class="form-label small">
+            Deployed to / Location
+            <span class="text-muted rk-fs-11">(required when deducting)</span>
+          </label>
+          <input type="text" name="deployed_to" class="form-control form-control-sm"
+                 data-require-if="action" data-require-if-value="deduct"
+                 data-error="Deployment location is required when deducting stock."
+                 placeholder="e.g. Brgy. Landayan evacuation center">
+        </div>
+        <div class="mt-2">
+          <label class="form-label small">Date &amp; time <span class="text-danger">*</span></label>
+          <input type="datetime-local" name="occurred_at" class="form-control form-control-sm"
+                 value="{{ now_local }}" max="{{ now_local }}"
+                 data-rule="not-future" required>
+          <div class="form-text rk-fs-11">When the movement actually happened (Philippine time).</div>
         </div>
       </div>
       <div class="modal-footer">

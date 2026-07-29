@@ -1,0 +1,132 @@
+{% extends "admin/base.html" %}
+{% from "shared/_pagination.html" import pager %}
+
+{% block title %}Post-Incident Reports — RisKonek{% endblock %}
+
+{% set active_nav = 'bdrrmo_incident_reports' %}
+
+{% macro workflow_pill(v, label) -%}
+    {% if v == 'submitted' %}
+        <span class="status-pill status-operational">{{ label }}</span>
+    {% else %}
+        <span class="badge bg-light text-dark border">{{ label }}</span>
+    {% endif %}
+{%- endmacro %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start page-header">
+    <div>
+        <h1>Post-Incident Reports</h1>
+        <p>Your operational reports filed after disaster response activities in
+           {% if barangay %}Barangay {{ barangay.name }}{% else %}your barangay{% endif %}.</p>
+    </div>
+    {% if barangay %}
+    <div class="dropdown">
+        <button class="btn btn-rk dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="bi bi-plus-lg"></i> New Report
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end">
+            <li>
+                <a class="dropdown-item" href="/bdrrmo/incident-reports/new">
+                    <i class="bi bi-pencil-square me-1"></i> Fill Manually
+                </a>
+            </li>
+            <li>
+                <a class="dropdown-item" href="/bdrrmo/incident-reports/upload">
+                    <i class="bi bi-cloud-upload me-1"></i> Upload Existing Report
+                </a>
+            </li>
+        </ul>
+    </div>
+    {% endif %}
+</div>
+
+{% if request.query_params.get('success') %}
+<div class="alert alert-success alert-dismissible fade show">
+    <i class="bi bi-check-circle-fill me-1"></i>{{ request.query_params.get('success') }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+{% if request.query_params.get('error') %}
+<div class="alert alert-danger alert-dismissible fade show">
+    <i class="bi bi-exclamation-triangle-fill me-1"></i>{{ request.query_params.get('error') }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+{% if not barangay %}
+<div class="alert alert-warning">
+    No barangay is assigned to your account — ask an administrator to assign one
+    before filing post-incident reports.
+</div>
+{% endif %}
+
+<!-- ── Filter ─────────────────────────────────────────────────── -->
+<div class="dash-card mb-3">
+    <form method="GET" action="/bdrrmo/incident-reports" class="row g-2 align-items-end js-live-filter">
+        <div class="col-md-3">
+            <label class="form-label small fw-semibold mb-1">Status</label>
+            <select name="status" class="form-select form-select-sm">
+                <option value="">All statuses</option>
+                {% for v, label in statuses %}
+                <option value="{{ v }}" {% if f_status == v %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2 d-grid">
+            <a href="/bdrrmo/incident-reports" class="btn btn-outline-secondary btn-sm"><i class="bi bi-x-circle"></i> Reset</a>
+        </div>
+    </form>
+</div>
+
+<!-- ── Table ──────────────────────────────────────────────────── -->
+<div class="dash-card p-0">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="rk-bg-soft">
+                <tr class="rk-th-soft">
+                    <th class="px-3 py-3">Disaster Type</th>
+                    <th class="py-3">Date Occurred</th>
+                    <th class="py-3">Personnel</th>
+                    <th class="py-3">Status</th>
+                    <th class="py-3">Filed</th>
+                    <th class="py-3 text-end px-3">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in rows %}
+                <tr class="rk-fs-13">
+                    <td class="px-3 fw-semibold">{{ r.disaster_type }}</td>
+                    <td class="text-muted">{{ r.date_occurred.strftime('%Y-%m-%d') if r.date_occurred else '—' }}</td>
+                    <td class="text-muted">{{ r.personnel_count }}</td>
+                    <td>{{ workflow_pill(r.report_status, r.report_status_label) }}</td>
+                    <td class="text-muted">{{ r.created_at | pht }}</td>
+                    <td class="text-end px-3">
+                        <a href="/bdrrmo/incident-reports/{{ r.id }}" class="btn btn-outline-secondary btn-sm">
+                            <i class="bi bi-eye"></i> View
+                        </a>
+                        {% if r.report_status == 'draft' %}
+                        <a href="/bdrrmo/incident-reports/{{ r.id }}/edit" class="btn btn-outline-secondary btn-sm">
+                            <i class="bi bi-pencil"></i>
+                        </a>
+                        <form method="POST" action="/bdrrmo/incident-reports/{{ r.id }}/submit" class="d-inline"
+                              data-confirm='Submit this report? You will no longer be able to edit it.'>
+                            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+                            <button type="submit" class="btn btn-rk btn-sm"><i class="bi bi-send"></i> Submit</button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6" class="text-center text-muted py-4">
+                    No post-incident reports found.
+                    {% if f_status %}<a href="/bdrrmo/incident-reports" class="ms-2">Clear filter</a>{% endif %}
+                </td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{{ pager(page_obj, "/bdrrmo/incident-reports", base_query) }}
+{% endblock %}

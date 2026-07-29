@@ -7,7 +7,7 @@ Gold:   only after Admin clicks Confirm Save — validated rows become
         Incident records and UploadedReport.status = confirmed.
 
 Re-process, BDRRMO upload access, CFAU post-incident, OCR, and the
-disaster simulator are intentionally out of scope for Week 6.
+resource simulator are intentionally out of scope for Week 6.
 """
 
 from fastapi import APIRouter, Request, Depends, UploadFile, File, Form

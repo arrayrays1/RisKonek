@@ -85,7 +85,7 @@
                 {'href': '/admin/serviceability', 'icon': 'bi-clipboard2-check', 'text': 'Serviceability', 'key': 'serviceability_review', 'title': 'Review and resolve CFAU equipment serviceability reports'}
             ]},
             {'label': 'Planning & Simulation', 'items': [
-                {'href': '/admin/simulator/setup', 'icon': 'bi-lightning-fill', 'text': 'Disaster Simulator', 'key': 'simulator'}
+                {'href': '/admin/simulator/setup', 'icon': 'bi-lightning-fill', 'text': 'Resource Simulator', 'key': 'simulator'}
             ]},
             {'label': 'Incident Management', 'items': [
                 {'href': '/admin/uploads', 'icon': 'bi-cloud-upload-fill', 'text': 'Incident Uploads', 'key': 'uploads', 'title': 'Upload and convert disaster reports into incident records.'},
@@ -143,6 +143,11 @@
            title="Historical disaster incidents in your barangay">
             <i class="bi bi-clock-history nav-icon"></i><span class="nav-label">Incident History</span>
         </a>
+        <a href="/bdrrmo/incident-reports"
+           class="nav-item-link nav-accent-purple {{ 'active' if active == 'bdrrmo_incident_reports' else '' }}"
+           title="Document response actions and operational outcomes after an incident in your barangay">
+            <i class="bi bi-journal-text nav-icon"></i><span class="nav-label">Post-Incident Reports</span>
+        </a>
         <a href="/bdrrmo/facilities"
            class="nav-item-link nav-accent-blue {{ 'active' if active == 'bdrrmo_facilities' else '' }}"
            title="Critical facilities in your barangay">
@@ -181,6 +186,14 @@
         </a>
         {% endif %}
 
+        {% if is_staff %}
+        <a href="/staff/audit"
+           class="nav-item-link nav-accent-orange {{ 'active' if active == 'staff_audit' else '' }}"
+           title="Recorded changes to stockpile resources and to vehicles &amp; equipment">
+            <i class="bi bi-file-earmark-text-fill nav-icon"></i><span class="nav-label">Audit Trail</span>
+        </a>
+        {% endif %}
+
         {% if is_cfau %}
         <a href="/cfau/serviceability"
            class="nav-item-link nav-accent-blue {{ 'active' if active == 'serviceability' else '' }}"
@@ -191,6 +204,11 @@
            class="nav-item-link nav-accent-purple {{ 'active' if active == 'incident_reports' else '' }}"
            title="Document response actions and operational outcomes for incidents.">
             <i class="bi bi-journal-text nav-icon"></i><span class="nav-label">Post-Incident Reports</span>
+        </a>
+        <a href="/cfau/equipment-audit"
+           class="nav-item-link nav-accent-blue {{ 'active' if active == 'equipment_audit' else '' }}"
+           title="Read-only trail of every change made to a vehicle or equipment unit — additions, edits, status movements, archiving, and serviceability reports.">
+            <i class="bi bi-clock-history nav-icon"></i><span class="nav-label">Equipment Audit Log</span>
         </a>
         {% endif %}
 

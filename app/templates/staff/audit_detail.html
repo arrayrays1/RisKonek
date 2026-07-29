@@ -1,0 +1,62 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Audit Entry #{{ log.id }} — RisKonek{% endblock %}
+
+{% set active_nav = 'staff_audit' %}
+
+{% block head_extra %}
+<style nonce="{{ request.state.csp_nonce }}">
+    .kv { font-size: 13px; }
+    .kv .k { color: var(--rk-muted); width: 170px; display: inline-block; }
+    .kv .v { font-weight: 500; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start page-header">
+    <div>
+        <h1>Audit Entry #{{ log.id }}</h1>
+        <p>Detailed view of a single logistics action.</p>
+    </div>
+    <a href="/staff/audit" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Back to Audit Trail
+    </a>
+</div>
+
+<div class="dash-card mb-3">
+    <div class="kv d-flex flex-column gap-2">
+        <div><span class="k">Action performed</span>
+            <span class="v"><span class="badge bg-light text-dark border">{{ log.action }}</span></span></div>
+        <div><span class="k">Module</span><span class="v">{{ category }}</span></div>
+        <div><span class="k">Affected record</span>
+            <span class="v">{{ log.target_table or '—' }}{% if log.target_id %} #{{ log.target_id }}{% endif %}</span></div>
+        <div><span class="k">Performed by</span>
+            <span class="v">{% if actor %}{{ actor.username }}{% else %}user #{{ log.user_id }}{% endif %}</span></div>
+        <div><span class="k">Recorded by system</span><span class="v">{{ log.timestamp | pht }}</span></div>
+        <div><span class="k">Description</span><span class="v">{{ log.description or '—' }}</span></div>
+    </div>
+</div>
+
+<!-- ── Accountability fields captured by the stock / status modals ──── -->
+<div class="dash-card">
+    <div class="card-title-row">
+        <i class="bi bi-clipboard-check"></i>
+        <h6>Movement Details</h6>
+    </div>
+    {% if log.reason or log.deployed_to or log.occurred_at %}
+    <div class="kv d-flex flex-column gap-2">
+        <div><span class="k">Reason</span><span class="v">{{ log.reason or '—' }}</span></div>
+        <div><span class="k">Deployed to / Location</span><span class="v">{{ log.deployed_to or '—' }}</span></div>
+        <div><span class="k">Actually occurred</span>
+            <span class="v">{{ log.occurred_at | pht if log.occurred_at else '—' }}</span></div>
+    </div>
+    {% else %}
+    <p class="text-muted small mb-0">
+        <i class="bi bi-info-circle me-1"></i>
+        No movement details recorded for this action. Reason, location, and
+        occurrence time are captured on stock changes and equipment status
+        changes.
+    </p>
+    {% endif %}
+</div>
+{% endblock %}

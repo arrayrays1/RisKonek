@@ -1,5 +1,5 @@
 """
-Disaster Simulator — calculation engine.
+Resource Simulator — calculation engine.
 
 PURE functions only. Every function here takes plain arguments (ints, strings,
 small dicts) and returns plain dicts/lists. There is deliberately NO database

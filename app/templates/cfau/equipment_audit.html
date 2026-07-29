@@ -1,0 +1,213 @@
+{% extends "admin/base.html" %}
+{% from "shared/_pagination.html" import pager %}
+
+{% block title %}Vehicle & Equipment Audit Log — RisKonek{% endblock %}
+
+{% set active_nav = 'equipment_audit' %}
+
+{% macro action_badge(a, label) -%}
+    {% if a == 'status_changed' %}
+        <span class="status-pill status-maintenance">{{ label }}</span>
+    {% elif a in ('archived',) %}
+        <span class="status-pill status-unavailable">{{ label }}</span>
+    {% elif a in ('created', 'restored') %}
+        <span class="status-pill status-operational">{{ label }}</span>
+    {% else %}
+        <span class="badge bg-light text-dark border">{{ label }}</span>
+    {% endif %}
+{%- endmacro %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start page-header">
+    <div>
+        <h1>Vehicle &amp; Equipment Audit Log</h1>
+        <p>
+            Every change made to a vehicle or equipment unit — additions, detail
+            edits, status movements, archiving, and serviceability reports.
+            {{ total }} matching entr{{ 'y' if total == 1 else 'ies' }}.
+        </p>
+    </div>
+    <div class="dropdown">
+        <button class="btn btn-rk dropdown-toggle" type="button"
+                data-bs-toggle="dropdown" aria-expanded="false"
+                {% if total == 0 %}disabled title="No entries to export"{% endif %}>
+            <i class="bi bi-download"></i> Export Log
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end">
+            <li>
+                <a class="dropdown-item"
+                   href="/cfau/equipment-audit/export?format=csv{% if base_query %}&{{ base_query }}{% endif %}">
+                    <i class="bi bi-filetype-csv me-2"></i>Export as CSV
+                </a>
+            </li>
+            <li>
+                <a class="dropdown-item"
+                   href="/cfau/equipment-audit/export?format=pdf{% if base_query %}&{{ base_query }}{% endif %}">
+                    <i class="bi bi-filetype-pdf me-2"></i>Export as PDF
+                </a>
+            </li>
+        </ul>
+    </div>
+</div>
+
+{% if focus_unit %}
+<div class="alert alert-info d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-wrench-adjustable me-1"></i>
+        Showing the history of <strong>{{ focus_unit.name }}</strong>
+        {% if focus_unit.plate_or_serial %}({{ focus_unit.plate_or_serial }}){% endif %}.
+    </span>
+    <a href="/cfau/equipment-audit" class="btn-soft">View all units</a>
+</div>
+{% endif %}
+
+<!-- ── Filter bar (auto-applies — no submit button needed) ────────── -->
+<div class="dash-card mb-3">
+    <form method="GET" action="/cfau/equipment-audit" id="equipAuditFilterForm"
+          class="row g-2 align-items-end">
+        <div class="col-md-6">
+            <label class="form-label small fw-semibold mb-1">Search</label>
+            <input type="text" name="q" value="{{ f_q }}" class="form-control form-control-sm"
+                   placeholder="Search description, reason, deployment, or username…"
+                   autocomplete="off">
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small fw-semibold mb-1">Vehicle / Equipment</label>
+            <select name="equipment_id" class="form-select form-select-sm">
+                <option value="">All units</option>
+                {% for u in units %}
+                <option value="{{ u.id }}" {% if f_equipment_id|string == u.id|string %}selected{% endif %}>
+                    {{ u.name }}{% if u.is_archived %} (archived){% endif %}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small fw-semibold mb-1">Action</label>
+            <select name="action" class="form-select form-select-sm">
+                <option value="">All actions</option>
+                {% for a in actions %}
+                <option value="{{ a }}" {% if f_action == a %}selected{% endif %}>
+                    {{ action_labels.get(a, a) }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small fw-semibold mb-1">From</label>
+            <input type="date" name="date_from" value="{{ f_date_from }}"
+                   class="form-control form-control-sm">
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small fw-semibold mb-1">To</label>
+            <input type="date" name="date_to" value="{{ f_date_to }}"
+                   class="form-control form-control-sm">
+        </div>
+        <div class="col-md-3 d-flex align-items-end">
+            <a href="/cfau/equipment-audit" class="btn-soft w-100 justify-content-center">
+                <i class="bi bi-x-circle"></i> Reset
+            </a>
+        </div>
+    </form>
+</div>
+
+<!-- ── Results ────────────────────────────────────────────────────── -->
+<div class="dash-card p-0">
+    <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+            <thead class="rk-bg-soft">
+                <tr class="rk-th-soft">
+                    <th class="px-3 py-3">Time</th>
+                    <th class="py-3">Unit</th>
+                    <th class="py-3">Action</th>
+                    <th class="py-3">User</th>
+                    <th class="py-3">Change</th>
+                    <th class="py-3 px-3">Reason / Deployed To</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for day_label, items in grouped %}
+                <tr><td colspan="6" class="bg-light text-muted small fw-semibold px-3 py-2">
+                    <i class="bi bi-calendar3 me-1"></i>{{ day_label }}
+                </td></tr>
+                {% for it in items %}
+                <tr class="rk-fs-13">
+                    <td class="px-3 text-nowrap">
+                        {{ it.timestamp | pht }}
+                        {% if it.occurred_at %}
+                        <div class="small text-muted" title="User-stated time the movement actually happened">
+                            <i class="bi bi-clock-history"></i> occurred {{ it.occurred_at | pht }}
+                        </div>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="fw-semibold">{{ it.unit_name }}</span>
+                        <div class="small text-muted">
+                            {{ it.unit_type }}{% if it.plate_or_serial != '—' %} · {{ it.plate_or_serial }}{% endif %}
+                        </div>
+                    </td>
+                    <td>{{ action_badge(it.action, it.action_label) }}</td>
+                    <td>{{ it.username }}</td>
+                    <td class="small rk-maxw-340">
+                        <span class="d-inline-block text-truncate rk-maxw-340"
+                              title="{{ it.description }}">
+                            {{ it.description or '—' }}
+                        </span>
+                    </td>
+                    <td class="small px-3">
+                        {% if it.reason %}<div>{{ it.reason }}</div>{% endif %}
+                        {% if it.deployed_to %}
+                        <div class="text-muted">
+                            <i class="bi bi-geo-alt"></i> {{ it.deployed_to }}
+                        </div>
+                        {% endif %}
+                        {% if not it.reason and not it.deployed_to %}
+                        <span class="text-muted">—</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center text-muted py-5">
+                        <i class="bi bi-search fs-3 d-block mb-2"></i>
+                        No equipment audit entries match your filters.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ── Pagination ─────────────────────────────────────────────────── -->
+{{ pager(page_obj, "/cfau/equipment-audit", base_query) }}
+{% endblock %}
+
+{% block scripts %}
+<script nonce="{{ request.state.csp_nonce }}">
+// Live filtering — vanilla JS, no framework. Mirrors the admin audit trail:
+// dropdowns/dates submit immediately, the text search submits after a short
+// debounce so the page doesn't reload on every keystroke.
+(function () {
+    const form = document.getElementById('equipAuditFilterForm');
+    if (!form) return;
+
+    form.querySelectorAll('select, input[type="date"]').forEach(function (el) {
+        el.addEventListener('change', function () { form.submit(); });
+    });
+
+    const search = form.querySelector('input[name="q"]');
+    if (search) {
+        let timer;
+        search.addEventListener('input', function () {
+            clearTimeout(timer);
+            timer = setTimeout(function () { form.submit(); }, 400);
+        });
+        if (search.value) {
+            search.focus();
+            search.setSelectionRange(search.value.length, search.value.length);
+        }
+    }
+})();
+</script>
+{% endblock %}

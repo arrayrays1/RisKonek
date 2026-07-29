@@ -1,5 +1,5 @@
 """
-Disaster Simulator — Pydantic schemas.
+Resource Simulator — Pydantic schemas.
 
 ScenarioInput validates what the admin submits from the setup form (never the
 affected count — that is computed server-side per TR-ADM-08). SimulationResult

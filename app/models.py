@@ -561,6 +561,16 @@ class AuditLog(Base):
     description = Column(Text)                    # human-readable description
     timestamp = Column(DateTime, server_default=func.now())
 
+    # ── Logistics accountability fields (additive) ────────────────────
+    # Captured by the stock-change and equipment-status modals so a
+    # movement records WHY it happened, WHERE the goods/unit went, and
+    # WHEN it actually happened. `timestamp` above stays the system
+    # record time; `occurred_at` is the user-stated (backdatable) time.
+    # NULL on entries logged outside those modals.
+    reason = Column(Text, nullable=True)
+    deployed_to = Column(String(150), nullable=True)
+    occurred_at = Column(DateTime, nullable=True)
+
     # relationships
     user = relationship("User", back_populates="audit_logs")
 
@@ -623,6 +633,10 @@ class SavedScenario(Base):
     horizon_days = Column(Integer, nullable=False)
     result_json = Column(Text, nullable=False)            # full engine result dict
     ai_briefing = Column(Text, nullable=True)             # saved AI prose (sanitized HTML)
+    # Supplemental AI parts frozen alongside the prose: the validated
+    # suggested_actions list + the closing advisory note. NULL on rows saved
+    # before this column existed (they simply render no suggested actions).
+    ai_actions_json = Column(Text, nullable=True)
     thresholds_json = Column(Text, nullable=False)        # thresholds used for THIS run
     created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime, server_default=func.now())
@@ -636,13 +650,26 @@ class SavedScenario(Base):
 # Audit log helper (called from every route that changes data)
 # *******************************
 
-def log_action(db, user_id: int, action: str, target_table: str, target_id: int, description: str):
+def log_action(
+    db,
+    user_id: int,
+    action: str,
+    target_table: str,
+    target_id: int,
+    description: str,
+    reason: str = None,
+    deployed_to: str = None,
+    occurred_at=None,
+):
     log = AuditLog(
         user_id=user_id,
         action=action,
         target_table=target_table,
         target_id=target_id,
-        description=description
+        description=description,
+        reason=reason,
+        deployed_to=deployed_to,
+        occurred_at=occurred_at,
     )
     db.add(log)
     db.commit()

@@ -21,6 +21,7 @@ from app.models import (
 from app.auth import require_role
 from app.simulation import engine
 from app.simulation import ai_layer
+from app.simulation import presenter
 from app.simulation import thresholds as thresholds_svc
 from app.simulation import weather as weather_svc
 from app.simulation import config as C
@@ -200,7 +201,7 @@ def simulator_setup(
         request=request,
         name="admin/simulator_setup.html",
         context={
-            "title": "Disaster Simulator — RisKonek",
+            "title": "Resource Simulator — RisKonek",
             "user": user,
             "barangays": barangays,
             "disaster_types": list(DisasterType),
@@ -368,11 +369,19 @@ def simulator_run(
     # numeric report anyway with a visible "unavailable" note. The exception is
     # NEVER surfaced to the browser (it could, in theory, echo config details)
     # and the API key is never logged.
+    # The same single call also returns the supplemental suggested actions; they
+    # are validated independently of the prose, so a bad/absent action list never
+    # affects the briefing (and vice versa).
     ai_briefing = None   # sanitized HTML fragment, safe to render
     ai_note = None
+    ai_actions = []
+    ai_advisory_note = None
     try:
         raw_briefing = ai_layer.explain_simulation(result)
-        ai_briefing = ai_layer.to_safe_html(raw_briefing)
+        parsed = ai_layer.parse_briefing(raw_briefing)
+        ai_briefing = ai_layer.to_safe_html(parsed["briefing_markdown"])
+        ai_actions = parsed["suggested_actions"]
+        ai_advisory_note = parsed["advisory_note"] or None
     except Exception as exc:
         # Distinguish a Groq 429 / rate-limit from every other failure, without
         # importing the SDK's exception classes here. Check the HTTP status code
@@ -398,6 +407,7 @@ def simulator_run(
     # second simulation, no second Groq call, and no duplicate audit row.
     run_id = _store_run({
         "result": result, "ai_briefing": ai_briefing, "ai_note": ai_note,
+        "ai_actions": ai_actions, "ai_advisory_note": ai_advisory_note,
         "user_id": user["id"],
         # Extra snapshot facts the /save route freezes into a SavedScenario.
         "barangay_id": barangay.id,
@@ -437,8 +447,11 @@ def simulator_results(request: Request, run_id: str, db: Session = Depends(get_d
             "title": "Simulation Results — RisKonek",
             "user": user,
             "result": run["result"],
+            "view": presenter.build_view(run["result"]),
             "ai_briefing": run["ai_briefing"],
             "ai_note": run["ai_note"],
+            "ai_actions": run.get("ai_actions") or [],
+            "ai_advisory_note": run.get("ai_advisory_note"),
             "run_id": run_id,
             "default_scenario_name": default_scenario_name,
             # Set once this run has been saved, so the button flips to a link
@@ -495,6 +508,12 @@ def simulator_save(
         horizon_days=inputs["horizon_days"],
         result_json=json.dumps(result),
         ai_briefing=run.get("ai_briefing"),
+        # Freeze the supplemental AI parts next to the prose so the saved view
+        # and its PDF show the same suggested actions this run produced.
+        ai_actions_json=json.dumps({
+            "suggested_actions": run.get("ai_actions") or [],
+            "advisory_note": run.get("ai_advisory_note") or "",
+        }),
         thresholds_json=json.dumps(run.get("thresholds") or {}),
         created_by=user["id"],
     )
@@ -665,6 +684,7 @@ def saved_scenario_detail(
 
     result = json.loads(row.result_json)
     saved_by = row.created_by_user.username if row.created_by_user else "—"
+    saved_ai = ai_layer.load_saved_actions(row.ai_actions_json)
 
     return templates.TemplateResponse(
         request=request,
@@ -675,8 +695,11 @@ def saved_scenario_detail(
             "scenario": row,
             "saved_by": saved_by,
             "result": result,
+            "view": presenter.build_view(result),
             "ai_briefing": row.ai_briefing,
             "ai_note": None,
+            "ai_actions": saved_ai["suggested_actions"],
+            "ai_advisory_note": saved_ai["advisory_note"] or None,
         },
     )
 
@@ -702,7 +725,11 @@ def saved_scenario_pdf(
     result = json.loads(row.result_json)
     saved_by = row.created_by_user.username if row.created_by_user else "—"
     created_at_str = _to_pht(row.created_at)
-    pdf_bytes = pdf_export.build_scenario_pdf(row, result, created_at_str, saved_by)
+    saved_ai = ai_layer.load_saved_actions(row.ai_actions_json)
+    pdf_bytes = pdf_export.build_scenario_pdf(
+        row, result, created_at_str, saved_by,
+        ai_actions=saved_ai["suggested_actions"],
+    )
 
     slug = re.sub(r"[^a-z0-9]+", "-", (row.barangay_name or "scenario").lower()).strip("-")
     date_slug = row.created_at.strftime("%Y%m%d") if row.created_at else "snapshot"

@@ -1,5 +1,5 @@
 """
-Disaster Simulator — planning configuration.
+Resource Simulator — planning configuration.
 
 Central home for every planning assumption the simulator engine uses, so that
 no magic numbers live in the engine itself. Everything here is a plain constant

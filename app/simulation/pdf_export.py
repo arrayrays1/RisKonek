@@ -25,7 +25,8 @@ CLASS_LABEL = {
     "vehicles": "Response Vehicles",
 }
 STATUS_LABEL = {"Adequate": "Sufficient", "Partial": "At Risk", "Critical": "Critical"}
-READINESS_LABEL = {"Adequate": "Low Risk", "Partial": "Moderate Risk", "Critical": "High Risk"}
+READINESS_LABEL = {"Adequate": "Low Priority", "Partial": "Moderate Priority",
+                   "Critical": "High Priority"}
 
 _REPLACEMENTS = {
     "—": "-", "–": "-", "−": "-",   # em / en dash, minus
@@ -75,9 +76,11 @@ class _ScenarioPDF(FPDF):
         self.multi_cell(0, 3.5, self._footer_note, align="C")
 
 
-def build_scenario_pdf(scenario, result: dict, created_at_str: str, saved_by: str) -> bytes:
+def build_scenario_pdf(scenario, result: dict, created_at_str: str, saved_by: str,
+                       ai_actions=None) -> bytes:
     """Render the stored snapshot to PDF bytes. `scenario` is the SavedScenario
-    row (for metadata); `result` is json.loads(result_json)."""
+    row (for metadata); `result` is json.loads(result_json); `ai_actions` is the
+    already-validated suggested-actions list (empty/None for older snapshots)."""
     inputs = result.get("inputs", {})
     footer_note = (
         "Advisory estimates only - validate with current conditions and "
@@ -204,7 +207,7 @@ def build_scenario_pdf(scenario, result: dict, created_at_str: str, saved_by: st
     if briefing:
         pdf.set_font("Helvetica", "B", 11)
         pdf.set_text_color(20, 20, 20)
-        pdf.cell(0, 7, "AI Planning Briefing", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.cell(0, 7, "AI Generated Planning Summary", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         pdf.set_font("Helvetica", "I", 7)
         pdf.set_text_color(120, 120, 120)
         pdf.multi_cell(0, 4, "AI-generated - advisory - validate with current "
@@ -213,6 +216,37 @@ def build_scenario_pdf(scenario, result: dict, created_at_str: str, saved_by: st
         pdf.set_font("Helvetica", "", 9)
         pdf.set_text_color(50, 50, 50)
         pdf.multi_cell(0, 5, _ascii(briefing), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+
+    # ── Suggested planning actions (only when a briefing was saved) ───────
+    # The disclaimer is written here, never by the model — so it prints even
+    # when the snapshot holds no actions.
+    if briefing:
+        pdf.ln(2)
+        pdf.set_font("Helvetica", "B", 11)
+        pdf.set_text_color(20, 20, 20)
+        pdf.cell(0, 7, "Suggested Planning Actions (AI-Assisted)",
+                 new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.set_font("Helvetica", "I", 7)
+        pdf.set_text_color(120, 120, 120)
+        pdf.multi_cell(0, 4, "For planning purposes only. Subject to CDRRMO validation.",
+                       new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.set_font("Helvetica", "", 9)
+        pdf.set_text_color(50, 50, 50)
+        if ai_actions:
+            for i, a in enumerate(ai_actions, start=1):
+                pdf.multi_cell(0, 5, _ascii(f"{i}. {a.get('action', '')}"),
+                               new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                if a.get("basis"):
+                    pdf.set_font("Helvetica", "I", 8)
+                    pdf.set_text_color(110, 110, 110)
+                    pdf.multi_cell(0, 4, _ascii("   Basis: " + a["basis"]),
+                                   new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                    pdf.set_font("Helvetica", "", 9)
+                    pdf.set_text_color(50, 50, 50)
+        else:
+            pdf.multi_cell(0, 5, "No additional AI-assisted planning actions were "
+                                 "identified from the available data.",
+                           new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
     out = pdf.output()
     return bytes(out)

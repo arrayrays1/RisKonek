@@ -1,11 +1,11 @@
 {% extends "admin/base.html" %}
 {% set active_nav = 'simulator' %}
-{% block title %}Disaster Simulator — RisKonek{% endblock %}
+{% block title %}Resource Simulator — RisKonek{% endblock %}
 
 {% block content %}
 <div class="page-header d-flex justify-content-between align-items-start flex-wrap gap-2">
     <div>
-        <h1><i class="bi bi-lightning-fill me-2"></i>Disaster Simulator</h1>
+        <h1><i class="bi bi-lightning-fill me-2"></i>Resource Simulator</h1>
         <p>Model a hypothetical disaster scenario to support planning and
            resource decisions before an event occurs.</p>
     </div>
@@ -39,7 +39,7 @@
     <i class="bi bi-info-circle-fill"></i>
     <span>
         <strong>About this module.</strong>
-        The Disaster Simulator provides decision support for disaster planning.
+        The Resource Simulator provides decision support for disaster planning.
         All outputs are <strong>advisory estimates only</strong> and must be
         reviewed and validated by qualified CDRRMO personnel before use in any
         operational plan.
@@ -232,9 +232,9 @@
 
 {# ── Saved scenarios history — full width across the bottom ────────────── #}
 {% set readiness_badge = {
-    'Adequate': {'label': 'Low Risk',      'class': 'status-operational'},
-    'Partial':  {'label': 'Moderate Risk', 'class': 'status-maintenance'},
-    'Critical': {'label': 'High Risk',      'class': 'status-unavailable'}
+    'Adequate': {'label': 'Low Priority',      'class': 'status-operational'},
+    'Partial':  {'label': 'Moderate Priority', 'class': 'status-maintenance'},
+    'Critical': {'label': 'High Priority',      'class': 'status-unavailable'}
 } %}
 <div class="dash-card mt-4" id="saved-scenarios">
     <div class="card-title-row">
