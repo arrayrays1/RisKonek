@@ -69,7 +69,13 @@
     {% if not result.hazard_recorded %}
     <div class="alert-banner mt-3 mb-0">
         <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
-        <span>{{ result.hazard_note }}</span>
+        <span>
+            {{ result.hazard_note }}
+            Figures below are still computed normally for planning purposes —
+            if this hazard is in fact a realistic risk for this barangay, its
+            recorded hazard types can be reviewed on the
+            <a href="/admin/barangays/{{ result.barangay_id }}" class="alert-link">barangay profile</a>.
+        </span>
     </div>
     {% endif %}
 </div>
@@ -90,6 +96,11 @@
                     {{ view.overall.label }}
                 </h2>
                 <p class="mb-0 rk-fs-14 rk-lh-16 rk-maxw-720">{{ view.overall.sentence }}</p>
+                {% if view.overall.label != 'Low Priority' %}
+                <a href="#rk-attention-h" class="rk-fs-13 fw-semibold d-inline-block mt-2 text-decoration-none">
+                    See what needs attention and why <i class="bi bi-arrow-down-short"></i>
+                </a>
+                {% endif %}
                 <p class="rk-fs-12 mb-0 mt-2 rk-hero-note">
                     Based on the worst-status resource class. This ranks how urgently
                     the gaps below need planning attention — it is not a forecast of
@@ -107,7 +118,12 @@
                     <span class="fw-semibold rk-fs-13">
                         <i class="bi {{ d.icon }} me-1" aria-hidden="true"></i>{{ d.label }}
                     </span>
+                    {% if d.status != 'Adequate' %}
+                    <a href="#rk-attention-h" class="status-pill {{ d.pill }} text-decoration-none"
+                       title="See what needs attention and why">{{ d.status_label }} <i class="bi bi-arrow-down-short"></i></a>
+                    {% else %}
                     <span class="status-pill {{ d.pill }}">{{ d.status_label }}</span>
+                    {% endif %}
                 </div>
                 <div class="progress rk-h-10 mb-2">
                     <div class="progress-bar {{ d.bar }} rk-w-p{{ d.pct }}" role="progressbar"
@@ -171,7 +187,10 @@
             </div>
         </div>
         <div class="col-6 col-lg-3">
-            <div class="dash-card rk-figure h-100">
+            <{{ 'a' if fig.critical_count else 'div' }}
+                {{ 'href="#rk-attention-h"' if fig.critical_count }}
+                class="dash-card rk-figure h-100 d-block text-decoration-none text-reset{{ ' rk-figure-linked' if fig.critical_count }}"
+                {% if fig.critical_count %}title="See which resource categories and why"{% endif %}>
                 <div class="rk-figure-head">
                     <span class="stat-label mb-0">Critical Resource Gaps</span>
                     <span class="stat-icon {{ 'rk-tint-red' if fig.critical_count else 'rk-tint-green' }}"
@@ -189,8 +208,9 @@
                     of {{ view.rows | length }} resource
                     {{ 'category' if view.rows | length == 1 else 'categories' }},
                     below half of the estimated requirement
+                    {% if fig.critical_count %}<span class="d-block rk-text-green mt-1">See which ones <i class="bi bi-arrow-down-short"></i></span>{% endif %}
                 </div>
-            </div>
+            </{{ 'a' if fig.critical_count else 'div' }}>
         </div>
         <div class="col-6 col-lg-3">
             <div class="dash-card rk-figure h-100">
@@ -214,8 +234,10 @@
     </div>
 </section>
 
-<!-- ── 5. What needs attention ─────────────────────────────────────────── -->
-<section class="dash-card rk-section rk-section-warn mb-3" aria-labelledby="rk-attention-h">
+<!-- ── 5 & 6: Needs Attention + Suggested Actions, paired side by side ──── -->
+<div class="row g-3 mb-3 align-items-start">
+<div class="col-md-6">
+<section class="dash-card rk-section rk-section-warn h-100" aria-labelledby="rk-attention-h">
     <div class="card-title-row">
         <h2 id="rk-attention-h" class="rk-h-section">
             <i class="bi bi-exclamation-diamond me-1" aria-hidden="true"></i>What Needs Attention
@@ -247,15 +269,16 @@
         </p>
     {% endif %}
 </section>
+</div>
 
-<!-- ── 6. Suggested planning actions (AI-assisted) ─────────────────────── -->
+<div class="col-md-6">
 {# Rendered from the validated `ai_actions` list, ALWAYS escaped (never |safe)
    and capped at five. The heading and the disclaimer are hardcoded here, not
    model output, so they stay visible when the list is empty or the AI failed.
    Informational only: the system has no assign/deploy workflow, so no such
    control is offered. #}
 {% set actions = (ai_actions | default([], true))[:5] %}
-<section class="dash-card rk-section rk-section-ok mb-3" aria-labelledby="rk-actions-h">
+<section class="dash-card rk-section rk-section-ok h-100" aria-labelledby="rk-actions-h">
     <div class="card-title-row flex-wrap">
         <h2 id="rk-actions-h" class="rk-h-section">
             <i class="bi bi-list-check me-1" aria-hidden="true"></i>Suggested Planning Actions
@@ -289,6 +312,8 @@
         </p>
     {% endif %}
 </section>
+</div>
+</div>
 
 <!-- ── 7. Resource coverage overview ───────────────────────────────────── -->
 {# Replaces the old shared-axis Need-vs-Available bar chart: litres, packs, kits,

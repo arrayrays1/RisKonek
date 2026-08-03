@@ -6,12 +6,6 @@
 
 {% block head_extra %}
 <style nonce="{{ request.state.csp_nonce }}">
-    .alert-banner {
-        background: #fff8e1; border-left: 4px solid #ffc107;
-        border-radius: 6px; padding: 10px 14px;
-        font-size: 13px; color: #856404; margin-bottom: 16px;
-        display: flex; align-items: center; gap: 8px;
-    }
     .attn-item {
         display: flex; align-items: center; gap: 12px;
         padding: 10px 0; border-bottom: 1px solid #f0f0f0;
@@ -42,7 +36,7 @@
         font-size: 14px; flex-shrink: 0;
     }
     .feed-text { font-size: 13px; color: var(--rk-text); }
-    .feed-time { font-size: 11px; color: #aaa; margin-top: 2px; }
+    .feed-time { font-size: 11px; color: var(--rk-muted); margin-top: 2px; }
 </style>
 {% endblock %}
 
@@ -128,17 +122,21 @@
 </div>
 
 <!-- ── ROW 2: Needs attention + Fleet status ──────────────────── -->
-<div class="row g-3 mb-4">
+<div class="row g-3 mb-4 align-items-start">
 
     <div class="col-md-7">
-        <div class="dash-card">
-            <div class="card-title-row">
-                <i class="bi bi-exclamation-triangle-fill text-danger"></i>
-                <h6>Stock Needing Attention</h6>
+        <div class="dash-card rk-collapsible">
+            <div class="rk-collapsible-toggle-row">
+                <button class="rk-collapsible-toggle" type="button" aria-expanded="true">
+                    <i class="bi bi-chevron-down"></i>
+                    <i class="bi bi-exclamation-triangle-fill text-danger"></i>
+                    <span>Stock Needing Attention</span>
+                </button>
                 <a href="/admin/resources" class="ms-auto rk-fs-12 rk-text-green text-decoration-none">
                     Open Inventory <i class="bi bi-arrow-right"></i>
                 </a>
             </div>
+            <div class="rk-collapsible-body">
 
             {% if attention %}
                 {% for r in attention %}
@@ -178,6 +176,7 @@
                     All stock is above threshold and within expiry.
                 </div>
             {% endif %}
+            </div>
         </div>
     </div>
 
@@ -222,7 +221,7 @@
 </div>
 
 <!-- ── ROW 3: Category chart + Recent activity ────────────────── -->
-<div class="row g-3 mb-4">
+<div class="row g-3 mb-4 align-items-start">
 
     <div class="col-md-6">
         <div class="dash-card">
@@ -235,14 +234,18 @@
     </div>
 
     <div class="col-md-6">
-        <div class="dash-card">
-            <div class="card-title-row">
-                <i class="bi bi-clock-history text-warning"></i>
-                <h6>Recent Logistics Activity</h6>
+        <div class="dash-card rk-collapsible" data-default-collapsed>
+            <div class="rk-collapsible-toggle-row">
+                <button class="rk-collapsible-toggle" type="button" aria-expanded="false">
+                    <i class="bi bi-chevron-down"></i>
+                    <i class="bi bi-clock-history text-warning"></i>
+                    <span>Recent Logistics Activity</span>
+                </button>
                 <a href="/staff/audit" class="ms-auto rk-fs-12 rk-text-green text-decoration-none">
                     Full Trail <i class="bi bi-arrow-right"></i>
                 </a>
             </div>
+            <div class="rk-collapsible-body">
 
             {% if recent_logs %}
                 {% for log in recent_logs %}
@@ -273,6 +276,7 @@
                     No logistics activity yet. Changes to resources and equipment will appear here.
                 </div>
             {% endif %}
+            </div>
         </div>
     </div>
 

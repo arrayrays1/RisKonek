@@ -6,12 +6,6 @@
 
 {% block head_extra %}
 <style nonce="{{ request.state.csp_nonce }}">
-    .alert-banner {
-        background: #fff8e1; border-left: 4px solid #ffc107;
-        border-radius: 6px; padding: 10px 14px;
-        font-size: 13px; color: #856404; margin-bottom: 16px;
-        display: flex; align-items: center; gap: 8px;
-    }
     .attn-item {
         display: flex; align-items: center; gap: 12px;
         padding: 10px 0; border-bottom: 1px solid #f0f0f0;
@@ -42,7 +36,7 @@
         font-size: 14px; flex-shrink: 0;
     }
     .feed-text { font-size: 13px; color: var(--rk-text); }
-    .feed-time { font-size: 11px; color: #aaa; margin-top: 2px; }
+    .feed-time { font-size: 11px; color: var(--rk-muted); margin-top: 2px; }
 </style>
 {% endblock %}
 
@@ -127,17 +121,21 @@
 </div>
 
 <!-- ── ROW 2: Action needed + Fleet status ────────────────────── -->
-<div class="row g-3 mb-4">
+<div class="row g-3 mb-4 align-items-start">
 
     <div class="col-md-7">
-        <div class="dash-card">
-            <div class="card-title-row">
-                <i class="bi bi-list-check text-danger"></i>
-                <h6>Needs Your Attention</h6>
-                <a href="/cfau/serviceability" class="ms-auto rk-fs-12 rk-text-green text-decoration-none">
+        <div class="dash-card rk-collapsible">
+            <div class="rk-collapsible-toggle-row">
+                <button class="rk-collapsible-toggle" type="button" aria-expanded="true">
+                    <i class="bi bi-chevron-down"></i>
+                    <i class="bi bi-list-check text-danger"></i>
+                    <span>Needs Your Attention</span>
+                </button>
+                <a href="/cfau/serviceability" class="ms-auto rk-fs-12 rk-text-green text-decoration-none flex-shrink-0">
                     All Reports <i class="bi bi-arrow-right"></i>
                 </a>
             </div>
+            <div class="rk-collapsible-body">
 
             {% if action_items %}
                 {% for r in action_items %}
@@ -172,6 +170,7 @@
                     Nothing pending — no drafts and no urgent findings awaiting review.
                 </div>
             {% endif %}
+            </div>
         </div>
     </div>
 
@@ -216,14 +215,16 @@
 </div>
 
 <!-- ── ROW 3: Repair schedule + Report workflow chart ─────────── -->
-<div class="row g-3 mb-4">
+<div class="row g-3 mb-4 align-items-start">
 
     <div class="col-md-6">
-        <div class="dash-card">
-            <div class="card-title-row">
+        <div class="dash-card rk-collapsible">
+            <button class="rk-collapsible-toggle" type="button" aria-expanded="true">
+                <i class="bi bi-chevron-down"></i>
                 <i class="bi bi-calendar-check rk-text-info"></i>
-                <h6>Repair Schedule</h6>
-            </div>
+                <span>Repair Schedule</span>
+            </button>
+            <div class="rk-collapsible-body">
             <p class="text-muted rk-fs-11 mb-2">
                 Scheduled repairs on your reports whose unit is still out of service.
                 A reminder clears itself once the unit returns to service.
@@ -262,6 +263,7 @@
                     No repairs scheduled on your reports.
                 </div>
             {% endif %}
+            </div>
         </div>
     </div>
 
@@ -284,14 +286,18 @@
 </div>
 
 <!-- ── ROW 4: Recent equipment activity ───────────────────────── -->
-<div class="dash-card mb-4">
-    <div class="card-title-row">
-        <i class="bi bi-clock-history text-warning"></i>
-        <h6>Recent Equipment Activity</h6>
+<div class="dash-card mb-4 rk-collapsible" data-default-collapsed>
+    <div class="rk-collapsible-toggle-row">
+        <button class="rk-collapsible-toggle" type="button" aria-expanded="false">
+            <i class="bi bi-chevron-down"></i>
+            <i class="bi bi-clock-history text-warning"></i>
+            <span>Recent Equipment Activity</span>
+        </button>
         <a href="/cfau/equipment-audit" class="ms-auto rk-fs-12 rk-text-green text-decoration-none">
             Full Audit Log <i class="bi bi-arrow-right"></i>
         </a>
     </div>
+    <div class="rk-collapsible-body">
 
     {% if recent_activity %}
         {% for it in recent_activity %}
@@ -321,6 +327,7 @@
             No equipment activity yet. Additions, edits, and status movements will appear here.
         </div>
     {% endif %}
+    </div>
 </div>
 
 <!-- ── ROW 5: Module quick links ──────────────────────────────── -->

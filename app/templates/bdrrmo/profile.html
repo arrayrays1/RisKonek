@@ -7,10 +7,16 @@
 {% block head_extra %}
 <style nonce="{{ request.state.csp_nonce }}">
     .profile-header { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
-    .profile-header h1 { margin: 0; }
+    .profile-header h1 {
+        margin: 0;
+        font-size: var(--rk-fs-h1);
+        font-weight: 700;
+        color: var(--rk-text);
+    }
     .trend-up { color: #c0392b; }
     .trend-stable { color: #6c757d; }
     .group-card { background: #fafbfc; border-radius: 10px; padding: 18px; }
+    html[data-theme="dark"] .group-card { background: var(--rk-bg); }
     .group-card .group-label { font-size: 12px; color: var(--rk-muted); }
     .group-card .group-value { font-size: 28px; font-weight: 700; color: var(--rk-text); margin: 4px 0; }
     .group-card .group-pct { font-size: 11px; color: var(--rk-green); font-weight: 600; }

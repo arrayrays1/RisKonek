@@ -10,20 +10,27 @@
         display: flex; align-items: center; gap: 14px;
         flex-wrap: wrap;
     }
-    .profile-header h1 { margin: 0; }
+    .profile-header h1 {
+        margin: 0;
+        font-size: var(--rk-fs-h1);
+        font-weight: 700;
+        color: var(--rk-text);
+    }
     .trend-up    { color: #c0392b; }
     .trend-stable { color: #6c757d; }
 
-    .nav-tabs-clean { border-bottom: 1px solid #e5e7eb; gap: 4px; }
+    .nav-tabs-clean { border-bottom: 1px solid var(--rk-border); gap: 4px; }
     .nav-tabs-clean .nav-link {
         border: none; color: var(--rk-muted);
         font-size: 13px; font-weight: 500;
         padding: 10px 18px; border-radius: 999px;
     }
     .nav-tabs-clean .nav-link.active {
-        background: white; color: var(--rk-text);
+        background: var(--rk-surface); color: var(--rk-text);
         box-shadow: 0 1px 3px rgba(0,0,0,0.08);
     }
+
+    html[data-theme="dark"] .group-card { background: var(--rk-bg); }
 
     .info-section h6 {
         font-size: 13px; font-weight: 600;

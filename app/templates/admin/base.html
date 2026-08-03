@@ -18,6 +18,10 @@
             if (localStorage.getItem('rk_sidebar_collapsed') === '1') {
                 html.classList.add('rk-sidebar-collapsed');
             }
+            var savedTheme = localStorage.getItem('rk_theme');
+            if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                html.setAttribute('data-theme', 'dark');
+            }
         } catch (e) { /* localStorage unavailable — ignore */ }
     })();
     </script>
@@ -47,6 +51,10 @@
             <div class="brand-name">RISKONEK</div>
             <div class="brand-sub">{{ portal_label }}</div>
         </div>
+        <button class="theme-toggle" id="themeToggle" type="button"
+                aria-label="Toggle dark mode" title="Toggle dark mode">
+            <i class="bi bi-moon-stars-fill" id="themeToggleIcon"></i>
+        </button>
         <button class="sidebar-toggle" id="sidebarToggle" type="button"
                 aria-label="Toggle sidebar" title="Toggle sidebar">
             <i class="bi bi-list" id="sidebarToggleIcon"></i>
@@ -110,10 +118,32 @@
         {% endif %}
 
         {% if is_staff %}
+        <div class="nav-section">Overview</div>
         <a href="/staff/dashboard"
            class="nav-item-link nav-accent-green {{ 'active' if active == 'staff_dashboard' else '' }}">
             <i class="bi bi-grid-1x2-fill nav-icon"></i><span class="nav-label">Dashboard</span>
         </a>
+
+        <div class="nav-section">Inventory</div>
+        <a href="/admin/resources"
+           class="nav-item-link nav-accent-pink {{ 'active' if active == 'resources' else '' }}"
+           title="Stockpile / resource goods owned by CDRRMO Logistics Staff (food packs, water, medicine, hygiene kits, blankets, and other relief goods)">
+            <i class="bi bi-box-seam-fill nav-icon"></i><span class="nav-label">Resources Module</span>
+        </a>
+        <a href="/admin/equipment"
+           class="nav-item-link {{ 'active' if active == 'equipment' else '' }}"
+           title="Vehicles, generators, chainsaws, flashlights, rescue tools, boats, ambulances, and other operational equipment">
+            <i class="bi bi-wrench-adjustable nav-icon"></i><span class="nav-label">Vehicle &amp; Equipment</span>
+        </a>
+
+        <div class="nav-section">Records</div>
+        <a href="/staff/audit"
+           class="nav-item-link nav-accent-orange {{ 'active' if active == 'staff_audit' else '' }}"
+           title="Recorded changes to stockpile resources and to vehicles &amp; equipment">
+            <i class="bi bi-file-earmark-text-fill nav-icon"></i><span class="nav-label">Audit Trail</span>
+        </a>
+
+        <div class="nav-section">Contacts</div>
         <a href="/staff/contacts"
            class="nav-item-link nav-accent-pink {{ 'active' if active == 'contacts' else '' }}"
            title="Barangay officials and emergency responder contacts (read-only)">
@@ -121,23 +151,22 @@
         </a>
         {% endif %}
         {% if is_cfau %}
+        <div class="nav-section">Overview</div>
         <a href="/cfau/dashboard"
            class="nav-item-link nav-accent-green {{ 'active' if active == 'cfau_dashboard' else '' }}">
             <i class="bi bi-grid-1x2-fill nav-icon"></i><span class="nav-label">Dashboard</span>
         </a>
-        <a href="/cfau/contacts"
-           class="nav-item-link nav-accent-pink {{ 'active' if active == 'contacts' else '' }}"
-           title="Barangay officials and emergency responder contacts (read-only)">
-            <i class="bi bi-person-vcard nav-icon"></i><span class="nav-label">Contact Directory</span>
-        </a>
         {% endif %}
 
         {% if is_bdrrmo %}
+        <div class="nav-section">Overview</div>
         <a href="/bdrrmo/profile"
            class="nav-item-link nav-accent-green {{ 'active' if active == 'bdrrmo_profile' else '' }}"
            title="Disaster profile and planning priority for your barangay">
             <i class="bi bi-geo-alt-fill nav-icon"></i><span class="nav-label">Barangay Profile</span>
         </a>
+
+        <div class="nav-section">Incident Records</div>
         <a href="/bdrrmo/incidents"
            class="nav-item-link nav-accent-orange {{ 'active' if active == 'bdrrmo_incidents' else '' }}"
            title="Historical disaster incidents in your barangay">
@@ -148,6 +177,8 @@
            title="Document response actions and operational outcomes after an incident in your barangay">
             <i class="bi bi-journal-text nav-icon"></i><span class="nav-label">Post-Incident Reports</span>
         </a>
+
+        <div class="nav-section">Facilities &amp; Population</div>
         <a href="/bdrrmo/facilities"
            class="nav-item-link nav-accent-blue {{ 'active' if active == 'bdrrmo_facilities' else '' }}"
            title="Critical facilities in your barangay">
@@ -158,6 +189,8 @@
            title="Record and view population data for your barangay">
             <i class="bi bi-people-fill nav-icon"></i><span class="nav-label">Population Records</span>
         </a>
+
+        <div class="nav-section">Contacts</div>
         <a href="/bdrrmo/contacts"
            class="nav-item-link nav-accent-pink {{ 'active' if active == 'bdrrmo_contacts' else '' }}"
            title="Manage officials and emergency responder contacts">
@@ -170,45 +203,36 @@
         </a>
         {% endif %}
 
-        {% if is_staff %}
-        <a href="/admin/resources"
-           class="nav-item-link nav-accent-pink {{ 'active' if active == 'resources' else '' }}"
-           title="Stockpile / resource goods owned by CDRRMO Logistics Staff (food packs, water, medicine, hygiene kits, blankets, and other relief goods)">
-            <i class="bi bi-box-seam-fill nav-icon"></i><span class="nav-label">Resources Module</span>
-        </a>
-        {% endif %}
-
-        {% if is_staff or is_cfau %}
+        {% if is_cfau %}
+        <div class="nav-section">Equipment &amp; Serviceability</div>
         <a href="/admin/equipment"
            class="nav-item-link {{ 'active' if active == 'equipment' else '' }}"
-           title="Shared module — accessible to CDRRMO Logistics Staff and CFAU / Operations Personnel (vehicles, generators, chainsaws, flashlights, rescue tools, boats, ambulances, and other operational equipment)">
+           title="Vehicles, generators, chainsaws, flashlights, rescue tools, boats, ambulances, and other operational equipment">
             <i class="bi bi-wrench-adjustable nav-icon"></i><span class="nav-label">Vehicle &amp; Equipment</span>
         </a>
-        {% endif %}
-
-        {% if is_staff %}
-        <a href="/staff/audit"
-           class="nav-item-link nav-accent-orange {{ 'active' if active == 'staff_audit' else '' }}"
-           title="Recorded changes to stockpile resources and to vehicles &amp; equipment">
-            <i class="bi bi-file-earmark-text-fill nav-icon"></i><span class="nav-label">Audit Trail</span>
-        </a>
-        {% endif %}
-
-        {% if is_cfau %}
         <a href="/cfau/serviceability"
            class="nav-item-link nav-accent-blue {{ 'active' if active == 'serviceability' else '' }}"
            title="Equipment inspection, maintenance, and serviceability reports">
             <i class="bi bi-clipboard2-check nav-icon"></i><span class="nav-label">Serviceability Reports</span>
         </a>
+        <a href="/cfau/equipment-audit"
+           class="nav-item-link nav-accent-blue {{ 'active' if active == 'equipment_audit' else '' }}"
+           title="Read-only trail of every change made to a vehicle or equipment unit — additions, edits, status movements, archiving, and serviceability reports.">
+            <i class="bi bi-clock-history nav-icon"></i><span class="nav-label">Equipment Audit Log</span>
+        </a>
+
+        <div class="nav-section">Incident Records</div>
         <a href="/cfau/incident-reports"
            class="nav-item-link nav-accent-purple {{ 'active' if active == 'incident_reports' else '' }}"
            title="Document response actions and operational outcomes for incidents.">
             <i class="bi bi-journal-text nav-icon"></i><span class="nav-label">Post-Incident Reports</span>
         </a>
-        <a href="/cfau/equipment-audit"
-           class="nav-item-link nav-accent-blue {{ 'active' if active == 'equipment_audit' else '' }}"
-           title="Read-only trail of every change made to a vehicle or equipment unit — additions, edits, status movements, archiving, and serviceability reports.">
-            <i class="bi bi-clock-history nav-icon"></i><span class="nav-label">Equipment Audit Log</span>
+
+        <div class="nav-section">Contacts</div>
+        <a href="/cfau/contacts"
+           class="nav-item-link nav-accent-pink {{ 'active' if active == 'contacts' else '' }}"
+           title="Barangay officials and emergency responder contacts (read-only)">
+            <i class="bi bi-person-vcard nav-icon"></i><span class="nav-label">Contact Directory</span>
         </a>
         {% endif %}
 
@@ -280,6 +304,73 @@
     requestAnimationFrame(function () {
         requestAnimationFrame(function () {
             html.classList.remove('rk-no-anim');
+        });
+    });
+})();
+</script>
+<script nonce="{{ request.state.csp_nonce }}">
+// ── Dark / light theme toggle (persisted in localStorage) ──────────
+(function () {
+    const html  = document.documentElement;
+    const btn   = document.getElementById('themeToggle');
+    const icon  = document.getElementById('themeToggleIcon');
+    const KEY   = 'rk_theme';
+
+    function syncIcon() {
+        icon.className = html.getAttribute('data-theme') === 'dark'
+            ? 'bi bi-sun-fill'
+            : 'bi bi-moon-stars-fill';
+    }
+    syncIcon();
+
+    btn.addEventListener('click', function () {
+        const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+        if (next === 'dark') { html.setAttribute('data-theme', 'dark'); }
+        else { html.removeAttribute('data-theme'); }
+        try { localStorage.setItem(KEY, next); } catch (e) { /* ignore */ }
+        syncIcon();
+    });
+})();
+</script>
+<script nonce="{{ request.state.csp_nonce }}">
+// ── "Jump to detail" links that may point inside a closed Bootstrap
+// .collapse (e.g. a warning pill linking down to a concern card that's
+// past the "View all resource gaps" fold). Expand it first, then scroll,
+// so the link never lands on an invisible element.
+(function () {
+    document.addEventListener('click', function (e) {
+        const link = e.target.closest('a[href^="#"]');
+        if (!link) return;
+        const id = link.getAttribute('href').slice(1);
+        const target = id && document.getElementById(id);
+        if (!target) return;
+        const hiddenCollapse = target.closest('.collapse:not(.show)');
+        if (!hiddenCollapse) return;
+        e.preventDefault();
+        const bsCollapse = bootstrap.Collapse.getOrCreateInstance(hiddenCollapse);
+        hiddenCollapse.addEventListener('shown.bs.collapse', function onShown() {
+            hiddenCollapse.removeEventListener('shown.bs.collapse', onShown);
+            target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        });
+        bsCollapse.show();
+    });
+})();
+</script>
+<script nonce="{{ request.state.csp_nonce }}">
+// ── Collapsible sections — any .rk-collapsible with a .rk-collapsible-toggle
+// button toggles its .rk-collapsible-body. Used to shorten long pages
+// (see rk.css for markup pattern).
+(function () {
+    document.querySelectorAll('.rk-collapsible').forEach(function (box) {
+        if (!box.hasAttribute('data-open')) {
+            box.setAttribute('data-open', box.hasAttribute('data-default-collapsed') ? 'false' : 'true');
+        }
+        const toggle = box.querySelector('.rk-collapsible-toggle');
+        if (!toggle) return;
+        toggle.addEventListener('click', function () {
+            const open = box.getAttribute('data-open') === 'true';
+            box.setAttribute('data-open', open ? 'false' : 'true');
+            toggle.setAttribute('aria-expanded', open ? 'false' : 'true');
         });
     });
 })();

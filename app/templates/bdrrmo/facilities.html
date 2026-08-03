@@ -271,7 +271,6 @@
                     <th class="py-3">Type</th>
                     <th class="py-3">Capacity</th>
                     <th class="py-3">Hazard Support</th>
-                    <th class="py-3">Coordinates</th>
                     <th class="py-3">Status</th>
                     <th class="py-3 px-3 text-end">Actions</th>
                 </tr>
@@ -310,7 +309,6 @@
                         {% if f.supports_fire %}<i class="bi bi-fire text-danger me-1" title="Fire"></i>{% endif %}
                         {% else %}<span class="text-muted">—</span>{% endif %}
                     </td>
-                    <td class="text-muted">{{ "%.5f"|format(f.latitude) }}, {{ "%.5f"|format(f.longitude) }}</td>
                     <td>
                         <span class="status-pill {{ status_classes[sval] }}">{{ status_labels[sval] }}</span>
                     </td>
@@ -354,7 +352,7 @@
                     </td>
                 </tr>
                 {% else %}
-                <tr><td colspan="{{ 8 if citywide else 7 }}" class="text-center text-muted py-4">
+                <tr><td colspan="{{ 7 if citywide else 6 }}" class="text-center text-muted py-4">
                     {% if show_archived %}
                     No archived facilities.
                     {% elif citywide %}

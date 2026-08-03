@@ -3,7 +3,7 @@
    variable `c` (a row from app/simulation/presenter.build_view). Neutral card
    surface with a status accent border — colour is never the only indicator, the
    status pill always carries the text. #}
-<div class="rk-concern-card {{ c.accent }} mb-2">
+<div class="rk-concern-card {{ c.accent }} mb-2" id="rk-concern-{{ c.key }}">
     <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap mb-1">
         <span class="fw-semibold rk-fs-14">
             {{ c.label }}

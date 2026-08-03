@@ -20,7 +20,7 @@
     .brgy-name { font-size: 14px; font-weight: 600; color: var(--rk-text); }
     .brgy-sub { font-size: 11px; color: var(--rk-muted); }
     .score-bar-track {
-        height: 6px; background: #f0f0f0; border-radius: 3px;
+        height: 6px; background: var(--rk-border); border-radius: 3px;
         overflow: hidden; margin-top: 6px;
     }
     .score-bar-fill {
@@ -39,19 +39,13 @@
         font-size: 14px; flex-shrink: 0;
     }
     .feed-text { font-size: 13px; color: var(--rk-text); }
-    .feed-time { font-size: 11px; color: #aaa; margin-top: 2px; }
+    .feed-time { font-size: 11px; color: var(--rk-muted); margin-top: 2px; }
 
     #dashMap { height: 320px; border-radius: 8px; }
 
     .prep-table th { font-size: 12px; color: var(--rk-muted); font-weight: 500; border: none; }
-    .prep-table td { font-size: 13px; vertical-align: middle; border-color: #f5f5f5; }
+    .prep-table td { font-size: 13px; vertical-align: middle; border-color: var(--rk-border); }
 
-    .alert-banner {
-        background: #fff8e1; border-left: 4px solid #ffc107;
-        border-radius: 6px; padding: 10px 14px;
-        font-size: 13px; color: #856404; margin-bottom: 16px;
-        display: flex; align-items: center; gap: 8px;
-    }
 </style>
 {% endblock %}
 
@@ -153,14 +147,16 @@
 </div>
 
 <!-- ── ROW 2: Insights feed + Mini map ────────────────────────── -->
-<div class="row g-3 mb-4">
+<div class="row g-3 mb-4 align-items-start">
 
     <div class="col-md-7">
-        <div class="dash-card">
-            <div class="card-title-row">
+        <div class="dash-card rk-collapsible">
+            <button class="rk-collapsible-toggle" type="button" aria-expanded="true">
+                <i class="bi bi-chevron-down"></i>
                 <i class="bi bi-bell text-warning"></i>
-                <h6>Insights & Latest Updates</h6>
-            </div>
+                <span>Insights & Latest Updates</span>
+            </button>
+            <div class="rk-collapsible-body">
 
             {% if recent_logs %}
                 {% for log in recent_logs %}
@@ -189,6 +185,7 @@
                     No recent activity yet. Actions taken in the system will appear here.
                 </div>
             {% endif %}
+            </div>
         </div>
     </div>
 
@@ -213,8 +210,8 @@
 
 </div>
 
-<!-- ── ROW 3: Charts ──────────────────────────────────────────── -->
-<div class="row g-3 mb-4">
+<!-- ── ROW 3: Bar graph side by side with the needs-attention panel ──── -->
+<div class="row g-3 mb-4 align-items-start">
 
     <div class="col-md-6">
         <div class="dash-card">
@@ -229,23 +226,8 @@
     <div class="col-md-6">
         <div class="dash-card">
             <div class="card-title-row">
-                <i class="bi bi-graph-up rk-text-green"></i>
-                <h6>Incidents Trend (Last 6 Years)</h6>
-            </div>
-            <canvas id="trendChart" height="180"></canvas>
-        </div>
-    </div>
-
-</div>
-
-<!-- ── ROW 4: Top 5 + Preparedness table ─────────────────────── -->
-<div class="row g-3 mb-4">
-
-    <div class="col-md-6">
-        <div class="dash-card">
-            <div class="card-title-row">
                 <i class="bi bi-exclamation-triangle-fill text-danger"></i>
-                <h6>Priority Barangays (Frequently Affected)</h6>
+                <h6>Priority Barangays (Needs Attention)</h6>
             </div>
 
             <div class="text-muted mb-2 rk-fs-11">
@@ -289,40 +271,57 @@
         </div>
     </div>
 
+</div>
+
+<!-- ── ROW 4: Trend chart + collapsible preparedness table ───────────── -->
+<div class="row g-3 mb-4 align-items-start">
+
     <div class="col-md-6">
         <div class="dash-card">
             <div class="card-title-row">
-                <i class="bi bi-shield-fill-check rk-text-green"></i>
-                <h6>Preparedness Index Overview</h6>
+                <i class="bi bi-graph-up rk-text-green"></i>
+                <h6>Incidents Trend (Last 6 Years)</h6>
             </div>
+            <canvas id="trendChart" height="180"></canvas>
+        </div>
+    </div>
 
-            <table class="table prep-table">
-                <thead>
-                    <tr>
-                        <th>Barangay</th>
-                        <th>Score</th>
-                        <th>Planning Priority</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for brgy in all_scores[:10] %}
-                    <tr>
-                        <td>{{ brgy.name }}</td>
-                        <td class="fw-medium">{{ brgy.score }}</td>
-                        <td>
-                            <span class="risk-badge risk-{{ brgy.level }}">
-                                {{ brgy.level.title() }}
-                            </span>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+    <div class="col-md-6">
+        <div class="dash-card rk-collapsible" data-default-collapsed>
+            <button class="rk-collapsible-toggle" type="button" aria-expanded="false">
+                <i class="bi bi-chevron-down"></i>
+                <i class="bi bi-shield-fill-check rk-text-green"></i>
+                <span>Preparedness Index Overview</span>
+            </button>
+            <div class="rk-collapsible-body">
+                <table class="table prep-table">
+                    <thead>
+                        <tr>
+                            <th>Barangay</th>
+                            <th>Score</th>
+                            <th>Planning Priority</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for brgy in all_scores[:10] %}
+                        <tr>
+                            <td>{{ brgy.name }}</td>
+                            <td class="fw-medium">{{ brgy.score }}</td>
+                            <td>
+                                <span class="risk-badge risk-{{ brgy.level }}">
+                                    {{ brgy.level.title() }}
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
 
-            <a href="/admin/barangays"
-               class="btn-soft w-100 justify-content-center mt-2 rk-text-green">
-                View All Barangays <i class="bi bi-arrow-right"></i>
-            </a>
+                <a href="/admin/barangays"
+                   class="btn-soft w-100 justify-content-center mt-2 rk-text-green">
+                    View All Barangays <i class="bi bi-arrow-right"></i>
+                </a>
+            </div>
         </div>
     </div>
 
