@@ -21,6 +21,12 @@
             var savedTheme = localStorage.getItem('rk_theme');
             if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
                 html.setAttribute('data-theme', 'dark');
+                // Bootstrap 5.3 ships its own dark-mode variables (badges,
+                // borders, text-muted, form controls, ...) gated behind
+                // data-bs-theme specifically — a different attribute than
+                // our own. Without this, all of that stays permanently
+                // light regardless of our toggle.
+                html.setAttribute('data-bs-theme', 'dark');
             }
         } catch (e) { /* localStorage unavailable — ignore */ }
     })();
@@ -33,6 +39,8 @@
     {% block head_extra %}{% endblock %}
 </head>
 <body>
+
+<a href="#mainContent" class="rk-skip-link">Skip to main content</a>
 
 {# ── Role-aware sidebar locals (hoisted so brand subtitle can use them) ── #}
 {% set role = (user.role if user else '') %}
@@ -71,8 +79,19 @@
     </div>
     {% endif %}
 
+    {% set search_prefix = '/admin' if is_admin else ('/staff' if is_staff else ('/cfau' if is_cfau else ('/bdrrmo' if is_bdrrmo else ''))) %}
+    {% set search_placeholder = 'Search barangays, resources…' if is_admin else ('Search resources, equipment…' if is_staff else ('Search equipment, reports…' if is_cfau else 'Search facilities, equipment…')) %}
+    {% if search_prefix %}
+    <div class="rk-global-search" data-search-prefix="{{ search_prefix }}">
+        <i class="bi bi-search"></i>
+        <input type="text" id="rkSearchInput" placeholder="{{ search_placeholder }}"
+               autocomplete="off" aria-label="Search">
+        <div class="rk-global-search-results" id="rkSearchResults"></div>
+    </div>
+    {% endif %}
+
     {% set active = active_nav | default('') %}
-    <nav>
+    <nav aria-label="Primary">
         {# ── Admin: grouped, data-driven navigation ──────────────────────
            Each section renders in order; every item keeps its active-route
            key and tooltip. To change the admin sidebar, edit this list — the
@@ -239,6 +258,9 @@
     </nav>
 
     <div class="sidebar-footer">
+        <a href="#" id="rkTourReplay">
+            <i class="bi bi-question-circle nav-icon"></i><span class="nav-label">Take a Tour</span>
+        </a>
         <a href="/logout">
             <i class="bi bi-box-arrow-right nav-icon"></i><span class="nav-label">Logout</span>
         </a>
@@ -246,9 +268,14 @@
 </div>
 
 <!-- ── MAIN CONTENT ───────────────────────────────────────────────── -->
-<div class="main-content">
+<button class="rk-mobile-menu-btn" id="mobileMenuBtn" type="button"
+        aria-label="Open menu" title="Open menu">
+    <i class="bi bi-list"></i>
+</button>
+<div class="rk-sidebar-backdrop" id="sidebarBackdrop"></div>
+<main class="main-content" id="mainContent" tabindex="-1">
     {% block content %}{% endblock %}
-</div>
+</main>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"
         integrity="sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz" crossorigin="anonymous"></script>
@@ -279,11 +306,16 @@
 <script nonce="{{ request.state.csp_nonce }}">
 // ── Collapsible sidebar (state persisted in localStorage) ──────────
 (function () {
-    const html   = document.documentElement;
-    const toggle = document.getElementById('sidebarToggle');
-    const icon   = document.getElementById('sidebarToggleIcon');
-    const KEY    = 'rk_sidebar_collapsed';
-    const CLS    = 'rk-sidebar-collapsed';
+    const html     = document.documentElement;
+    const toggle   = document.getElementById('sidebarToggle');
+    const icon     = document.getElementById('sidebarToggleIcon');
+    const backdrop = document.getElementById('sidebarBackdrop');
+    const sidebar  = document.getElementById('sidebar');
+    const mobileBtn = document.getElementById('mobileMenuBtn');
+    const KEY      = 'rk_sidebar_collapsed';
+    const CLS      = 'rk-sidebar-collapsed';
+    const MOBILE_CLS = 'rk-sidebar-mobile-open';
+    const isMobile = function () { return window.innerWidth < 768; };
 
     function syncIcon() {
         icon.className = html.classList.contains(CLS)
@@ -292,11 +324,35 @@
     }
     syncIcon();
 
+    function closeMobile() {
+        html.classList.remove(MOBILE_CLS);
+    }
+
     toggle.addEventListener('click', function () {
+        if (isMobile()) {
+            html.classList.toggle(MOBILE_CLS);
+            return;
+        }
         const next = !html.classList.contains(CLS);
         html.classList.toggle(CLS, next);
         localStorage.setItem(KEY, next ? '1' : '0');
         syncIcon();
+    });
+
+    // Tapping the dimmed backdrop, or a nav link (on mobile — the whole
+    // point of tapping a link is to go look at that page, not keep the
+    // menu covering it), closes the overlay.
+    backdrop.addEventListener('click', closeMobile);
+    mobileBtn.addEventListener('click', function () {
+        html.classList.add(MOBILE_CLS);
+    });
+    sidebar.addEventListener('click', function (e) {
+        if (isMobile() && e.target.closest('.nav-item-link')) closeMobile();
+    });
+    // Crossing the breakpoint (e.g. rotating a tablet) shouldn't leave
+    // the overlay state stuck from the other layout.
+    window.addEventListener('resize', function () {
+        if (!isMobile()) closeMobile();
     });
 
     // Remove the no-anim guard after first frame so subsequent toggles
@@ -307,6 +363,553 @@
         });
     });
 })();
+</script>
+<script nonce="{{ request.state.csp_nonce }}">
+// ── Toast notifications ─────────────────────────────────────────────
+// One consistent feedback mechanism everywhere. window.rkToast(message,
+// type) can be called directly (e.g. after a fetch()); a page landing
+// with ?success= or ?error= in the URL also gets one automatically, so
+// every existing "?success=" redirect across the app upgrades for free
+// without touching those templates. The query param is then stripped
+// via history.replaceState so refreshing the page doesn't re-show it.
+(function () {
+    var stack = document.createElement('div');
+    stack.className = 'rk-toast-stack';
+    stack.setAttribute('aria-live', 'polite');
+    document.body.appendChild(stack);
+
+    var ICONS = {
+        success: 'bi-check-circle-fill',
+        error: 'bi-exclamation-triangle-fill',
+        info: 'bi-info-circle-fill',
+    };
+
+    window.rkToast = function (message, type, action) {
+        type = (type === 'error' || type === 'info') ? type : 'success';
+        var el = document.createElement('div');
+        el.className = 'rk-toast rk-toast-' + type;
+        el.innerHTML =
+            '<i class="bi ' + ICONS[type] + ' rk-toast-icon" aria-hidden="true"></i>' +
+            '<span></span>' +
+            (action ? '<button type="button" class="rk-toast-action"></button>' : '') +
+            '<button type="button" class="rk-toast-close" aria-label="Dismiss">' +
+            '<i class="bi bi-x-lg"></i></button>';
+        el.querySelector('span').textContent = message;
+
+        function dismiss() {
+            if (!el.parentNode) return;
+            el.classList.add('rk-toast-leaving');
+            setTimeout(function () { el.remove(); }, 180);
+        }
+        el.querySelector('.rk-toast-close').addEventListener('click', dismiss);
+
+        if (action) {
+            var actionBtn = el.querySelector('.rk-toast-action');
+            actionBtn.textContent = action.label;
+            actionBtn.addEventListener('click', function () {
+                actionBtn.disabled = true;
+                actionBtn.textContent = 'Undoing…';
+                var meta = document.querySelector('meta[name="csrf-token"]');
+                var body = new URLSearchParams();
+                body.set('csrf_token', meta ? meta.content : '');
+                fetch(action.url, { method: 'POST', body: body })
+                    .then(function (r) {
+                        if (!r.ok) throw new Error('Undo failed');
+                        // Land on the plain (active) view with its own
+                        // ?success= — not whatever filter was active when
+                        // the archive happened (e.g. "Archived" would now
+                        // just look empty/broken even though undo worked),
+                        // and not a toast here that a navigation would wipe
+                        // out half a second later before anyone reads it.
+                        window.location.href = window.location.pathname +
+                            '?success=' + encodeURIComponent(action.doneMessage || 'Undone.');
+                    })
+                    .catch(function () {
+                        actionBtn.disabled = false;
+                        actionBtn.textContent = action.label;
+                        window.rkToast("Couldn't undo that — try again.", 'error');
+                    });
+            });
+        }
+
+        stack.appendChild(el);
+        setTimeout(dismiss, type === 'error' ? 7000 : (action ? 8000 : 4500));
+    };
+
+    var params = new URLSearchParams(window.location.search);
+    var success = params.get('success');
+    var error = params.get('error');
+    var undoUrl = params.get('undo');
+    if (success || error) {
+        var action = (success && undoUrl) ? { label: 'Undo', url: undoUrl, doneMessage: 'Restored.' } : null;
+        window.rkToast(success || error, success ? 'success' : 'error', action);
+        params.delete('success');
+        params.delete('error');
+        params.delete('undo');
+        var qs = params.toString();
+        var newUrl = window.location.pathname + (qs ? '?' + qs : '') + window.location.hash;
+        window.history.replaceState(null, '', newUrl);
+    }
+})();
+</script>
+<script nonce="{{ request.state.csp_nonce }}">
+(function () {
+    const input = document.getElementById('rkSearchInput');
+    if (!input) return;  // not rendered for this role yet
+    const box = document.getElementById('rkSearchResults');
+    let controller = null;
+    let debounceTimer = null;
+    let activeIndex = -1;
+
+    const ICON_BG = {
+        Barangay: 'rk-tint-green', Facility: 'rk-tint-blue',
+        Resource: 'rk-tint-purple', Equipment: 'rk-tint-orange',
+    };
+
+    function render(results) {
+        activeIndex = -1;
+        if (!results.length) {
+            box.innerHTML = '<div class="rk-search-empty">No matches found.</div>';
+            box.classList.add('rk-open');
+            return;
+        }
+        box.innerHTML = results.map(function (r) {
+            return '<a href="' + r.url + '" class="rk-search-result">' +
+                '<i class="bi ' + r.icon + ' rk-result-icon ' + (ICON_BG[r.type] || 'rk-tint-green') + '"></i>' +
+                '<span><span class="rk-result-label"></span><br>' +
+                '<span class="rk-result-sub"></span></span>' +
+                '<span class="rk-result-type">' + r.type + '</span></a>';
+        }).join('');
+        // textContent for the user-controlled label/sub fields — avoids
+        // building HTML out of untrusted record names.
+        box.querySelectorAll('.rk-search-result').forEach(function (el, i) {
+            el.querySelector('.rk-result-label').textContent = results[i].label;
+            el.querySelector('.rk-result-sub').textContent = results[i].sub || '';
+        });
+        box.classList.add('rk-open');
+    }
+
+    function search(q) {
+        if (controller) controller.abort();
+        controller = new AbortController();
+        box.innerHTML = '<div class="rk-search-loading">Searching…</div>';
+        box.classList.add('rk-open');
+        var prefix = document.querySelector('.rk-global-search').dataset.searchPrefix || '/admin';
+        fetch(prefix + '/api/search?q=' + encodeURIComponent(q), { signal: controller.signal })
+            .then(function (r) { return r.json(); })
+            .then(function (data) { render(data.results || []); })
+            .catch(function (e) { if (e.name !== 'AbortError') box.classList.remove('rk-open'); });
+    }
+
+    input.addEventListener('input', function () {
+        clearTimeout(debounceTimer);
+        const q = input.value.trim();
+        if (q.length < 2) { box.classList.remove('rk-open'); return; }
+        debounceTimer = setTimeout(function () { search(q); }, 250);
+    });
+
+    input.addEventListener('keydown', function (e) {
+        const items = box.querySelectorAll('.rk-search-result');
+        if (!items.length) return;
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            e.preventDefault();
+            items[activeIndex] && items[activeIndex].classList.remove('rk-active');
+            activeIndex += (e.key === 'ArrowDown' ? 1 : -1);
+            activeIndex = (activeIndex + items.length) % items.length;
+            items[activeIndex].classList.add('rk-active');
+            items[activeIndex].scrollIntoView({ block: 'nearest' });
+        } else if (e.key === 'Enter' && activeIndex >= 0) {
+            e.preventDefault();
+            items[activeIndex].click();
+        } else if (e.key === 'Escape') {
+            box.classList.remove('rk-open');
+        }
+    });
+
+    document.addEventListener('click', function (e) {
+        if (!e.target.closest('.rk-global-search')) box.classList.remove('rk-open');
+    });
+})();
+</script>
+<script nonce="{{ request.state.csp_nonce }}">
+(function () {
+    const toolbar = document.getElementById('bulkToolbar');
+    const form = document.getElementById('bulkForm');
+    if (!toolbar || !form) return;  // page doesn't use bulk actions
+
+    const selectAll = document.getElementById('bulkSelectAll');
+    const countEl = document.getElementById('bulkCount');
+    const clearBtn = document.getElementById('bulkClearBtn');
+    const actionBtn = document.getElementById('bulkArchiveBtn');
+    const checks = function () { return Array.from(document.querySelectorAll('.rk-bulk-check')); };
+
+    function sync() {
+        const checked = checks().filter(function (c) { return c.checked; });
+        countEl.textContent = checked.length;
+        toolbar.classList.toggle('rk-open', checked.length > 0);
+        if (selectAll) {
+            selectAll.checked = checked.length > 0 && checked.length === checks().length;
+            selectAll.indeterminate = checked.length > 0 && checked.length < checks().length;
+        }
+    }
+
+    document.addEventListener('change', function (e) {
+        if (e.target.classList && e.target.classList.contains('rk-bulk-check')) sync();
+    });
+
+    if (selectAll) {
+        selectAll.addEventListener('change', function () {
+            checks().forEach(function (c) { c.checked = selectAll.checked; });
+            sync();
+        });
+    }
+
+    if (clearBtn) {
+        clearBtn.addEventListener('click', function () {
+            checks().forEach(function (c) { c.checked = false; });
+            sync();
+        });
+    }
+
+    if (actionBtn) {
+        actionBtn.addEventListener('click', function () {
+            const ids = checks().filter(function (c) { return c.checked; }).map(function (c) { return c.value; });
+            if (!ids.length) return;
+            form.innerHTML = '';
+            var csrf = document.querySelector('meta[name="csrf-token"]');
+            var csrfInput = document.createElement('input');
+            csrfInput.type = 'hidden'; csrfInput.name = 'csrf_token';
+            csrfInput.value = csrf ? csrf.content : '';
+            form.appendChild(csrfInput);
+            var action = actionBtn.dataset.bulkAction || 'archive';
+            var url = form.getAttribute('action').split('?')[0] + '?action=' + encodeURIComponent(action) +
+                '&' + ids.map(function (id) { return 'ids=' + encodeURIComponent(id); }).join('&');
+            form.setAttribute('action', url);
+            form.submit();
+        });
+    }
+})();
+</script>
+<script nonce="{{ request.state.csp_nonce }}">
+// ── Draft protection (autosave to localStorage) ─────────────────────
+// Long forms (serviceability reports, incident reports, facility/
+// equipment/resource records) can represent real work — a dropped
+// connection, an accidental back-button, or a closed tab shouldn't lose
+// it. Any <form data-autosave="some-key"> gets this for free: field
+// values are periodically mirrored to localStorage, and if the page is
+// reloaded with unsaved changes still sitting there, a banner offers to
+// restore them. Nothing is sent to the server — this never creates a
+// server-side draft record, it only protects against losing what's
+// already been typed.
+(function () {
+    var forms = document.querySelectorAll('form[data-autosave]');
+    if (!forms.length) return;
+
+    function storageKey(form) {
+        // Scoped to the form's action URL, not just the page path — a
+        // shared modal (e.g. the facility Add/Edit dialog) reuses the
+        // same pathname for every record, but its action URL includes
+        // the record id, so each one still gets its own draft slot.
+        return 'rk_draft_' + form.dataset.autosave + '_' + (form.getAttribute('action') || window.location.pathname);
+    }
+
+    function serialize(form) {
+        var data = {};
+        Array.from(form.elements).forEach(function (el) {
+            if (!el.name || el.name === 'csrf_token') return;
+            if (el.type === 'password' || el.type === 'file' || el.type === 'hidden') return;
+            if (el.type === 'checkbox' || el.type === 'radio') {
+                if (el.checked) data[el.name] = el.value;
+            } else {
+                data[el.name] = el.value;
+            }
+        });
+        return data;
+    }
+
+    function isMeaningfullyFilled(data) {
+        return Object.values(data).some(function (v) { return v && String(v).trim().length > 0; });
+    }
+
+    forms.forEach(function (form) {
+        var key = storageKey(form);
+        var saved = null;
+        try {
+            var raw = localStorage.getItem(key);
+            saved = raw ? JSON.parse(raw) : null;
+        } catch (e) { saved = null; }
+
+        if (saved && saved.data && isMeaningfullyFilled(saved.data)) {
+            var banner = document.createElement('div');
+            banner.className = 'rk-draft-banner';
+            var when = new Date(saved.savedAt);
+            banner.innerHTML =
+                '<i class="bi bi-clock-history" aria-hidden="true"></i> ' +
+                '<span>You have unsaved changes from ' + when.toLocaleString() + '. </span>' +
+                '<button type="button" class="btn btn-outline-secondary btn-sm rk-draft-restore">Restore</button> ' +
+                '<button type="button" class="btn-soft rk-draft-discard">Discard</button>';
+            // A form that IS the modal box (class="modal-content") has no
+            // useful "before the form" position — that would land outside
+            // the visible dialog. Prepend inside it instead.
+            if (form.classList.contains('modal-content')) {
+                banner.classList.add('m-3', 'mb-0');
+                form.insertBefore(banner, form.firstChild);
+            } else {
+                form.parentNode.insertBefore(banner, form);
+            }
+
+            banner.querySelector('.rk-draft-restore').addEventListener('click', function () {
+                Object.keys(saved.data).forEach(function (name) {
+                    var el = form.elements[name];
+                    if (!el) return;
+                    if (el.type === 'checkbox' || el.type === 'radio') {
+                        el.checked = (el.value === saved.data[name]);
+                    } else {
+                        el.value = saved.data[name];
+                    }
+                });
+                banner.remove();
+                if (window.rkToast) window.rkToast('Draft restored.', 'success');
+            });
+            banner.querySelector('.rk-draft-discard').addEventListener('click', function () {
+                try { localStorage.removeItem(key); } catch (e) {}
+                banner.remove();
+            });
+        }
+
+        var saveTimer = null;
+        form.addEventListener('input', function () {
+            clearTimeout(saveTimer);
+            saveTimer = setTimeout(function () {
+                try {
+                    localStorage.setItem(key, JSON.stringify({
+                        data: serialize(form), savedAt: Date.now(),
+                    }));
+                } catch (e) { /* storage full/unavailable — draft protection is best-effort */ }
+            }, 800);
+        });
+    });
+
+    // A real submit means the work is saved server-side now — the local
+    // draft would only be stale/confusing from here on. Document-level,
+    // default (bubble) phase — deliberately: rk-forms.js's data-confirm
+    // handler runs earlier in document order at the same phase, so by
+    // the time this fires, e.defaultPrevented correctly reflects a
+    // declined confirm() instead of us clearing a draft that was never
+    // actually submitted.
+    document.addEventListener('submit', function (e) {
+        if (e.defaultPrevented) return;
+        var form = e.target;
+        if (!form || !form.matches || !form.matches('form[data-autosave]')) return;
+        try { localStorage.removeItem(storageKey(form)); } catch (err) {}
+    });
+})();
+</script>
+<script nonce="{{ request.state.csp_nonce }}">
+// ── Button loading state on submit ──────────────────────────────────
+// A save/generate/upload with no visible response looks frozen and
+// invites a double-click. This fires on every real form submission
+// (skipped if a data-confirm dialog was just declined, via
+// e.defaultPrevented) — no per-form markup needed anywhere.
+(function () {
+    // Bubble phase (not capture) — deliberately: rk-forms.js's data-confirm
+    // handler runs window.confirm() in the bubble phase too, registered
+    // earlier in document order. Running after it means e.defaultPrevented
+    // correctly reflects a declined confirm() by the time we check it,
+    // instead of showing a spinner the user then cancels out of.
+    document.addEventListener('submit', function (e) {
+        if (e.defaultPrevented) return;
+        var form = e.target;
+        if (!form || !form.matches || !form.matches('form')) return;
+        // e.submitter is the actual button/input that triggered this submit —
+        // important for forms with more than one submit button (e.g. Save
+        // Draft vs Submit for Review), so the spinner lands on the right one.
+        var btn = e.submitter && e.submitter.type === 'submit'
+            ? e.submitter
+            : form.querySelector('button[type="submit"]');
+        if (!btn || btn.disabled) return;
+        btn.dataset.rkOriginal = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="rk-btn-spinner" aria-hidden="true"></span>Working…';
+    });
+})();
+</script>
+<script nonce="{{ request.state.csp_nonce }}">
+// ── First-login guided tour ──────────────────────────────────────────
+// Shown once per role on first login (per the panel's original "hard to
+// learn without prior knowledge" feedback) — walks through the sidebar
+// grouping, search, and theme toggle. Targets elements common to every
+// page (not page-specific content), so it works regardless of which
+// page the user lands on after logging in. Replayable anytime via the
+// "Take a Tour" link in the sidebar footer.
+(function () {
+    var role = '{{ role }}';
+    var KEY = 'rk_tour_seen_' + role;
+    var replayLink = document.getElementById('rkTourReplay');
+
+    function buildSteps() {
+        var steps = [];
+        var navSection = document.querySelector('.sidebar nav');
+        if (navSection) {
+            steps.push({
+                el: navSection,
+                title: 'Your navigation',
+                text: 'Everything you can do is grouped here by what it\'s for — expand a group to see its pages.',
+            });
+        }
+        var search = document.querySelector('.rk-global-search');
+        if (search) {
+            steps.push({
+                el: search,
+                title: 'Jump straight to anything',
+                text: 'Type a name here to find a barangay, resource, or equipment item without digging through menus.',
+            });
+        }
+        var themeToggle = document.getElementById('themeToggle');
+        if (themeToggle) {
+            steps.push({
+                el: themeToggle,
+                title: 'Light or dark, your choice',
+                text: 'Switch themes anytime — it\'s remembered for next time you log in.',
+            });
+        }
+        var sidebarToggle = document.getElementById('sidebarToggle');
+        if (sidebarToggle) {
+            steps.push({
+                el: sidebarToggle,
+                title: 'More room when you need it',
+                text: 'Collapse the sidebar to a narrow rail, or reopen it — your choice is remembered too.',
+            });
+        }
+        return steps;
+    }
+
+    var spotlight = null, card = null, current = 0, steps = [];
+
+    function place(step) {
+        var r = step.el.getBoundingClientRect();
+        var pad = 6;
+        spotlight.style.top = (r.top - pad) + 'px';
+        spotlight.style.left = (r.left - pad) + 'px';
+        spotlight.style.width = (r.width + pad * 2) + 'px';
+        spotlight.style.height = (r.height + pad * 2) + 'px';
+
+        // Place the card to the right of the target if there's room,
+        // otherwise below it — keeps it on-screen for narrow sidebars.
+        var cardTop = Math.min(r.top, window.innerHeight - 220);
+        var cardLeft = r.right + 16;
+        if (cardLeft + 300 > window.innerWidth) {
+            cardLeft = Math.max(16, r.left);
+            cardTop = r.bottom + 12;
+        }
+        card.style.top = Math.max(16, cardTop) + 'px';
+        card.style.left = cardLeft + 'px';
+    }
+
+    function render() {
+        var step = steps[current];
+        card.querySelector('h6').textContent = step.title;
+        card.querySelector('p').textContent = step.text;
+        card.querySelectorAll('.rk-tour-dot').forEach(function (d, i) {
+            d.classList.toggle('rk-active', i === current);
+        });
+        var nextBtn = card.querySelector('.rk-tour-next');
+        nextBtn.textContent = (current === steps.length - 1) ? 'Done' : 'Next';
+        place(step);
+    }
+
+    function end() {
+        try { localStorage.setItem(KEY, '1'); } catch (e) {}
+        if (spotlight) spotlight.remove();
+        if (card) card.remove();
+        spotlight = null; card = null;
+        window.removeEventListener('resize', onResize);
+    }
+
+    function onResize() { if (steps[current]) place(steps[current]); }
+
+    function start() {
+        steps = buildSteps();
+        if (!steps.length) return;
+        current = 0;
+
+        spotlight = document.createElement('div');
+        spotlight.className = 'rk-tour-spotlight';
+        document.body.appendChild(spotlight);
+
+        card = document.createElement('div');
+        card.className = 'rk-tour-card';
+        card.innerHTML =
+            '<h6></h6><p></p>' +
+            '<div class="rk-tour-footer">' +
+            '<button type="button" class="rk-tour-skip">Skip</button>' +
+            '<div class="rk-tour-dots">' +
+            steps.map(function () { return '<span class="rk-tour-dot"></span>'; }).join('') +
+            '</div>' +
+            '<button type="button" class="btn btn-rk btn-sm rk-tour-next">Next</button>' +
+            '</div>';
+        document.body.appendChild(card);
+
+        card.querySelector('.rk-tour-skip').addEventListener('click', end);
+        card.querySelector('.rk-tour-next').addEventListener('click', function () {
+            current++;
+            if (current >= steps.length) { end(); return; }
+            render();
+        });
+        window.addEventListener('resize', onResize);
+        render();
+    }
+
+    var alreadySeen = false;
+    try { alreadySeen = !!localStorage.getItem(KEY); } catch (e) {}
+    if (!alreadySeen) {
+        // Let the page finish laying out before measuring element
+        // positions for the spotlight.
+        setTimeout(start, 500);
+    }
+
+    if (replayLink) {
+        replayLink.addEventListener('click', function (e) {
+            e.preventDefault();
+            end();  // clear any tour already mid-flight
+            start();
+        });
+    }
+})();
+</script>
+<script nonce="{{ request.state.csp_nonce }}">
+// ── Chart.js theme colors ───────────────────────────────────────────
+// Chart.js draws to a <canvas> with colors set in JS, not CSS — flipping
+// data-theme alone does nothing to an already-rendered chart. Any page
+// that creates a chart should call rkChartTheme() for its grid/tick
+// colors; this also lets the toggle below recolor + redraw every live
+// chart on the page (via Chart.js's own instance registry) instead of
+// leaving stale light-mode charts behind after switching to dark.
+window.rkChartTheme = function () {
+    const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    return {
+        grid: dark ? 'rgba(255,255,255,0.08)' : '#f5f5f5',
+        text: dark ? '#9aa3b2' : '#6c757d',
+    };
+};
+function rkRepaintCharts() {
+    if (typeof Chart === 'undefined') return;
+    const colors = window.rkChartTheme();
+    Chart.defaults.color = colors.text;
+    Object.values(Chart.instances || {}).forEach(function (chart) {
+        if (chart.options.plugins && chart.options.plugins.legend) {
+            chart.options.plugins.legend.labels = chart.options.plugins.legend.labels || {};
+            chart.options.plugins.legend.labels.color = colors.text;
+        }
+        const scales = chart.options.scales || {};
+        Object.values(scales).forEach(function (scale) {
+            if (scale.grid) scale.grid.color = colors.grid;
+            scale.ticks = scale.ticks || {};
+            scale.ticks.color = colors.text;
+        });
+        chart.update();
+    });
+}
 </script>
 <script nonce="{{ request.state.csp_nonce }}">
 // ── Dark / light theme toggle (persisted in localStorage) ──────────
@@ -325,10 +928,16 @@
 
     btn.addEventListener('click', function () {
         const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-        if (next === 'dark') { html.setAttribute('data-theme', 'dark'); }
-        else { html.removeAttribute('data-theme'); }
+        if (next === 'dark') {
+            html.setAttribute('data-theme', 'dark');
+            html.setAttribute('data-bs-theme', 'dark');
+        } else {
+            html.removeAttribute('data-theme');
+            html.removeAttribute('data-bs-theme');
+        }
         try { localStorage.setItem(KEY, next); } catch (e) { /* ignore */ }
         syncIcon();
+        rkRepaintCharts();
     });
 })();
 </script>

@@ -5,9 +5,14 @@
 {% set active_nav = 'equipment' %}
 
 {% block content %}
-<div class="page-header">
-    <h1>{{ 'Edit Equipment' if edit_mode else 'Add Equipment' }}</h1>
-    <p>{{ 'Update equipment details. Use Status from the list view to log status changes individually.' if edit_mode else 'Register a new equipment unit. Status defaults to Available.' }}</p>
+<div class="d-flex justify-content-between align-items-start page-header">
+    <div>
+        <h1>{{ 'Edit Equipment' if edit_mode else 'Add Equipment' }}</h1>
+        <p>{{ 'Update equipment details. Use Status from the list view to log status changes individually.' if edit_mode else 'Register a new equipment unit. Status defaults to Available.' }}</p>
+    </div>
+    <a href="/admin/equipment" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Back
+    </a>
 </div>
 
 {% if error %}
@@ -17,7 +22,7 @@
 <div class="dash-card">
     <form method="POST"
           action="{{ '/admin/equipment/' ~ target.id ~ '/edit' if edit_mode else '/admin/equipment/new' }}"
-          class="row g-3" data-validate>
+          class="row g-3" data-validate data-autosave="equipment">
             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
 
         <div class="col-md-8">
@@ -68,7 +73,7 @@
         <div class="col-12 d-flex justify-content-end gap-2 pt-2">
             <a href="/admin/equipment" class="btn btn-outline-secondary">Cancel</a>
             <button type="submit" class="btn btn-rk">
-                <i class="bi bi-check2"></i> {{ 'Save Changes' if edit_mode else 'Create Equipment' }}
+                <i class="bi bi-save"></i> {{ 'Save Changes' if edit_mode else 'Create Equipment' }}
             </button>
         </div>
     </form>

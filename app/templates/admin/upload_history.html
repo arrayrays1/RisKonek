@@ -9,7 +9,7 @@
     .timeline { position: relative; margin-left: 8px; padding-left: 28px; }
     .timeline::before {
         content: ""; position: absolute; left: 9px; top: 4px; bottom: 4px;
-        width: 2px; background: #e3e7ee;
+        width: 2px; background: var(--rk-border);
     }
     .tl-item { position: relative; padding-bottom: 22px; }
     .tl-dot {
@@ -119,7 +119,7 @@
         {% set et = e.event_type.value %}
         {% if et == 'created' %}{% set icon = 'bi-cloud-upload' %}{% set dot = 'bg-secondary' %}
         {% elif et == 'extracted' %}{% set icon = 'bi-file-earmark-text' %}{% set dot = 'bg-primary' %}
-        {% elif et == 'confirmed' %}{% set icon = 'bi-check2-circle' %}{% set dot = 'rk-bg-teal' %}
+        {% elif et == 'confirmed' %}{% set icon = 'bi-check-circle-fill' %}{% set dot = 'rk-bg-teal' %}
         {% elif et == 'edited' %}{% set icon = 'bi-pencil' %}{% set dot = 'rk-bg-amber' %}
         {% elif et == 'archived' %}{% set icon = 'bi-archive' %}{% set dot = 'bg-secondary' %}
         {% elif et == 'unarchived' %}{% set icon = 'bi-arrow-counterclockwise' %}{% set dot = 'rk-bg-teal' %}

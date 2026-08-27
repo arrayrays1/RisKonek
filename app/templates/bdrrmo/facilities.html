@@ -109,7 +109,7 @@
                 <div class="stat-label">Available</div>
                 <div class="stat-value">{{ summary.available }}</div>
             </div>
-            <div class="stat-icon rk-tint-green-alt"><i class="bi bi-check2-circle"></i></div>
+            <div class="stat-icon rk-tint-green-alt"><i class="bi bi-check-circle-fill"></i></div>
         </div>
     </div>
     {% if not citywide %}
@@ -316,7 +316,7 @@
                         {% if show_archived %}
                         <form method="POST" action="/bdrrmo/facilities/{{ f.id }}/archive" class="d-inline">
             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
-                            <button type="submit" class="btn btn-outline-secondary btn-sm" title="Restore" aria-label="Restore {{ f.name }}">
+                            <button type="submit" class="btn btn-outline-success btn-sm" title="Restore" aria-label="Restore {{ f.name }}">
                                 <i class="bi bi-arrow-counterclockwise"></i> Restore
                             </button>
                         </form>

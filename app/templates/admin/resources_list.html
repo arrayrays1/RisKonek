@@ -107,13 +107,13 @@
 <div class="dash-card mb-3">
     <form method="GET" action="/admin/resources" class="row g-2 align-items-end js-live-filter">
         <div class="col-md-3">
-            <label class="form-label small fw-semibold mb-1">Search</label>
-            <input type="text" name="q" value="{{ f_q }}" class="form-control form-control-sm"
+            <label class="form-label small fw-semibold mb-1" for="fltSearch">Search</label>
+            <input type="text" name="q" id="fltSearch" value="{{ f_q }}" class="form-control form-control-sm"
                    placeholder="Search name or location…" autocomplete="off">
         </div>
         <div class="col-md-2">
-            <label class="form-label small fw-semibold mb-1">Category</label>
-            <select name="category" class="form-select form-select-sm">
+            <label class="form-label small fw-semibold mb-1" for="fltCategory">Category</label>
+            <select name="category" id="fltCategory" class="form-select form-select-sm">
                 <option value="">All categories</option>
                 {% for c in categories %}
                 <option value="{{ c }}" {% if f_category == c %}selected{% endif %}>{{ c.title() }}</option>
@@ -121,8 +121,8 @@
             </select>
         </div>
         <div class="col-md-2">
-            <label class="form-label small fw-semibold mb-1">Food Type</label>
-            <select name="food_type" class="form-select form-select-sm">
+            <label class="form-label small fw-semibold mb-1" for="fltFoodType">Food Type</label>
+            <select name="food_type" id="fltFoodType" class="form-select form-select-sm">
                 <option value="">All food</option>
                 {% for v, label in food_types %}
                 <option value="{{ v }}" {% if f_food_type == v %}selected{% endif %}>{{ label }}</option>
@@ -130,8 +130,8 @@
             </select>
         </div>
         <div class="col-md-2">
-            <label class="form-label small fw-semibold mb-1">Alert</label>
-            <select name="alert" class="form-select form-select-sm">
+            <label class="form-label small fw-semibold mb-1" for="fltAlert">Alert</label>
+            <select name="alert" id="fltAlert" class="form-select form-select-sm">
                 <option value="">Any</option>
                 <option value="low_stock"   {% if f_alert == 'low_stock'   %}selected{% endif %}>Low Stock</option>
                 <option value="near_expiry" {% if f_alert == 'near_expiry' %}selected{% endif %}>Near Expiry</option>
@@ -139,8 +139,8 @@
             </select>
         </div>
         <div class="col-md-2">
-            <label class="form-label small fw-semibold mb-1">View</label>
-            <select name="archived" class="form-select form-select-sm">
+            <label class="form-label small fw-semibold mb-1" for="fltArchived">View</label>
+            <select name="archived" id="fltArchived" class="form-select form-select-sm">
                 <option value=""  {% if not show_archived %}selected{% endif %}>Active</option>
                 <option value="1" {% if show_archived %}selected{% endif %}>Archived</option>
             </select>
@@ -155,10 +155,27 @@
 
 <!-- ── Table ──────────────────────────────────────────────────── -->
 <div class="dash-card p-0">
+    <div class="rk-bulk-toolbar" id="bulkToolbar" role="status" aria-live="polite">
+        <span><strong id="bulkCount">0</strong> selected</span>
+        {% if show_archived %}
+        <button type="button" class="btn btn-outline-success btn-sm" id="bulkArchiveBtn" data-bulk-action="restore">
+            <i class="bi bi-arrow-counterclockwise"></i> Restore Selected
+        </button>
+        {% else %}
+        <button type="button" class="btn btn-outline-secondary btn-sm" id="bulkArchiveBtn" data-bulk-action="archive">
+            <i class="bi bi-archive"></i> Archive Selected
+        </button>
+        {% endif %}
+        <button type="button" class="btn-soft" id="bulkClearBtn">Cancel</button>
+    </div>
+    <form id="bulkForm" method="POST" action="/admin/resources/bulk-archive"></form>
     <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
             <thead class="rk-bg-soft">
                 <tr class="rk-th-soft">
+                    <th class="px-3 py-3" style="width: 36px;">
+                        <input type="checkbox" class="form-check-input" id="bulkSelectAll" aria-label="Select all">
+                    </th>
                     <th class="px-3 py-3">Item</th>
                     <th class="py-3">Category</th>
                     <th class="py-3 text-end">Qty</th>
@@ -173,6 +190,9 @@
             <tbody>
                 {% for r in rows %}
                 <tr class="rk-fs-13">
+                    <td class="px-3">
+                        <input type="checkbox" class="form-check-input rk-bulk-check" value="{{ r.id }}" aria-label="Select {{ r.name }}">
+                    </td>
                     <td class="px-3">
                         <div class="fw-semibold">{{ r.name }}</div>
                         <div class="text-muted small">
@@ -191,25 +211,25 @@
                     <td>{{ alert_pill(r.alert) }}</td>
                     <td class="text-end px-3">
                         {% if not r.is_archived %}
-                        <button type="button" class="btn-soft rk-text-ok"
+                        <button type="button" class="btn btn-outline-primary btn-sm"
                                 data-bs-toggle="modal" data-bs-target="#stockModal-{{ r.id }}">
                             <i class="bi bi-plus-slash-minus"></i> Stock
                         </button>
                         <a href="/admin/resources/{{ r.id }}/edit"
-                           class="btn-soft" title="Edit">
+                           class="btn btn-outline-secondary btn-sm" title="Edit" aria-label="Edit {{ r.name }}">
                             <i class="bi bi-pencil"></i>
                         </a>
                         <form method="POST" action="/admin/resources/{{ r.id }}/archive" class="d-inline"
                               data-confirm='Archive {{ r.name }}?'>
             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
-                            <button type="submit" class="btn-soft rk-text-amber" title="Archive">
+                            <button type="submit" class="btn btn-outline-secondary btn-sm" title="Archive" aria-label="Archive {{ r.name }}">
                                 <i class="bi bi-archive"></i>
                             </button>
                         </form>
                         {% else %}
                         <form method="POST" action="/admin/resources/{{ r.id }}/archive" class="d-inline">
             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
-                            <button type="submit" class="btn-soft rk-text-ok">
+                            <button type="submit" class="btn btn-outline-success btn-sm">
                                 <i class="bi bi-arrow-counterclockwise"></i> Restore
                             </button>
                         </form>
@@ -218,7 +238,7 @@
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="9" class="text-center text-muted py-4">
+                    <td colspan="10" class="text-center text-muted py-4">
                         No resources match your filters.
                         {% if f_q or f_category or f_alert or f_archived %}
                         <a href="/admin/resources" class="ms-2">Clear filters</a>

@@ -1,0 +1,144 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Barangay Comparison — RisKonek{% endblock %}
+
+{% set active_nav = 'barangays' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start page-header">
+    <div>
+        <h1>Barangay Comparison</h1>
+        <p>Compare all 27 barangays by risk profile at a glance — for pre/post-disaster planning, not live incident response.</p>
+    </div>
+    <a href="/admin/barangays" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Back to List
+    </a>
+</div>
+
+<div class="dash-card mb-4">
+    <div class="card-title-row">
+        <i class="bi bi-graph-up-arrow rk-text-green"></i>
+        <h6>Risk Profile Clustering</h6>
+    </div>
+    <p class="text-muted rk-fs-12 mb-3">
+        Each bubble is a barangay. Position shows hazard exposure (right = higher) against
+        incident history (up = higher); bubble size reflects the population-size sub-score.
+        Barangays clustered together share a similar risk profile — useful for grouping
+        them into the same planning priority tier. Hover a bubble for details, or click it
+        to open that barangay's profile.
+    </p>
+    <canvas id="riskScatterChart" height="110"></canvas>
+    <div class="d-flex gap-3 mt-3 rk-fs-12 flex-wrap">
+        <span><span class="rk-legend-dot" style="background:#dc2626"></span> Critical</span>
+        <span><span class="rk-legend-dot" style="background:#f87171"></span> High</span>
+        <span><span class="rk-legend-dot" style="background:#f59e0b"></span> Moderate</span>
+        <span><span class="rk-legend-dot" style="background:#10b981"></span> Low</span>
+    </div>
+</div>
+
+<div class="dash-card p-0">
+    <div class="card-title-row px-4 pt-4">
+        <i class="bi bi-table rk-text-green"></i>
+        <h6>Exact Scores</h6>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="rk-bg-soft">
+                <tr class="rk-th-soft">
+                    <th class="px-3 py-3">Barangay</th>
+                    <th class="py-3">Priority Level</th>
+                    <th class="py-3 text-end">Hazard Exposure</th>
+                    <th class="py-3 text-end">Incident History</th>
+                    <th class="py-3 text-end">Population Size</th>
+                    <th class="py-3 text-end px-3">Overall Score</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in points %}
+                <tr class="rk-fs-13">
+                    <td class="px-3 fw-semibold">
+                        <a href="/admin/barangays/{{ p.id }}" class="text-decoration-none">{{ p.name }}</a>
+                    </td>
+                    <td><span class="risk-badge risk-{{ p.level }}">{{ p.level.title() }}</span></td>
+                    <td class="text-end">{{ p.hazard_score }}</td>
+                    <td class="text-end">{{ p.incident_score }}</td>
+                    <td class="text-end">{{ p.population_score }}</td>
+                    <td class="text-end px-3 fw-semibold">{{ p.score }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"
+        integrity="sha384-XcS9dtIcQ+RTgo0iDLXGgz7Ai3PcxjjUY0YCyLZ7QIT9tS3wnhAvI4kJ84J0Cakm" crossorigin="anonymous"></script>
+<script nonce="{{ request.state.csp_nonce }}">
+const points = {{ points | tojson }};
+const levelColor = { critical: '#dc2626', high: '#f87171', moderate: '#f59e0b', low: '#10b981' };
+
+Chart.defaults.color = window.rkChartTheme ? window.rkChartTheme().text : '#6c757d';
+
+const chart = new Chart(document.getElementById('riskScatterChart'), {
+    type: 'bubble',
+    data: {
+        datasets: [{
+            label: 'Barangays',
+            data: points.map(p => ({
+                x: p.hazard_score, y: p.incident_score,
+                r: Math.max(6, p.population_score / 3.2),
+            })),
+            backgroundColor: points.map(p => (levelColor[p.level] || '#6c757d') + 'B3'),
+            borderColor: points.map(p => levelColor[p.level] || '#6c757d'),
+            borderWidth: 1.5,
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: { display: false },
+            tooltip: {
+                callbacks: {
+                    label: function (ctx) {
+                        const p = points[ctx.dataIndex];
+                        return [
+                            p.name + ' — ' + p.level.charAt(0).toUpperCase() + p.level.slice(1),
+                            'Hazard: ' + p.hazard_score + '  ·  Incidents: ' + p.incident_score,
+                            'Population wt: ' + p.population_score + '  ·  Overall: ' + p.score,
+                        ];
+                    }
+                }
+            }
+        },
+        scales: {
+            x: {
+                title: { display: true, text: 'Hazard Exposure →' },
+                min: 0, max: 105,
+                grid: { color: window.rkChartTheme ? window.rkChartTheme().grid : '#f5f5f5' },
+            },
+            y: {
+                title: { display: true, text: 'Incident History →' },
+                min: 0, max: 105,
+                grid: { color: window.rkChartTheme ? window.rkChartTheme().grid : '#f5f5f5' },
+            },
+        },
+        onClick: function (evt, elements) {
+            if (!elements.length) return;
+            const p = points[elements[0].index];
+            window.location.href = '/admin/barangays/' + p.id;
+        },
+        onHover: function (evt, elements) {
+            evt.native.target.style.cursor = elements.length ? 'pointer' : 'default';
+        },
+    }
+});
+
+document.addEventListener('click', function (e) {
+    if (e.target.id === 'themeToggle' || e.target.closest('#themeToggle')) {
+        setTimeout(function () {
+            if (typeof rkRepaintCharts === 'function') rkRepaintCharts();
+        }, 50);
+    }
+});
+</script>
+{% endblock %}

@@ -88,7 +88,7 @@
                             <i class="bi bi-pencil"></i> Resume Draft
                         </a>
                         <a href="/admin/uploads/{{ r.id }}/history"
-                           class="btn btn-outline-secondary btn-sm me-1" title="Audit trail">
+                           class="btn btn-outline-secondary btn-sm me-1" title="Audit trail" aria-label="Audit trail for {{ r.file_name }}">
                             <i class="bi bi-clock-history"></i>
                         </a>
                         <form method="POST" action="/admin/uploads/{{ r.id }}/discard"
@@ -159,18 +159,18 @@
                             <i class="bi bi-eye"></i> View
                         </a>
                         <a href="/admin/uploads/{{ r.id }}/history"
-                           class="btn btn-outline-secondary btn-sm me-1" title="Audit trail">
+                           class="btn btn-outline-secondary btn-sm me-1" title="Audit trail" aria-label="Audit trail for {{ r.file_name }}">
                             <i class="bi bi-clock-history"></i>
                         </a>
                         <a href="/admin/uploads/{{ r.id }}/file"
-                           class="btn btn-outline-secondary btn-sm me-1" title="Download raw file">
+                           class="btn btn-outline-secondary btn-sm me-1" title="Download raw file" aria-label="Download raw file for {{ r.file_name }}">
                             <i class="bi bi-download"></i>
                         </a>
                         <form method="POST" action="/admin/uploads/{{ r.id }}/archive"
                               class="d-inline"
                               data-confirm='Archive this upload? It stays searchable and auditable and can be restored later.'>
             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
-                            <button type="submit" class="btn btn-outline-secondary btn-sm" title="Archive">
+                            <button type="submit" class="btn btn-outline-secondary btn-sm" title="Archive" aria-label="Archive {{ r.file_name }}">
                                 <i class="bi bi-archive"></i>
                             </button>
                         </form>
@@ -205,7 +205,7 @@
                             <i class="bi bi-eye"></i> View
                         </a>
                         <a href="/admin/uploads/{{ r.id }}/history"
-                           class="btn btn-outline-secondary btn-sm me-1" title="Audit trail">
+                           class="btn btn-outline-secondary btn-sm me-1" title="Audit trail" aria-label="Audit trail for {{ r.file_name }}">
                             <i class="bi bi-clock-history"></i>
                         </a>
                         {% if r.lifecycle_status.value == 'archived' %}

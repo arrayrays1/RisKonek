@@ -24,7 +24,7 @@
 <div class="modal fade" id="facilityModal" tabindex="-1" aria-labelledby="facilityModalLabel" aria-hidden="true"
      data-bs-backdrop="static" {% if editing %}data-autoshow="1"{% endif %}>
   <div class="modal-dialog modal-xl modal-dialog-scrollable">
-    <form method="POST" id="facilityForm" novalidate
+    <form method="POST" id="facilityForm" novalidate data-autosave="facility"
           action="{{ action_edit_prefix ~ '/' ~ editing.id ~ '/edit' if editing else action_add }}"
           class="modal-content">
         <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">

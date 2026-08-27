@@ -190,14 +190,14 @@
                                 </select>
                             </div>
                         </form>
-                        <a href="/bdrrmo/equipment?edit={{ e.id }}" class="btn btn-outline-secondary btn-sm" title="Edit">
+                        <a href="/bdrrmo/equipment?edit={{ e.id }}" class="btn btn-outline-secondary btn-sm" title="Edit" aria-label="Edit {{ e.name }}">
                             <i class="bi bi-pencil"></i>
                         </a>
                         <form method="POST" action="/bdrrmo/equipment/{{ e.id }}/archive"
                               class="d-inline"
                               data-confirm='Archive {{ e.name }}? It will be hidden from the active list but kept on record.'>
             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
-                            <button type="submit" class="btn btn-outline-secondary btn-sm" title="Archive">
+                            <button type="submit" class="btn btn-outline-secondary btn-sm" title="Archive" aria-label="Archive {{ e.name }}">
                                 <i class="bi bi-archive"></i>
                             </button>
                         </form>

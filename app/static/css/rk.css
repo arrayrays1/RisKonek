@@ -11,18 +11,84 @@
     --rk-green-mid: #059669;
     --rk-green-dark: #047857;
     --rk-green-light: #d1fae5;
+
+    /* Cool personnel palette — pulled from the logo's teal/navy, replacing
+       the old warm red-orange sidebar for CFAU / BDRRMO / Logistics. */
+    --rk-cool: #0891b2;
+    --rk-cool-mid: #0e7490;
+    --rk-cool-dark: #155e75;
+    --rk-cool-light: #cffafe;
+
     --rk-bg: #f4f6f9;
+    --rk-surface: #ffffff;
+    --rk-border: #e9ecef;
     --rk-text: #1a1a2e;
     --rk-muted: #6c757d;
     --rk-radius: 14px;
     --sidebar-w: 240px;
     --sidebar-w-collapsed: 64px;
+
+    /* Base type scale — bumped up per defense feedback (small/illegible text) */
+    --rk-fs-base: 15px;
+    --rk-fs-h1: clamp(22px, 2.4vw, 28px);
+
+    /* Ghost / outline button surfaces — swapped in dark mode so Cancel,
+       Edit, Reset, page-size, and similar actions don't stay white. */
+    --rk-btn-ghost-bg: #f3f4f6;
+    --rk-btn-ghost-border: #e5e7eb;
+    --rk-btn-ghost-hover: #e5e7eb;
+    --rk-btn-disabled-bg: #cbd5e1;
+    --rk-btn-disabled-fg: #fff;
 }
+
+/* ── Dark mode — toggled via [data-theme="dark"] on <html> ─────────── */
+html[data-theme="dark"] {
+    --rk-bg: #10131a;
+    --rk-surface: #1a1e28;
+    --rk-border: #2b3140;
+    --rk-text: #eef1f6;
+    --rk-muted: #9aa3b2;
+    --rk-green-light: #06301f;
+    --rk-cool-light: #062a30;
+    --rk-btn-ghost-bg: #252a36;
+    --rk-btn-ghost-border: #3a4152;
+    --rk-btn-ghost-hover: #323848;
+    --rk-btn-disabled-bg: #3a4150;
+    --rk-btn-disabled-fg: #9aa3b2;
+}
+html[data-theme="dark"] .dash-card,
+html[data-theme="dark"] .stat-card,
+html[data-theme="dark"] .card,
+html[data-theme="dark"] .modal-content {
+    background: var(--rk-surface);
+    border-color: var(--rk-border);
+    color: var(--rk-text);
+}
+html[data-theme="dark"] .table,
+html[data-theme="dark"] .prep-table td,
+html[data-theme="dark"] .prep-table th {
+    color: var(--rk-text);
+}
+html[data-theme="dark"] .feed-item,
+html[data-theme="dark"] .brgy-item {
+    border-bottom-color: var(--rk-border);
+}
+html[data-theme="dark"] input,
+html[data-theme="dark"] select,
+html[data-theme="dark"] textarea {
+    background: var(--rk-surface);
+    color: var(--rk-text);
+    border-color: var(--rk-border);
+}
+
+/* Suppress transitions on first paint (theme + sidebar) to avoid flashing */
+html.rk-no-anim, html.rk-no-anim * { transition: none !important; }
 
 body {
     background: var(--rk-bg);
     font-family: 'Segoe UI', sans-serif;
     color: var(--rk-text);
+    font-size: var(--rk-fs-base);
 }
 
 /* ── Sidebar (default = expanded) ──────────────────────────── */
@@ -54,20 +120,21 @@ body {
     box-shadow: 0 2px 6px rgba(0,0,0,0.12);
 }
 
-/* Personnel roles (BDRRMO / CFAU / CDRRMO Staff) — red→orange sidebar
-   gradient per Figma, scoped so Admin keeps the original green look. */
+/* Personnel roles (BDRRMO / CFAU / CDRRMO Staff) — cool teal→navy sidebar
+   gradient matching the RisKonek logo palette, replacing the old warm
+   red-orange look per defense feedback. Admin keeps the original green. */
 .sidebar.sidebar-personnel {
-    background: linear-gradient(180deg, #f54900 0%, #c10107 100%);
+    background: linear-gradient(180deg, var(--rk-cool) 0%, var(--rk-cool-dark) 100%);
 }
 .sidebar.sidebar-personnel .brand-icon {
-    color: #c10107;
+    color: var(--rk-cool-dark);
 }
 .sidebar-brand .brand-text { line-height: 1.2; flex: 1; min-width: 0; }
 .sidebar-brand .brand-name {
     color: white; font-weight: 700; font-size: 15px;
 }
 .sidebar-brand .brand-sub {
-    color: rgba(255,255,255,0.65); font-size: 11px;
+    color: rgba(255,255,255,0.8); font-size: 13px;
 }
 
 .sidebar-toggle {
@@ -103,7 +170,7 @@ body {
 }
 .sidebar-user .user-info { line-height: 1.25; }
 .sidebar-user .user-name { color: white; font-size: 13px; font-weight: 500; }
-.sidebar-user .user-role { color: rgba(255,255,255,0.6); font-size: 11px; }
+.sidebar-user .user-role { color: rgba(255,255,255,0.78); font-size: 13px; }
 
 /* Nav scrolls; sidebar-footer stays pinned at bottom */
 .sidebar nav {
@@ -122,8 +189,8 @@ body {
 .nav-section {
     margin: 16px 0 8px;       /* group top spacing (16px) + label bottom (8px) */
     padding: 0 16px;
-    color: rgba(255,255,255,0.6);
-    font-size: 11px;
+    color: rgba(255,255,255,0.75);
+    font-size: 12px;
     font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
@@ -157,12 +224,10 @@ body {
     color: white;
     font-weight: 600;   /* prevent Bootstrap .active bold from inflating text size */
 }
-.nav-item-link.active.nav-accent-blue   { background: linear-gradient(135deg,#3b82f6,#2563eb); box-shadow: 0 2px 8px rgba(37,99,235,0.35); }
-.nav-item-link.active.nav-accent-pink   { background: linear-gradient(135deg,#ec4899,#db2777); box-shadow: 0 2px 8px rgba(219,39,119,0.35); }
-.nav-item-link.active.nav-accent-orange { background: linear-gradient(135deg,#f97316,#ea580c); box-shadow: 0 2px 8px rgba(234,88,12,0.35); }
-.nav-item-link.active.nav-accent-slate  { background: linear-gradient(135deg,#475569,#1e293b); box-shadow: 0 2px 8px rgba(30,41,59,0.35); }
-.nav-item-link.active.nav-accent-purple { background: linear-gradient(135deg,#a855f7,#7c3aed); box-shadow: 0 2px 8px rgba(124,58,237,0.35); }
-.nav-item-link.active.nav-accent-green  { background: linear-gradient(135deg,#10b981,#059669); box-shadow: 0 2px 8px rgba(5,150,105,0.35); }
+/* Previously each nav item cycled through 6 unrelated accent colors when
+   active (blue/pink/orange/slate/purple/green) with no semantic meaning —
+   just visual noise. All items now share the one calm active style above;
+   the accent classes stay in the markup (harmless) but no longer override it. */
 .nav-item-link .nav-icon {
     font-size: 18px;
     width: 22px;              /* fixed width keeps all icons/labels aligned */
@@ -241,7 +306,7 @@ body {
 }
 .main-content {
     margin-left: var(--sidebar-w);
-    padding: 24px;
+    padding: 28px 32px;
     transition: margin-left 0.2s ease;
     min-height: 100vh;
 }
@@ -256,10 +321,44 @@ html.rk-no-anim .sidebar,
 html.rk-no-anim .main-content { transition: none !important; }
 
 /* ── Page header ───────────────────────────────────────────── */
-.page-header { margin-bottom: 20px; }
-.page-header h1 { font-size: 22px; font-weight: 700; color: var(--rk-text); margin: 0; }
-.page-header p { color: var(--rk-muted); font-size: 13px; margin: 3px 0 0; }
-.last-updated { font-size: 12px; color: var(--rk-muted); text-align: right; }
+.page-header { margin-bottom: 24px; }
+.page-header h1 { font-size: var(--rk-fs-h1); font-weight: 700; color: var(--rk-text); margin: 0; }
+.page-header p { color: var(--rk-muted); font-size: 14px; margin: 4px 0 0; }
+.last-updated { font-size: 13px; color: var(--rk-muted); text-align: right; }
+
+/* ── Theme toggle (sun/moon) — sits beside the sidebar collapse button ── */
+.theme-toggle {
+    background: transparent; border: none; color: rgba(255,255,255,0.85);
+    font-size: 18px; cursor: pointer; padding: 6px 8px; border-radius: 6px;
+    flex-shrink: 0; line-height: 1;
+}
+.theme-toggle:hover { background: rgba(255,255,255,0.15); color: white; }
+
+/* ── Collapsible section — reusable wrapper to cut down on page scroll ──
+   Markup:
+   <div class="rk-collapsible">
+     <button class="rk-collapsible-toggle" type="button" aria-expanded="true">
+       <i class="bi bi-chevron-down"></i> <span>Section title</span>
+     </button>
+     <div class="rk-collapsible-body">...content...</div>
+   </div>
+   JS in base.html toggles [data-open] and rotates the chevron. Starts open;
+   add data-default-collapsed to a .rk-collapsible to start it closed. */
+.rk-collapsible-toggle {
+    display: flex; align-items: center; gap: 8px;
+    width: 100%; background: transparent; border: none;
+    padding: 4px 0; margin-bottom: 8px;
+    font-size: 14px; font-weight: 600; color: var(--rk-text);
+    cursor: pointer; text-align: left;
+}
+.rk-collapsible-toggle i { transition: transform 0.18s ease; font-size: 13px; color: var(--rk-muted); }
+.rk-collapsible[data-open="false"] .rk-collapsible-toggle i.bi-chevron-down { transform: rotate(-90deg); }
+.rk-collapsible[data-open="false"] .rk-collapsible-body { display: none; }
+/* When the toggle shares a header row with another element (e.g. an "All
+   Reports" link), let it shrink to its own content instead of claiming
+   the full row width. */
+.rk-collapsible-toggle-row { display: flex; align-items: center; margin-bottom: 8px; }
+.rk-collapsible-toggle-row > .rk-collapsible-toggle { width: auto; flex: 1 1 auto; min-width: 0; margin-bottom: 0; }
 
 /* ── Shared card styles ────────────────────────────────────── */
 .stat-card,
@@ -269,12 +368,17 @@ html.rk-no-anim .main-content { transition: none !important; }
     box-shadow: 0 1px 3px rgba(16,24,40,0.06), 0 1px 8px rgba(16,24,40,0.04);
     border: 1px solid rgba(16,24,40,0.04);
 }
-.stat-card { padding: 18px 20px; height: 100%; }
-.dash-card { padding: 20px; height: 100%; }
+.stat-card { padding: 20px 22px; height: 100%; }
+/* No forced height:100% here — a dash-card sized to its own tallest
+   sibling (a short chart card next to a long list card) was the source of
+   the "modals too long" congestion across every module. Cards now size to
+   their own content; pages that genuinely want two cards the same height
+   (e.g. paired quick-link panels) opt in explicitly with .h-100. */
+.dash-card { padding: 24px; }
 
-.stat-card .stat-label { font-size: 12px; color: var(--rk-muted); margin-bottom: 6px; }
+.stat-card .stat-label { font-size: 13px; color: var(--rk-muted); margin-bottom: 8px; }
 .stat-card .stat-value { font-size: clamp(15px, 2vw, 26px); font-weight: 700; color: var(--rk-text); margin: 0; word-break: break-word; }
-.stat-card .stat-change { font-size: 12px; margin-top: 4px; }
+.stat-card .stat-change { font-size: 13px; margin-top: 6px; }
 .stat-card .stat-icon {
     width: 38px; height: 38px; border-radius: 12px;
     display: flex; align-items: center; justify-content: center;
@@ -283,7 +387,7 @@ html.rk-no-anim .main-content { transition: none !important; }
 
 .dash-card .card-title-row {
     display: flex; align-items: center; gap: 10px;
-    margin-bottom: 16px;
+    margin-bottom: 18px;
 }
 .dash-card .card-title-row h6 {
     font-size: 14px; font-weight: 600; color: var(--rk-text); margin: 0;
@@ -294,7 +398,7 @@ html.rk-no-anim .main-content { transition: none !important; }
    Moderate/Low stay neutral so attention isn't spread evenly —
    this mirrors the emphasis used across the reference screens. */
 .risk-badge {
-    font-size: 11px; font-weight: 700;
+    font-size: 12px; font-weight: 700;
     padding: 4px 12px; border-radius: 20px;
     display: inline-block;
     letter-spacing: 0.01em;
@@ -306,13 +410,73 @@ html.rk-no-anim .main-content { transition: none !important; }
 
 /* ── Status pills ──────────────────────────────────────────── */
 .status-pill {
-    font-size: 11px; font-weight: 700;
+    font-size: 12px; font-weight: 700;
     padding: 4px 12px; border-radius: 20px;
     display: inline-block;
 }
 .status-operational     { background: #d1fae5; color: #047857; }
 .status-maintenance     { background: #fef3c7; color: #b45309; }
 .status-unavailable     { background: #fee2e2; color: #dc2626; }
+
+/* ── Tables — app-wide ─────────────────────────────────────────
+   No custom table rules existed before this, so every list page ran on
+   raw Bootstrap defaults (~8px cell padding, no consistent alignment
+   convention). One shared rule set here instead of each page hand-tuning
+   its own <table>, so density and alignment read the same everywhere. */
+.table {
+    font-size: 13px;
+}
+.table > :not(caption) > * > * {
+    padding: 12px 14px;
+    vertical-align: middle;
+}
+.table thead th {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--rk-muted);
+    border-bottom-width: 1px;
+}
+/* Numeric/quantity columns: right-align consistently instead of the
+   left-default that made counts and totals hard to scan and compare. */
+.table .text-end,
+.table th.text-end {
+    font-variant-numeric: tabular-nums;
+}
+html[data-theme="dark"] .table thead th { color: var(--rk-muted); border-color: var(--rk-border); }
+html[data-theme="dark"] .table > :not(caption) > * > * { border-color: var(--rk-border); }
+
+/* ── Form fields — de-emphasize optional inputs app-wide ────────────
+   Every required field already carries the HTML `required` attribute for
+   browser validation; we reuse that instead of adding a second marker.
+   Required fields keep the normal bold/dark label and standard border.
+   Everything else quiets down, so a long form reads as "here's what's
+   needed" first and "here's what's optional" second, without hiding
+   anything or adding a toggle to click through. One rule, every form.
+   Scoped OUT of .js-live-filter (search/filter bars) — every field there
+   is optional by design, but they're primary controls a user needs to
+   see clearly, not secondary record data, so they keep full emphasis. */
+.form-label.fw-semibold:not(:has(+ .form-control:required)):not(:has(+ .form-select:required)) {
+    font-weight: 500 !important;
+    color: var(--rk-muted);
+}
+.js-live-filter .form-label.fw-semibold {
+    font-weight: 600 !important;
+    color: var(--rk-text) !important;
+}
+.form-control:not(:required):not(:disabled):not(:focus),
+.form-select:not(:required):not(:disabled):not(:focus) {
+    border-color: #eef0f2;
+}
+.js-live-filter .form-control:not(:disabled):not(:focus),
+.js-live-filter .form-select:not(:disabled):not(:focus) {
+    border-color: var(--rk-border);
+}
+html[data-theme="dark"] .form-control:not(:required):not(:disabled):not(:focus),
+html[data-theme="dark"] .form-select:not(:required):not(:disabled):not(:focus) {
+    border-color: var(--rk-border);
+}
 
 /* ── Buttons ───────────────────────────────────────────────── */
 .btn-rk {
@@ -325,25 +489,134 @@ html.rk-no-anim .main-content { transition: none !important; }
 }
 .btn-rk:hover { background: linear-gradient(135deg, var(--rk-green-mid), var(--rk-green-dark)); color: white; }
 .btn-rk:disabled, .btn-rk.disabled {
-    background: #cbd5e1; box-shadow: none; opacity: 1; color: #fff;
+    background: var(--rk-btn-disabled-bg); box-shadow: none; opacity: 1;
+    color: var(--rk-btn-disabled-fg);
 }
 
 /* Soft "ghost" pill button — used for secondary row actions like
    "View Profile" so they read as calm, not competing with .btn-rk. */
 .btn-soft {
-    background: #f3f4f6; color: var(--rk-text);
-    border: 1px solid #e5e7eb; border-radius: 8px;
+    background: var(--rk-btn-ghost-bg); color: var(--rk-text);
+    border: 1px solid var(--rk-btn-ghost-border); border-radius: 8px;
     font-size: 12.5px; font-weight: 500;
     padding: 6px 14px;
     transition: background 0.15s;
     display: inline-flex; align-items: center; gap: 4px;
 }
-.btn-soft:hover { background: #e5e7eb; color: var(--rk-text); }
+.btn-soft:hover { background: var(--rk-btn-ghost-hover); color: var(--rk-text); }
 
 /* Rounded search bar used in list/filter toolbars */
-.search-bar-rk .input-group-text { background: white; border-right: 0; border-radius: 10px 0 0 10px; }
+.search-bar-rk .input-group-text {
+    background: var(--rk-surface); color: var(--rk-muted);
+    border-color: var(--rk-border); border-right: 0; border-radius: 10px 0 0 10px;
+}
 .search-bar-rk input { border-left: 0; border-radius: 0 10px 10px 0; }
 .search-bar-rk input:focus { box-shadow: none; border-color: #ced4da; }
+
+/* Dark-mode Bootstrap outline / pagination / close — these keep light-mode
+   fills (white or pale gray) even when data-bs-theme=dark is set, because
+   outline variants hard-code --bs-btn-* rather than following --rk-surface.
+   Used on every role: Cancel, Edit, Reset, Archive, page-size, etc. */
+html[data-theme="dark"] .btn-outline-secondary,
+html[data-theme="dark"] .btn-outline-primary,
+html[data-theme="dark"] .btn-outline-success,
+html[data-theme="dark"] .btn-outline-danger {
+    --bs-btn-bg: var(--rk-btn-ghost-bg);
+    --bs-btn-hover-bg: var(--rk-btn-ghost-hover);
+    --bs-btn-active-bg: var(--rk-btn-ghost-hover);
+    --bs-btn-disabled-bg: var(--rk-btn-ghost-bg);
+    background-color: var(--rk-btn-ghost-bg);
+    border-color: var(--rk-btn-ghost-border);
+}
+html[data-theme="dark"] .btn-outline-secondary {
+    --bs-btn-color: var(--rk-text);
+    --bs-btn-border-color: var(--rk-btn-ghost-border);
+    --bs-btn-hover-color: var(--rk-text);
+    --bs-btn-hover-border-color: #5a6478;
+    --bs-btn-active-color: var(--rk-text);
+    --bs-btn-active-border-color: #5a6478;
+    --bs-btn-disabled-color: var(--rk-muted);
+    color: var(--rk-text);
+}
+html[data-theme="dark"] .btn-outline-secondary:hover,
+html[data-theme="dark"] .btn-outline-secondary:focus,
+html[data-theme="dark"] .btn-outline-secondary:active,
+html[data-theme="dark"] .btn-outline-secondary.active {
+    color: var(--rk-text);
+    background-color: var(--rk-btn-ghost-hover);
+    border-color: #5a6478;
+}
+html[data-theme="dark"] .btn-outline-primary {
+    --bs-btn-color: #93c5fd;
+    --bs-btn-border-color: #3b5a8a;
+    --bs-btn-hover-color: #dbeafe;
+    --bs-btn-hover-border-color: #5b82b8;
+    color: #93c5fd;
+    border-color: #3b5a8a;
+}
+html[data-theme="dark"] .btn-outline-primary:hover,
+html[data-theme="dark"] .btn-outline-primary:focus,
+html[data-theme="dark"] .btn-outline-primary:active,
+html[data-theme="dark"] .btn-outline-primary.active {
+    color: #dbeafe;
+    background-color: #1e3a5f;
+    border-color: #5b82b8;
+}
+html[data-theme="dark"] .btn-outline-success {
+    --bs-btn-color: #86efac;
+    --bs-btn-border-color: #2f5c40;
+    --bs-btn-hover-color: #bbf7d0;
+    color: #86efac;
+    border-color: #2f5c40;
+}
+html[data-theme="dark"] .btn-outline-success:hover,
+html[data-theme="dark"] .btn-outline-success:focus,
+html[data-theme="dark"] .btn-outline-success:active,
+html[data-theme="dark"] .btn-outline-success.active {
+    color: #bbf7d0;
+    background-color: #17301f;
+    border-color: #3d7a52;
+}
+html[data-theme="dark"] .btn-outline-danger {
+    --bs-btn-color: #f2a7a7;
+    --bs-btn-border-color: #6b3535;
+    --bs-btn-hover-color: #fecaca;
+    color: #f2a7a7;
+    border-color: #6b3535;
+}
+html[data-theme="dark"] .btn-outline-danger:hover,
+html[data-theme="dark"] .btn-outline-danger:focus,
+html[data-theme="dark"] .btn-outline-danger:active,
+html[data-theme="dark"] .btn-outline-danger.active {
+    color: #fecaca;
+    background-color: #3a1f1f;
+    border-color: #8a4545;
+}
+html[data-theme="dark"] .page-link {
+    background-color: var(--rk-btn-ghost-bg);
+    border-color: var(--rk-btn-ghost-border);
+    color: var(--rk-text);
+}
+html[data-theme="dark"] .page-link:hover {
+    background-color: var(--rk-btn-ghost-hover);
+    border-color: #5a6478;
+    color: var(--rk-text);
+}
+html[data-theme="dark"] .page-item.disabled .page-link {
+    background-color: var(--rk-surface);
+    border-color: var(--rk-border);
+    color: var(--rk-muted);
+}
+html[data-theme="dark"] .dropdown-menu {
+    background-color: var(--rk-surface);
+    border-color: var(--rk-border);
+}
+html[data-theme="dark"] .dropdown-item { color: var(--rk-text); }
+html[data-theme="dark"] .dropdown-item:hover,
+html[data-theme="dark"] .dropdown-item:focus {
+    background-color: var(--rk-btn-ghost-hover);
+    color: var(--rk-text);
+}
 
 /* Reusable alert / insight banner (amber notice strip) */
 .alert-banner {
@@ -352,6 +625,20 @@ html.rk-no-anim .main-content { transition: none !important; }
     font-size: 13px; color: #856404; margin-bottom: 16px;
     display: flex; align-items: center; gap: 8px;
 }
+html[data-theme="dark"] .alert-banner {
+    background: #3a2f0f; border-left-color: #d4a017; color: #f0d78c;
+}
+html[data-theme="dark"] .alert-banner .alert-link { color: #ffe8a3; }
+
+/* ── Audit-log before/after diff — was duplicated with hardcoded,
+   light-only colors in admin/audit_detail.html and staff/audit_detail.html.
+   Centralized here so both stay in sync and adapt to dark mode. */
+.diff-box { font-size: 12px; border-radius: 6px; padding: 8px 10px; white-space: pre-wrap; word-break: break-word; min-height: 38px; }
+.diff-old { background: #fdecea; border: 1px solid #f4c2bd; color: #842029; }
+.diff-new { background: #eafaf1; border: 1px solid #c8e6d4; color: #14563a; }
+.diff-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--rk-muted); }
+html[data-theme="dark"] .diff-old { background: #3a1f1f; border-color: #6b3535; color: #f2a7a7; }
+html[data-theme="dark"] .diff-new { background: #17301f; border-color: #2f5c40; color: #92e0ae; }
 
 /* ── Utility layer (CSP refactor) ──────────────────────────────
    Small, reusable helpers that replace the repeated inline style=""
@@ -359,9 +646,9 @@ html.rk-no-anim .main-content { transition: none !important; }
    main.py drop `style-src 'unsafe-inline'`. See SECURITY_CSP_STYLE_REPORT.md. */
 
 /* Font-size steps (px — matches the existing px-based type scale) */
-.rk-fs-10 { font-size: 10px; }
-.rk-fs-11 { font-size: 11px; }
-.rk-fs-12 { font-size: 12px; }
+.rk-fs-10 { font-size: 11px; }
+.rk-fs-11 { font-size: 12px; }
+.rk-fs-12 { font-size: 13px; }
 .rk-fs-13 { font-size: 13px; }
 .rk-fs-14 { font-size: 14px; }
 .rk-fs-16 { font-size: 16px; }
@@ -393,7 +680,7 @@ html.rk-no-anim .main-content { transition: none !important; }
 
 /* Soft uppercase table-header row (muted, letter-spaced) */
 .rk-th-soft {
-    font-size: 12px; color: var(--rk-muted);
+    font-size: 13px; color: var(--rk-muted);
     text-transform: uppercase; letter-spacing: 0.04em;
 }
 
@@ -505,7 +792,7 @@ html.rk-no-anim .main-content { transition: none !important; }
     display: inline-flex; align-items: center; justify-content: center;
     width: 22px; height: 22px; border-radius: 50%; flex: 0 0 auto;
     background: var(--rk-green); color: #fff;
-    font-size: 12px; font-weight: 700;
+    font-size: 13px; font-weight: 700;
 }
 
 /* Legend separator row */
@@ -520,7 +807,7 @@ html.rk-no-anim .main-content { transition: none !important; }
 
 /* Raw extracted-text preview box */
 .rk-raw-preview {
-    white-space: pre-wrap; font-size: 12px;
+    white-space: pre-wrap; font-size: 13px;
     background: #f9fafb; padding: 10px; border-radius: 6px;
 }
 
@@ -642,14 +929,14 @@ html.rk-no-anim .main-content { transition: none !important; }
     min-height: 480px;
 }
 .filter-panel {
-    background: white;
+    background: var(--rk-surface);
     border-radius: var(--rk-radius);
     box-shadow: 0 1px 3px rgba(16,24,40,0.06), 0 1px 8px rgba(16,24,40,0.04);
     padding: 18px;
     overflow-y: auto;
 }
 .filter-panel h6 {
-    font-size: 12px;
+    font-size: 13px;
     text-transform: uppercase;
     letter-spacing: 0.04em;
     color: var(--rk-muted);
@@ -669,9 +956,15 @@ html.rk-no-anim .main-content { transition: none !important; }
     border-radius: var(--rk-radius);
     overflow: hidden;
     box-shadow: 0 1px 3px rgba(16,24,40,0.06), 0 1px 8px rgba(16,24,40,0.04);
-    background: white;
+    background: var(--rk-surface);
 }
 .map-area .leaflet-container { height: 100%; width: 100%; }
+html[data-theme="dark"] .leaflet-bar a,
+html[data-theme="dark"] .leaflet-bar a:hover {
+    background: var(--rk-surface);
+    color: var(--rk-text);
+    border-bottom-color: var(--rk-border);
+}
 
 /* Below lg, .map-wrap's single-column grid stacks .filter-panel and
    .map-area into two auto-height rows instead of stretching them across
@@ -698,12 +991,12 @@ html.rk-no-anim .main-content { transition: none !important; }
     border-radius: 8px;
     padding: 10px 12px;
     box-shadow: 0 1px 6px rgba(0,0,0,0.12);
-    font-size: 12px;
+    font-size: 13px;
     max-width: 260px;
     z-index: 500;
 }
 .map-overlay .legend-title {
-    font-size: 11px;
+    font-size: 12px;
     text-transform: uppercase;
     letter-spacing: 0.04em;
     color: var(--rk-muted);
@@ -729,7 +1022,9 @@ html.rk-no-anim .main-content { transition: none !important; }
     position: absolute;
     top: 12px; left: 50%;
     transform: translateX(-50%);
-    background: white;
+    background: var(--rk-surface);
+    border: 1px solid var(--rk-border);
+    color: var(--rk-text);
     border-radius: 10px;
     box-shadow: 0 2px 10px rgba(0,0,0,0.18);
     padding: 8px 12px;
@@ -757,7 +1052,7 @@ html.rk-no-anim .main-content { transition: none !important; }
     position: absolute;
     top: 100%; left: 0; right: 0;
     margin-top: 2px;
-    background: white;
+    background: var(--rk-surface);
     border: 1px solid rgba(16,24,40,0.12);
     border-radius: 8px;
     box-shadow: 0 4px 14px rgba(0,0,0,0.15);
@@ -777,14 +1072,14 @@ html.rk-no-anim .main-content { transition: none !important; }
     background: var(--rk-bg-soft, #f3f6f4);
 }
 .picker-search-result-name { font-weight: 600; font-size: 13px; }
-.picker-search-result-sub  { font-size: 11px; color: var(--rk-muted); }
-.picker-search-result-cat  { font-size: 10px; color: var(--rk-muted); text-transform: uppercase; letter-spacing: 0.03em; }
+.picker-search-result-sub  { font-size: 12px; color: var(--rk-muted); }
+.picker-search-result-cat  { font-size: 11px; color: var(--rk-muted); text-transform: uppercase; letter-spacing: 0.03em; }
 .picker-search-empty {
     padding: 8px 12px;
-    font-size: 12px;
+    font-size: 13px;
     color: var(--rk-muted);
 }
-.picker-landmarks-toggle { font-size: 12px; }
+.picker-landmarks-toggle { font-size: 13px; }
 .picker-selected-summary { line-height: 1.3; }
 .picker-selected-name { font-weight: 600; font-size: 13px; }
 .picker-boundary-warning {
@@ -792,7 +1087,7 @@ html.rk-no-anim .main-content { transition: none !important; }
     color: #856404;
     border-radius: 6px;
     padding: 6px 10px;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 600;
 }
 
@@ -801,7 +1096,8 @@ html.rk-no-anim .main-content { transition: none !important; }
 .map-search-bar {
     position: absolute;
     top: 12px; left: 12px;
-    background: white;
+    background: var(--rk-surface);
+    border: 1px solid var(--rk-border);
     border-radius: 10px;
     box-shadow: 0 2px 10px rgba(0,0,0,0.18);
     padding: 8px 12px;
@@ -823,7 +1119,7 @@ html.rk-no-anim .main-content { transition: none !important; }
     flex-shrink: 0;
 }
 .landmark-ref-label {
-    font-size: 10px;
+    font-size: 11px;
     color: var(--rk-muted);
     font-style: italic;
     margin-top: 4px;
@@ -855,7 +1151,7 @@ body.facility-location-picking .map-area .leaflet-container {
     margin-bottom: 16px; flex-wrap: wrap;
 }
 .stat-pill {
-    background: white;
+    background: var(--rk-surface);
     border-radius: 10px;
     box-shadow: 0 1px 3px rgba(16,24,40,0.06), 0 1px 8px rgba(16,24,40,0.04);
     padding: 8px 14px;
@@ -865,7 +1161,7 @@ body.facility-location-picking .map-area .leaflet-container {
 .stat-pill .stat-pill-value { font-weight: 700; color: var(--rk-green); }
 
 .rk-form-section-title {
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.03em;
@@ -873,7 +1169,7 @@ body.facility-location-picking .map-area .leaflet-container {
     margin-bottom: 4px;
 }
 
-.popup-table { font-size: 12px; }
+.popup-table { font-size: 13px; }
 .popup-table th {
     text-align: left;
     color: var(--rk-muted);
@@ -883,10 +1179,10 @@ body.facility-location-picking .map-area .leaflet-container {
 }
 .popup-table td { padding: 1px 0; vertical-align: top; }
 .popup-name { font-size: 14px; font-weight: 700; color: var(--rk-text); margin-bottom: 2px; }
-.popup-sub  { font-size: 11px; color: var(--rk-muted); margin-bottom: 8px; }
+.popup-sub  { font-size: 12px; color: var(--rk-muted); margin-bottom: 8px; }
 .popup-badges { margin: 6px 0 8px; display: flex; flex-wrap: wrap; gap: 4px; }
 .popup-badge {
-    font-size: 10px; font-weight: 600;
+    font-size: 11px; font-weight: 600;
     padding: 2px 8px; border-radius: 12px;
     background: #d1fae5; color: #047857;
 }
@@ -933,6 +1229,15 @@ body.facility-location-picking .map-area .leaflet-container {
 
 /* Key-figure cards: flat, minimal shadow, readable when stacked */
 .rk-figure { padding: 16px 18px; }
+.rk-figure-linked { transition: box-shadow 0.15s ease, transform 0.15s ease; cursor: pointer; }
+.rk-figure-linked:hover { box-shadow: 0 4px 14px rgba(0,0,0,0.08); transform: translateY(-1px); }
+
+/* Anchor targets for "jump to detail" links (warning pills, hero, figure
+   cards) — a little top clearance so the target isn't flush against the
+   viewport edge when scrolled into view. */
+#rk-attention-h, .rk-concern-card[id] { scroll-margin-top: 16px; }
+a.status-pill { cursor: pointer; }
+a.status-pill:hover { filter: brightness(0.95); }
 
 /* Resource-coverage rows */
 .rk-coverage-row { padding: 10px 0; }
@@ -1020,7 +1325,7 @@ body.facility-location-picking .map-area .leaflet-container {
     display: flex; align-items: flex-start; justify-content: space-between;
     gap: 8px; margin-bottom: 6px;
 }
-.rk-figure-head .stat-label { font-size: 12px; color: var(--rk-muted); }
+.rk-figure-head .stat-label { font-size: 13px; color: var(--rk-muted); }
 /* .stat-icon's box is scoped to .stat-card upstream, so restate it here. */
 .rk-figure-head .stat-icon {
     width: 32px; height: 32px; border-radius: 10px; flex: 0 0 auto;

@@ -8,7 +8,7 @@
 <style nonce="{{ request.state.csp_nonce }}">
     .attn-item {
         display: flex; align-items: center; gap: 12px;
-        padding: 10px 0; border-bottom: 1px solid #f0f0f0;
+        padding: 10px 0; border-bottom: 1px solid var(--rk-border);
     }
     .attn-item:last-child { border-bottom: none; }
     .attn-name { font-size: 14px; font-weight: 600; color: var(--rk-text); }
@@ -20,14 +20,14 @@
 
     .fleet-row {
         display: flex; align-items: center; justify-content: space-between;
-        padding: 8px 0; border-bottom: 1px solid #f0f0f0;
+        padding: 8px 0; border-bottom: 1px solid var(--rk-border);
     }
     .fleet-row:last-child { border-bottom: none; }
     .fleet-count { font-size: 15px; font-weight: 700; color: var(--rk-text); }
 
     .feed-item {
         display: flex; gap: 12px; align-items: flex-start;
-        padding: 10px 0; border-bottom: 1px solid #f0f0f0;
+        padding: 10px 0; border-bottom: 1px solid var(--rk-border);
     }
     .feed-item:last-child { border-bottom: none; }
     .feed-icon {
@@ -437,6 +437,7 @@ if (fleetCanvas) {
 
 // ── My reports by workflow stage ──────────────────────────────────
 // Lifecycle order, keyed by stage name — tojson sorts the dict's keys.
+Chart.defaults.color = window.rkChartTheme().text;
 const workflowLabels = {{ workflow_labels | tojson }};
 const workflowData = {{ svc_counts | tojson }};
 const workflowOrder = ['draft', 'submitted', 'reviewed', 'resolved'];
@@ -462,7 +463,7 @@ if (workflowCanvas) {
             responsive: true,
             plugins: { legend: { display: false } },
             scales: {
-                y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#f5f5f5' } },
+                y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: window.rkChartTheme().grid } },
                 x: { grid: { display: false } }
             }
         }

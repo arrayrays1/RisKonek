@@ -296,7 +296,7 @@
                               class="d-inline"
                               data-confirm="Delete saved scenario '{{ s.name }}'? This cannot be undone.">
                             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
-                            <button type="submit" class="btn-soft rk-text-crit" title="Delete">
+                            <button type="submit" class="btn-soft rk-text-crit" title="Delete" aria-label="Delete saved scenario {{ s.name }}">
                                 <i class="bi bi-trash"></i>
                             </button>
                         </form>
