@@ -256,7 +256,11 @@ if (!mapElement) {
 const spBounds = {{ sp_bounds | tojson }};
 const spBoundary = {{ sp_boundary | tojson }};  // [[lat,lng], ...] — see app/services/geocoding.py
 
-const map = L.map(mapElement).setView([14.356, 121.052], 13);
+const map = L.map(mapElement, { zoomControl: false }).setView([14.356, 121.052], 13);
+// Zoom control is moved to bottom-right: the default top-left spot is where
+// .map-search-bar lives, and the two were overlapping (search box drawn on
+// top of the +/- buttons, making zoom unusable behind it).
+L.control.zoom({ position: 'bottomright' }).addTo(map);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap contributors',
     maxZoom: 18

@@ -2,6 +2,16 @@
 {% set active_nav = 'simulator' %}
 {% block title %}Resource Simulator — RisKonek{% endblock %}
 
+{% block head_extra %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<style nonce="{{ request.state.csp_nonce }}">
+    /* Calendar range picker reuses the app's date-input sizing so it drops
+       into the form like any other .form-control. */
+    #date_range_display { background-color: #fff; cursor: pointer; }
+    .flatpickr-calendar { box-shadow: 0 4px 14px rgba(0,0,0,0.15); }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="page-header d-flex justify-content-between align-items-start flex-wrap gap-2">
     <div>
@@ -105,20 +115,21 @@
                     </div>
                 </div>
 
-                {# 3. Estimated Duration — drives water/food sizing #}
+                {# 3. Estimated Duration — a calendar date range, not a fixed
+                     preset, so planners aren't capped at "2 weeks". Drives
+                     water/food sizing via the resulting day count. #}
                 <div class="mb-4">
-                    <label for="duration" class="form-label fw-semibold">
+                    <label for="date_range_display" class="form-label fw-semibold">
                         Estimated Duration
                     </label>
-                    <select class="form-select" id="duration" name="duration" required>
-                        {% for opt in duration_options %}
-                        <option value="{{ opt.value }}"
-                            {{ 'selected' if opt.value == default_duration else '' }}>
-                            {{ opt.label }}
-                        </option>
-                        {% endfor %}
-                    </select>
-                    <div class="form-text">
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-calendar-range"></i></span>
+                        <input type="text" class="form-control" id="date_range_display"
+                               placeholder="Select a date range…" autocomplete="off" required>
+                    </div>
+                    <input type="hidden" id="date_from" name="date_from" required>
+                    <input type="hidden" id="date_to" name="date_to" required>
+                    <div class="form-text" id="duration_hint">
                         Used to estimate water and food requirements.
                     </div>
                 </div>
@@ -130,47 +141,14 @@
         </div>
     </div>
 
-    <!-- ── RIGHT (wider): Weather strip + Priority Barangays ────────────── -->
-    {# Flex column so the Priority card grows to fill the remaining height and
-       its bottom aligns with the Scenario Setup card on the left. The global
-       .dash-card{height:100%} is overridden inline so the weather strip stays
-       compact instead of stretching. #}
-    <div class="col-lg-7 d-flex flex-column">
-        {# ── Weather Outlook — compact 7-day horizontal strip ───────────── #}
-        <div class="dash-card mb-4 rk-h-auto">
-            {% if weather and weather.days %}
-                <div class="d-flex flex-nowrap gap-2 overflow-auto">
-                    {% for d in weather.days %}
-                    {% set iwx = 'rk-wx-rain' if ('rain' in d.icon or 'drizzle' in d.icon or 'lightning' in d.icon)
-                                  else ('rk-wx-sun' if 'sun' in d.icon else 'rk-wx-cloud') %}
-                    <div class="text-center flex-fill py-2 px-1 rounded rk-mw-60 rk-bg-slate-soft"
-                         title="{{ d.label }}">
-                        <div class="fw-semibold rk-fs-12">{{ d.day }}</div>
-                        <div class="my-1"><i class="bi {{ d.icon }} rk-fs-20 {{ iwx }}"></i></div>
-                        <div class="rk-fs-12 rk-nowrap">
-                            <span class="fw-semibold">{{ d.tmax }}°</span>
-                            <span class="text-muted">{{ d.tmin }}°</span>
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-                <p class="text-muted mb-0 mt-2 rk-fs-11">
-                    Forecast data from Open-Meteo. For official warnings, refer to PAGASA.
-                </p>
-            {% else %}
-                <div class="alert-banner mb-0">
-                    <i class="bi bi-cloud-slash-fill"></i>
-                    <span>Weather data unavailable. This does not affect the simulator —
-                          try refreshing later.</span>
-                </div>
-            {% endif %}
-        </div>
-
+    <!-- ── RIGHT (wider): Priority Barangays ────────────────────────────── -->
+    <div class="col-lg-7">
         {# ── Priority Barangays (config-list; study risk score) ─────────── #}
         {# Shown ONE at a time with prev/next navigation so the card stays
-           compact — no long list, no awkward empty space. flex-grow-1 lets it
-           fill the remaining column height so its bottom aligns with the left. #}
-        <div class="dash-card flex-grow-1 rk-h-auto">
+           compact — no long list, no awkward empty space. The global
+           .dash-card{height:100%} lets it match the Scenario Setup card's
+           height on the left. #}
+        <div class="dash-card rk-h-auto">
             <div class="card-title-row">
                 <h6 class="mb-0"><i class="bi bi-exclamation-triangle-fill me-1 text-danger"></i>Priority Barangays (Frequently Affected)</h6>
                 {% if priority_rows | length > 1 %}
@@ -334,6 +312,53 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/flatpickr" nonce="{{ request.state.csp_nonce }}"></script>
+<script nonce="{{ request.state.csp_nonce }}">
+// Estimated Duration — calendar range picker (flatpickr). Two months shown
+// side by side, free navigation month to month with no min/max date, so a
+// planner can pick any span rather than being capped at a fixed preset.
+(function () {
+    var display = document.getElementById('date_range_display');
+    if (!display || !window.flatpickr) return;
+
+    var fromField = document.getElementById('date_from');
+    var toField = document.getElementById('date_to');
+    var hint = document.getElementById('duration_hint');
+
+    function toISO(d) {
+        var m = String(d.getMonth() + 1).padStart(2, '0');
+        var day = String(d.getDate()).padStart(2, '0');
+        return d.getFullYear() + '-' + m + '-' + day;
+    }
+
+    function applyRange(from, to) {
+        fromField.value = toISO(from);
+        toField.value = toISO(to);
+        var days = Math.round((to - from) / 86400000) + 1;
+        if (hint) {
+            hint.textContent = days + (days === 1 ? ' day selected — ' : ' days selected — ')
+                + 'used to estimate water and food requirements.';
+        }
+    }
+
+    var defaultFrom = "{{ default_date_from }}";
+    var defaultTo = "{{ default_date_to }}";
+
+    flatpickr(display, {
+        mode: 'range',
+        dateFormat: 'M j, Y',
+        showMonths: window.matchMedia('(max-width: 576px)').matches ? 1 : 2,
+        defaultDate: [defaultFrom, defaultTo],
+        onChange: function (selectedDates) {
+            if (selectedDates.length === 2) applyRange(selectedDates[0], selectedDates[1]);
+        },
+    });
+
+    // Prefill the hidden fields + hint to match the initial default range
+    // (onChange only fires on a user-driven change, not on init).
+    applyRange(new Date(defaultFrom + 'T00:00:00'), new Date(defaultTo + 'T00:00:00'));
+})();
+</script>
 <script nonce="{{ request.state.csp_nonce }}">
 // Priority Barangays carousel — show one entry at a time, prev/next cycles.
 // CSP-safe: nonce'd, delegated listener, no inline on* handlers.

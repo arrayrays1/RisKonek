@@ -2,7 +2,7 @@ import json
 import re
 import uuid
 from collections import OrderedDict
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone, timedelta, date
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Request, Depends, Form
@@ -23,7 +23,6 @@ from app.simulation import engine
 from app.simulation import ai_layer
 from app.simulation import presenter
 from app.simulation import thresholds as thresholds_svc
-from app.simulation import weather as weather_svc
 from app.simulation import config as C
 from app.simulation.schemas import ScenarioInput
 from app.simulation import pdf_export
@@ -66,9 +65,10 @@ def _store_run(payload: dict) -> str:
         _RUN_STORE.popitem(last=False)   # drop oldest
     return run_id
 
-# Estimated-duration presets. The value is what the engine reads (via `days`)
-# to size water/food needs; the label is what the planner sees. "3 days" is the
-# default per the task spec.
+# Legacy duration presets — kept ONLY so saved scenarios created before the
+# calendar range picker still render a nice label ("3_days" -> "3 days")
+# instead of the raw stored key. New runs no longer produce these keys; see
+# _format_duration_label() below, which builds a label from the picked dates.
 DURATION_OPTIONS = [
     {"value": "1_day", "label": "1 day", "days": 1},
     {"value": "3_days", "label": "3 days", "days": 3},
@@ -79,6 +79,22 @@ DURATION_OPTIONS = [
 DURATION_DAYS = {opt["value"]: opt["days"] for opt in DURATION_OPTIONS}
 # Fast key -> human label lookup reused by the saved-scenario views.
 DURATION_LABELS = {opt["value"]: opt["label"] for opt in DURATION_OPTIONS}
+
+
+def _format_duration_label(date_from, date_to, days):
+    """Human label for an admin-picked calendar range, e.g. 'Jun 1-5, 2026
+    (5 days)', or 'Jun 30 - Jul 4, 2026 (5 days)' when it crosses a month, or
+    'Dec 28, 2026 - Jan 3, 2027 (7 days)' when it crosses a year. No cap on
+    the span — the picker allows any range."""
+    if date_from == date_to:
+        span = date_from.strftime("%b %d, %Y")
+    elif date_from.year == date_to.year and date_from.month == date_to.month:
+        span = f"{date_from.strftime('%b %d')}-{date_to.strftime('%d, %Y')}"
+    elif date_from.year == date_to.year:
+        span = f"{date_from.strftime('%b %d')} - {date_to.strftime('%b %d, %Y')}"
+    else:
+        span = f"{date_from.strftime('%b %d, %Y')} - {date_to.strftime('%b %d, %Y')}"
+    return f"{span} ({days} {'day' if days == 1 else 'days'})"
 
 # Which Facility.supports_* boolean gates evacuation capacity for each disaster
 # type. earthquake / other have no dedicated support flag, so they fall back to
@@ -160,8 +176,8 @@ def simulator_setup(
         for s in rows
     ]
 
-    # ── Right column: weather outlook (server-side, fail-safe) + priority list ─
-    weather = weather_svc.get_outlook()   # dict or None (never raises)
+    # ── Right column: priority list ────────────────────────────────────────
+    # (Weather Outlook strip removed from this page — see priority_rows below.)
 
     # Priority barangays: compute the study risk score for each configured name,
     # then rank highest-first. Score/level reuse the existing analytics formula
@@ -205,14 +221,16 @@ def simulator_setup(
             "user": user,
             "barangays": barangays,
             "disaster_types": list(DisasterType),
-            "duration_options": DURATION_OPTIONS,
-            "default_duration": "3_days",
+            # Calendar range picker defaults to today -> today+2 (a 3-day
+            # span, matching the old dropdown's default) with no min/max —
+            # the planner can pick any past or future range, month to month.
+            "default_date_from": date.today().isoformat(),
+            "default_date_to": (date.today() + timedelta(days=2)).isoformat(),
             "preselect_barangay_id": preselect_barangay.id if preselect_barangay else None,
             "preselect_barangay_name": preselect_barangay.name if preselect_barangay else None,
             "saved_rows": saved_rows,
             "total_saved": total_saved,
             "show_all": show_all,
-            "weather": weather,
             "priority_rows": priority_rows,
         },
     )
@@ -224,7 +242,8 @@ def simulator_run(
     db: Session = Depends(get_db),
     barangay_id: int = Form(...),
     disaster_type: str = Form(...),
-    duration: str = Form(...),
+    date_from: str = Form(...),
+    date_to: str = Form(...),
 ):
     """Assemble scenario facts from the DB (read-only) and run the pure engine.
 
@@ -235,22 +254,34 @@ def simulator_run(
     if isinstance(user, RedirectResponse):
         return user
 
-    # Validate the submitted scenario (disaster type + duration + barangay id).
+    # Validate the submitted scenario (disaster type + date range + barangay id).
     try:
         scenario = ScenarioInput(
             barangay_id=barangay_id,
             disaster_type=disaster_type,
-            duration=duration,
+            date_from=date_from,
+            date_to=date_to,
         )
     except ValidationError as exc:
         return JSONResponse(status_code=422, content={"errors": exc.errors()})
+
+    # Cross-field rule (end can't precede start) — checked here rather than in
+    # the schema since both dates already parse fine on their own.
+    if scenario.date_to < scenario.date_from:
+        return JSONResponse(status_code=422, content={"errors": [{
+            "loc": ["date_to"], "type": "value_error",
+            "msg": "End date must be on or after the start date.",
+        }]})
 
     barangay = db.query(Barangay).filter(Barangay.id == scenario.barangay_id).first()
     if barangay is None:
         return JSONResponse(status_code=404, content={"error": "Barangay not found."})
 
     dtype = scenario.disaster_type            # DisasterType enum
-    horizon_days = DURATION_DAYS[scenario.duration]
+    # Inclusive of both ends — picking the same day for from/to is a 1-day
+    # scenario. No upper bound: the calendar lets the planner span any range.
+    horizon_days = (scenario.date_to - scenario.date_from).days + 1
+    duration_label = _format_duration_label(scenario.date_from, scenario.date_to, horizon_days)
 
     # ── Population — latest record for this barangay ──────────────────────
     pop = (
@@ -338,10 +369,7 @@ def simulator_run(
     }
 
     result = engine.run_simulation(scenario_facts)
-    result["duration_label"] = next(
-        (o["label"] for o in DURATION_OPTIONS if o["value"] == scenario.duration),
-        scenario.duration,
-    )
+    result["duration_label"] = duration_label
 
     # ── Hazard-recorded advisory ──────────────────────────────────────────
     recorded_hazards = {
@@ -411,7 +439,7 @@ def simulator_run(
         "user_id": user["id"],
         # Extra snapshot facts the /save route freezes into a SavedScenario.
         "barangay_id": barangay.id,
-        "duration": scenario.duration,
+        "duration": duration_label,
         "thresholds": scenario_facts["thresholds"],
         # When this run was generated (UTC) — used to autofill the save name.
         "generated_at": datetime.utcnow(),
@@ -436,7 +464,7 @@ def simulator_results(request: Request, run_id: str, db: Session = Depends(get_d
     # Editable in the modal; the planner can override before saving.
     ir = run["result"]["inputs"]
     default_scenario_name = (
-        f"{ir['barangay_name']} — {DURATION_LABELS.get(run.get('duration'), '')} — "
+        f"{ir['barangay_name']} — {run.get('duration', '')} — "
         f"{str(ir['disaster_type']).title()} — {_to_pht(run.get('generated_at'))}"
     )
 

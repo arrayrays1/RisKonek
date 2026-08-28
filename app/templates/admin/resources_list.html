@@ -177,7 +177,7 @@
             <thead class="rk-bg-soft">
                 <tr class="rk-th-soft">
                     <th class="px-3 py-3" style="width: 36px;">
-                        <input type="checkbox" class="form-check-input" id="bulkSelectAll" aria-label="Select all">
+                        <input type="checkbox" class="form-check-input rk-select-check" id="bulkSelectAll" aria-label="Select all">
                     </th>
                     <th class="px-3 py-3">Item</th>
                     <th class="py-3">Category</th>
@@ -194,7 +194,7 @@
                 {% for r in rows %}
                 <tr class="rk-fs-13">
                     <td class="px-3">
-                        <input type="checkbox" class="form-check-input rk-bulk-check" value="{{ r.id }}" aria-label="Select {{ r.name }}">
+                        <input type="checkbox" class="form-check-input rk-select-check rk-bulk-check" value="{{ r.id }}" aria-label="Select {{ r.name }}">
                     </td>
                     <td class="px-3">
                         <div class="fw-semibold">{{ r.name }}</div>

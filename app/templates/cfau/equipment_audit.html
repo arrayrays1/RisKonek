@@ -18,7 +18,7 @@
 {%- endmacro %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-start page-header">
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 page-header">
     <div>
         <h1>Vehicle &amp; Equipment Audit Log</h1>
         <p>
@@ -27,26 +27,31 @@
             {{ total }} matching entr{{ 'y' if total == 1 else 'ies' }}.
         </p>
     </div>
-    <div class="dropdown">
-        <button class="btn btn-rk dropdown-toggle" type="button"
-                data-bs-toggle="dropdown" aria-expanded="false"
-                {% if total == 0 %}disabled title="No entries to export"{% endif %}>
-            <i class="bi bi-download"></i> Export Log
-        </button>
-        <ul class="dropdown-menu dropdown-menu-end">
-            <li>
-                <a class="dropdown-item"
-                   href="/cfau/equipment-audit/export?format=csv{% if base_query %}&{{ base_query }}{% endif %}">
-                    <i class="bi bi-filetype-csv me-2"></i>Export as CSV
-                </a>
-            </li>
-            <li>
-                <a class="dropdown-item"
-                   href="/cfau/equipment-audit/export?format=pdf{% if base_query %}&{{ base_query }}{% endif %}">
-                    <i class="bi bi-filetype-pdf me-2"></i>Export as PDF
-                </a>
-            </li>
-        </ul>
+    <div class="d-flex gap-2 flex-shrink-0">
+        <a href="/admin/equipment" class="btn btn-outline-secondary text-nowrap">
+            <i class="bi bi-arrow-left"></i> Back to Equipment
+        </a>
+        <div class="dropdown">
+            <button class="btn btn-rk dropdown-toggle" type="button"
+                    data-bs-toggle="dropdown" aria-expanded="false"
+                    {% if total == 0 %}disabled title="No entries to export"{% endif %}>
+                <i class="bi bi-download"></i> Export Log
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end">
+                <li>
+                    <a class="dropdown-item"
+                       href="/cfau/equipment-audit/export?format=csv{% if base_query %}&{{ base_query }}{% endif %}">
+                        <i class="bi bi-filetype-csv me-2"></i>Export as CSV
+                    </a>
+                </li>
+                <li>
+                    <a class="dropdown-item"
+                       href="/cfau/equipment-audit/export?format=pdf{% if base_query %}&{{ base_query }}{% endif %}">
+                        <i class="bi bi-filetype-pdf me-2"></i>Export as PDF
+                    </a>
+                </li>
+            </ul>
+        </div>
     </div>
 </div>
 
@@ -103,7 +108,7 @@
             <input type="date" name="date_to" value="{{ f_date_to }}"
                    class="form-control form-control-sm">
         </div>
-        <div class="col-md-3 d-flex align-items-end gap-2">
+        <div class="col-md-6 d-flex align-items-end gap-2">
             <button type="submit" class="btn btn-rk btn-sm flex-fill">
                 <i class="bi bi-search"></i> Search
             </button>

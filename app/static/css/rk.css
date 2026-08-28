@@ -1469,6 +1469,16 @@ html[data-theme="dark"] .rk-draft-banner i { color: #7dd3fc; }
 .rk-bulk-toolbar.rk-open { display: flex; }
 html[data-theme="dark"] .rk-bulk-toolbar { background: #0d3c2a; }
 
+/* ── Row-select checkboxes — the header "select all" and per-row bulk
+   checkboxes on tables like Vehicle & Equipment and Resources. Bootstrap's
+   default 1em box reads as tiny next to 13px table text, so these are
+   sized up and given a bit of click padding. */
+.rk-select-check {
+    width: 1.15rem;
+    height: 1.15rem;
+    cursor: pointer;
+}
+
 /* ── Button loading state ─────────────────────────────────────
    Applied automatically to a form's submit button the moment a real
    (not cancelled) submit goes through, so an async save/generate/upload

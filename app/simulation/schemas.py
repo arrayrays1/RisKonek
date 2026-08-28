@@ -6,6 +6,7 @@ affected count — that is computed server-side per TR-ADM-08). SimulationResult
 is a typed mirror of the pure engine's output dict so /docs shows a clear shape.
 """
 
+from datetime import date
 from typing import Dict, List, Literal, Optional
 
 from pydantic import BaseModel
@@ -13,18 +14,20 @@ from pydantic import BaseModel
 from app.models import DisasterType
 
 
-# The four duration keys mirror DURATION_OPTIONS in app/simulation/routes.py
-# (the Stage-0 GET /setup mapping). The route reuses that same mapping to turn
-# the key into horizon days; here we only constrain the accepted values.
-DurationKey = Literal["1_day", "3_days", "1_week", "2_weeks"]
-
-
 class ScenarioInput(BaseModel):
     """One simulation request. No severity field (TR-ADM-07); no affected count
-    (TR-ADM-08 — the server derives it)."""
+    (TR-ADM-08 — the server derives it).
+
+    duration is expressed as an explicit calendar date range (date_from/date_to,
+    inclusive on both ends) rather than a fixed preset — the route turns that
+    into `horizon_days` for the engine and a human label for display. Ordering
+    (date_to >= date_from) is checked in the route, not here, since it's a
+    cross-field rule and the two dates already parse independently.
+    """
     barangay_id: int
     disaster_type: DisasterType
-    duration: DurationKey
+    date_from: date
+    date_to: date
 
 
 # ── Typed mirror of the engine output ────────────────────────────────────
