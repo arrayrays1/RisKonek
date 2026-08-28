@@ -147,10 +147,10 @@
 </div>
 
 <!-- ── ROW 2: Insights feed + Mini map ────────────────────────── -->
-<div class="row g-3 mb-4 align-items-start">
+<div class="row g-3 mb-4 align-items-start" id="insightsMapRow">
 
-    <div class="col-md-7">
-        <div class="dash-card rk-collapsible">
+    <div class="col-md-7" id="insightsCol">
+        <div class="dash-card rk-collapsible" id="insightsCard">
             <button class="rk-collapsible-toggle" type="button" aria-expanded="true">
                 <i class="bi bi-chevron-down"></i>
                 <i class="bi bi-bell text-warning"></i>
@@ -189,7 +189,7 @@
         </div>
     </div>
 
-    <div class="col-md-5">
+    <div class="col-md-5" id="mapCol">
         <div class="dash-card">
             <div class="card-title-row">
                 <i class="bi bi-map-fill rk-text-green"></i>
@@ -296,6 +296,7 @@
                 <span>Preparedness Index Overview</span>
             </button>
             <div class="rk-collapsible-body">
+                <div class="rk-scroll-cap rk-scroll-cap-table">
                 <table class="table prep-table">
                     <thead>
                         <tr>
@@ -318,6 +319,7 @@
                         {% endfor %}
                     </tbody>
                 </table>
+                </div>
 
                 <a href="/admin/barangays"
                    class="btn-soft w-100 justify-content-center mt-2 rk-text-green">
@@ -437,5 +439,27 @@ markers.forEach(m => {
             <span class="rk-fs-10 rk-text-faint">System-generated for planning support only; not an official hazard or risk classification.</span>
         `);
 });
+
+// ── Insights collapse ↔ map reflow ──────────────────────────────────
+// When "Insights & Latest Updates" is collapsed, its column has nothing
+// left in it but a header — give the map the full row instead of
+// leaving it squeezed into 5 of 12 columns next to empty space.
+(function () {
+    const card = document.getElementById('insightsCard');
+    const row = document.getElementById('insightsMapRow');
+    const toggle = card && card.querySelector('.rk-collapsible-toggle');
+    if (!card || !row || !toggle) return;
+
+    function sync() {
+        const collapsed = card.getAttribute('data-open') === 'false';
+        row.classList.toggle('rk-insights-collapsed', collapsed);
+        // Leaflet caches its container size; it needs a nudge to redraw
+        // tiles correctly after the map's box changes width/height.
+        setTimeout(() => map.invalidateSize(), 200);
+    }
+
+    toggle.addEventListener('click', sync);
+    sync(); // match whatever state the collapsible starts in on load
+})();
 </script>
 {% endblock %}

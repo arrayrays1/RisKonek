@@ -126,9 +126,12 @@
                 <option value="1" {% if show_archived %}selected{% endif %}>Archived</option>
             </select>
         </div>
-        <div class="col-md-1 d-grid">
-            <a href="/admin/equipment" class="btn btn-outline-secondary btn-sm" title="Reset filters">
-                <i class="bi bi-x-circle"></i>
+        <div class="col-12 d-flex justify-content-end gap-2">
+            <button type="submit" class="btn btn-rk btn-sm">
+                <i class="bi bi-search"></i> Search
+            </button>
+            <a href="/admin/equipment" class="btn btn-outline-secondary btn-sm" title="Clear all filters">
+                <i class="bi bi-x-circle"></i> Clear Filters
             </a>
         </div>
     </form>

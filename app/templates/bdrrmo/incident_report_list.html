@@ -73,8 +73,13 @@
                 {% endfor %}
             </select>
         </div>
-        <div class="col-md-2 d-grid">
-            <a href="/bdrrmo/incident-reports" class="btn btn-outline-secondary btn-sm"><i class="bi bi-x-circle"></i> Reset</a>
+        <div class="col-md-4 d-flex align-items-end gap-2">
+            <button type="submit" class="btn btn-rk btn-sm flex-fill">
+                <i class="bi bi-search"></i> Search
+            </button>
+            <a href="/bdrrmo/incident-reports" class="btn btn-outline-secondary btn-sm flex-fill" title="Clear all filters">
+                <i class="bi bi-x-circle"></i> Clear Filters
+            </a>
         </div>
     </form>
 </div>

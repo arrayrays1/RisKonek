@@ -45,7 +45,8 @@
     </div>
 </div>
 
-<!-- ── Filter bar (auto-applies — no submit button needed) ────────── -->
+<!-- ── Filter bar ───────────────────────────────────────────────────
+     Filters only apply when Search is pressed (or Enter in the search box). -->
 <div class="dash-card mb-3">
     <form method="GET" action="/staff/audit" class="row g-2 align-items-end js-live-filter">
         <div class="col-md-6">
@@ -79,9 +80,12 @@
             <label class="form-label small fw-semibold mb-1">To</label>
             <input type="date" name="date_to" value="{{ f_date_to }}" class="form-control form-control-sm">
         </div>
-        <div class="col-md-3 d-flex align-items-end">
-            <a href="/staff/audit" class="btn-soft w-100 justify-content-center">
-                <i class="bi bi-x-circle"></i> Reset
+        <div class="col-md-3 d-flex align-items-end gap-2">
+            <button type="submit" class="btn btn-rk btn-sm flex-fill">
+                <i class="bi bi-search"></i> Search
+            </button>
+            <a href="/staff/audit" class="btn-soft flex-fill justify-content-center" title="Clear all filters">
+                <i class="bi bi-x-circle"></i> Clear Filters
             </a>
         </div>
     </form>

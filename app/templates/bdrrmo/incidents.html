@@ -92,7 +92,8 @@
     </form>
 </div>
 
-<!-- ── Filters (auto-apply) ───────────────────────────────────── -->
+<!-- ── Filters ─────────────────────────────────────────────────
+     Filters only apply when Search is pressed (or Enter in the search box). -->
 <div class="dash-card mb-3">
     <form method="GET" action="/bdrrmo/incidents" class="row g-2 align-items-end js-live-filter">
         <div class="col-md-5">
@@ -100,7 +101,7 @@
             <input type="text" name="q" value="{{ f_q }}" class="form-control form-control-sm"
                    placeholder="Search description…" autocomplete="off">
         </div>
-        <div class="col-md-3">
+        <div class="col-md-2">
             <label class="form-label small fw-semibold mb-1">Type</label>
             <select name="disaster_type" class="form-select form-select-sm">
                 <option value="">All types</option>
@@ -109,7 +110,7 @@
                 {% endfor %}
             </select>
         </div>
-        <div class="col-md-3">
+        <div class="col-md-2">
             <label class="form-label small fw-semibold mb-1">Severity</label>
             <select name="severity" class="form-select form-select-sm">
                 <option value="">Any</option>
@@ -118,9 +119,12 @@
                 {% endfor %}
             </select>
         </div>
-        <div class="col-md-1 d-grid">
-            <a href="/bdrrmo/incidents" class="btn btn-outline-secondary btn-sm" title="Reset filters">
-                <i class="bi bi-x-circle"></i>
+        <div class="col-md-3 d-flex align-items-end gap-2">
+            <button type="submit" class="btn btn-rk btn-sm flex-fill">
+                <i class="bi bi-search"></i> Search
+            </button>
+            <a href="/bdrrmo/incidents" class="btn btn-outline-secondary btn-sm flex-fill" title="Clear all filters">
+                <i class="bi bi-x-circle"></i> Clear Filters
             </a>
         </div>
     </form>

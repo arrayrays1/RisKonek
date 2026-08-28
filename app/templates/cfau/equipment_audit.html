@@ -60,7 +60,8 @@
 </div>
 {% endif %}
 
-<!-- ── Filter bar (auto-applies — no submit button needed) ────────── -->
+<!-- ── Filter bar ───────────────────────────────────────────────────
+     Filters only apply when Search is pressed (or Enter in a text field). -->
 <div class="dash-card mb-3">
     <form method="GET" action="/cfau/equipment-audit" id="equipAuditFilterForm"
           class="row g-2 align-items-end">
@@ -102,9 +103,12 @@
             <input type="date" name="date_to" value="{{ f_date_to }}"
                    class="form-control form-control-sm">
         </div>
-        <div class="col-md-3 d-flex align-items-end">
-            <a href="/cfau/equipment-audit" class="btn-soft w-100 justify-content-center">
-                <i class="bi bi-x-circle"></i> Reset
+        <div class="col-md-3 d-flex align-items-end gap-2">
+            <button type="submit" class="btn btn-rk btn-sm flex-fill">
+                <i class="bi bi-search"></i> Search
+            </button>
+            <a href="/cfau/equipment-audit" class="btn-soft flex-fill justify-content-center" title="Clear all filters">
+                <i class="bi bi-x-circle"></i> Clear Filters
             </a>
         </div>
     </form>
@@ -183,31 +187,4 @@
 {{ pager(page_obj, "/cfau/equipment-audit", base_query) }}
 {% endblock %}
 
-{% block scripts %}
-<script nonce="{{ request.state.csp_nonce }}">
-// Live filtering — vanilla JS, no framework. Mirrors the admin audit trail:
-// dropdowns/dates submit immediately, the text search submits after a short
-// debounce so the page doesn't reload on every keystroke.
-(function () {
-    const form = document.getElementById('equipAuditFilterForm');
-    if (!form) return;
-
-    form.querySelectorAll('select, input[type="date"]').forEach(function (el) {
-        el.addEventListener('change', function () { form.submit(); });
-    });
-
-    const search = form.querySelector('input[name="q"]');
-    if (search) {
-        let timer;
-        search.addEventListener('input', function () {
-            clearTimeout(timer);
-            timer = setTimeout(function () { form.submit(); }, 400);
-        });
-        if (search.value) {
-            search.focus();
-            search.setSelectionRange(search.value.length, search.value.length);
-        }
-    }
-})();
-</script>
-{% endblock %}
+{% block scripts %}{% endblock %}

@@ -476,7 +476,15 @@ html.rk-no-anim .main-content { transition: none !important; }
     border-radius: var(--rk-radius);
     box-shadow: 0 1px 3px rgba(16,24,40,0.06), 0 1px 8px rgba(16,24,40,0.04);
     border: 1px solid rgba(16,24,40,0.04);
+    transition: box-shadow 0.18s ease, transform 0.18s ease;
 }
+.stat-card:hover,
+.dash-card:hover {
+    box-shadow: 0 8px 20px rgba(16,24,40,0.10), 0 2px 8px rgba(16,24,40,0.06);
+    transform: translateY(-2px);
+}
+html.rk-no-anim .stat-card,
+html.rk-no-anim .dash-card { transition: none !important; }
 .stat-card { padding: 20px 22px; height: 100%; }
 /* No forced height:100% here — a dash-card sized to its own tallest
    sibling (a short chart card next to a long list card) was the source of
@@ -487,6 +495,32 @@ html.rk-no-anim .main-content { transition: none !important; }
    from looking like a stray small box next to a taller neighbor, without
    reintroducing the wasted-space problem for genuine size mismatches. */
 .dash-card { padding: 24px; min-height: 220px; }
+/* Filter/search bars are plain .dash-card wrappers too, but they're a
+   couple of short form rows, not dashboard content — the 220px floor
+   above just padded them out with empty space underneath the fields. */
+.dash-card:has(> form.js-live-filter),
+.dash-card:has(> form#auditFilterForm),
+.dash-card:has(> form#equipAuditFilterForm) { min-height: 0; }
+/* A collapsed .rk-collapsible still carries the .dash-card min-height
+   floor above, so the card stayed ~220px tall — a big empty box below
+   the header — even though .rk-collapsible-body was display:none.
+   Drop the floor once collapsed; the card should hug its header only. */
+.dash-card.rk-collapsible[data-open="false"] { min-height: 0; }
+
+/* ── Admin dashboard: Insights ↔ map row ──────────────────────────
+   Collapsing "Insights & Latest Updates" leaves nothing useful in its
+   7-of-12 column, so the hazard map (previously squeezed into 5 of 12)
+   expands to the full row and drops below the collapsed header instead
+   of sitting cramped beside empty space. Toggled by JS in
+   admin/dashboard.html; #insightsMapRow only exists on that page. */
+#insightsMapRow.rk-insights-collapsed #insightsCol,
+#insightsMapRow.rk-insights-collapsed #mapCol {
+    flex: 0 0 100%;
+    max-width: 100%;
+}
+#insightsMapRow.rk-insights-collapsed #insightsCol { order: 1; }
+#insightsMapRow.rk-insights-collapsed #mapCol { order: 2; }
+#insightsMapRow.rk-insights-collapsed #dashMap { height: 480px; }
 
 .stat-card .stat-label { font-size: 13px; color: var(--rk-muted); margin-bottom: 8px; }
 .stat-card .stat-value { font-size: clamp(15px, 2vw, 26px); font-weight: 700; color: var(--rk-text); margin: 0; word-break: break-word; }
@@ -1306,6 +1340,23 @@ html[data-theme="dark"] .rk-consequence {
     max-height: 320px;
     overflow-y: auto;
     padding-right: 4px;
+}
+/* Preparedness Index Overview (admin dashboard): the table can run to 10
+   rows, which used to force the whole card taller than its neighboring
+   chart card once both were height-matched. Cap just the table instead —
+   the chart card sets the pace, the table scrolls internally to match it,
+   and collapsing the card is unaffected either way. */
+.rk-scroll-cap-table {
+    max-height: 180px;
+}
+.rk-scroll-cap-table thead th {
+    position: sticky;
+    top: 0;
+    background: white;
+    z-index: 1;
+}
+html[data-theme="dark"] .rk-scroll-cap-table thead th {
+    background: var(--rk-surface);
 }
 
 .rk-legend-dot {

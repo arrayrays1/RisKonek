@@ -984,33 +984,6 @@ function rkRepaintCharts() {
     });
 })();
 </script>
-<script nonce="{{ request.state.csp_nonce }}">
-// ── Live filtering ────────────────────────────────────────────────
-// Any <form class="js-live-filter"> auto-applies its filters: selects and
-// date inputs submit immediately on change; text inputs submit after a short
-// debounce so the page doesn't reload on every keystroke. No Apply button
-// needed — mirrors the audit-trail filter behaviour across the system.
-(function () {
-    document.querySelectorAll('form.js-live-filter').forEach(function (form) {
-        form.querySelectorAll('select, input[type="date"]').forEach(function (el) {
-            el.addEventListener('change', function () { form.submit(); });
-        });
-
-        form.querySelectorAll('input[type="text"], input[type="search"]').forEach(function (el) {
-            let timer;
-            el.addEventListener('input', function () {
-                clearTimeout(timer);
-                timer = setTimeout(function () { form.submit(); }, 400);
-            });
-            // After an auto-submit reload, keep the cursor in the search box.
-            if (el.value) {
-                el.focus();
-                el.setSelectionRange(el.value.length, el.value.length);
-            }
-        });
-    });
-})();
-</script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

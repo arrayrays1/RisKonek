@@ -19,7 +19,7 @@
 <!-- ── Search + filter card ───────────────────────────────────── -->
 <div class="dash-card mb-4">
     <form method="GET" action="/admin/barangays" class="row g-2 align-items-center js-live-filter">
-        <div class="col-md-8">
+        <div class="col-md-6">
             <div class="input-group search-bar-rk">
                 <span class="input-group-text bg-white">
                     <i class="bi bi-search text-muted"></i>
@@ -39,9 +39,12 @@
                 {% endfor %}
             </select>
         </div>
-        <div class="col-md-1 d-grid">
-            <a href="/admin/barangays" class="btn-soft justify-content-center" title="Reset filters">
-                <i class="bi bi-x-circle"></i>
+        <div class="col-md-3 d-flex gap-2">
+            <button type="submit" class="btn btn-rk btn-sm flex-fill">
+                <i class="bi bi-search"></i> Search
+            </button>
+            <a href="/admin/barangays" class="btn-soft flex-fill justify-content-center" title="Clear all filters">
+                <i class="bi bi-x-circle"></i> Clear Filters
             </a>
         </div>
     </form>
