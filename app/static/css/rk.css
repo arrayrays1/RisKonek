@@ -43,6 +43,25 @@ html[data-theme="dark"] {
     --rk-green-light: #06301f;
     --rk-cool-light: #062a30;
 }
+
+/* ── Simulation results: more prominent secondary text ───────────────────
+   Panel feedback: muted/secondary text (units, notes, captions) read too
+   faint next to the figures. Mixes the muted tone 50% of the way toward
+   the page's full text color. Redeclaring the custom properties means every
+   descendant that reads var(--rk-muted) (stat-label, notes, etc.) and every
+   Bootstrap .text-muted / .text-secondary (which reads --bs-secondary-color)
+   picks up the stronger tone automatically, in both themes, with no need to
+   touch each rule individually. Scoped to .rk-sim-results only — no other
+   page is affected. */
+.rk-sim-results {
+    --rk-muted: color-mix(in srgb, var(--rk-muted) 50%, var(--rk-text) 50%);
+    --bs-secondary-color: color-mix(in srgb, var(--bs-secondary-color) 50%, var(--bs-body-color) 50%);
+}
+/* Belt-and-suspenders: force Bootstrap's .text-muted/.text-secondary to the
+   boosted value above directly, in case a future Bootstrap version renames
+   the internal variable .text-muted reads from. */
+.rk-sim-results .text-muted,
+.rk-sim-results .text-secondary { color: var(--rk-muted) !important; }
 html[data-theme="dark"] .dash-card,
 html[data-theme="dark"] .stat-card,
 html[data-theme="dark"] .card,
@@ -223,15 +242,15 @@ body {
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .rk-search-result .rk-result-sub {
-    font-size: 11.5px; color: var(--rk-muted); display: block;
+    font-size: 13px; color: var(--rk-muted); display: block;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .rk-search-result .rk-result-type {
-    margin-left: auto; font-size: 10.5px; color: var(--rk-muted);
+    margin-left: auto; font-size: 12px; color: var(--rk-muted);
     text-transform: uppercase; letter-spacing: 0.03em; flex-shrink: 0;
 }
 .rk-search-empty, .rk-search-loading {
-    padding: 14px 10px; text-align: center; font-size: 12.5px; color: var(--rk-muted);
+    padding: 14px 10px; text-align: center; font-size: 14px; color: var(--rk-muted);
 }
 
 /* Nav scrolls; sidebar-footer stays pinned at bottom */
@@ -247,7 +266,10 @@ body {
 .sidebar nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.25); border-radius: 4px; }
 
 /* Non-clickable grouping label — one small uppercase heading per group.
-   More space above (between groups) than the gap between items in a group. */
+   More space above (between groups) than the gap between items in a group.
+   Turned into a collapsible toggle button by JS in base.html (wraps each
+   .nav-section + its items into a .nav-group/.nav-group-body pair) — the
+   flex/cursor/caret rules below only matter once that wrapping has run. */
 .nav-section {
     margin: 16px 0 8px;       /* group top spacing (16px) + label bottom (8px) */
     padding: 0 16px;
@@ -258,9 +280,24 @@ body {
     text-transform: uppercase;
     white-space: nowrap;
     user-select: none;
+    display: flex; align-items: center; justify-content: space-between;
+    cursor: pointer;
 }
-/* First group hugs the top instead of getting the full inter-group gap. */
-.sidebar nav .nav-section:first-child { margin-top: 8px; }
+.nav-section:hover, .nav-section:focus-visible { color: rgba(255,255,255,0.95); }
+.nav-section:focus-visible { outline: 1px solid rgba(255,255,255,0.5); outline-offset: 2px; border-radius: 4px; }
+.nav-section-caret { font-size: 11px; transition: transform 0.18s ease; flex-shrink: 0; }
+.nav-group[data-open="false"] .nav-section-caret { transform: rotate(-90deg); }
+.nav-group[data-open="false"] .nav-group-body { display: none; }
+/* Icon-only sidebar mode hides section labels entirely (below) — every item
+   must stay reachable there regardless of a group's expand/collapse state,
+   since that's a separate, independent collapse dimension. */
+html.rk-sidebar-collapsed .sidebar .nav-group-body { display: block !important; }
+/* Only the very first group hugs the top instead of getting the full
+   inter-group gap. Targets .nav-group, not .nav-section, since after JS
+   wraps every section into its own .nav-group, .nav-section:first-child
+   would otherwise match every group (each is the first child of its own
+   wrapper), not just the first group in the whole nav. */
+.sidebar nav .nav-group:first-child .nav-section { margin-top: 8px; }
 
 .nav-item-link {
     display: flex; align-items: center; gap: 12px;
@@ -432,8 +469,8 @@ html.rk-no-anim .main-content { transition: none !important; }
 /* ── Page header ───────────────────────────────────────────── */
 .page-header { margin-bottom: 24px; }
 .page-header h1 { font-size: var(--rk-fs-h1); font-weight: 700; color: var(--rk-text); margin: 0; }
-.page-header p { color: var(--rk-muted); font-size: 14px; margin: 4px 0 0; }
-.last-updated { font-size: 13px; color: var(--rk-muted); text-align: right; }
+.page-header p { color: var(--rk-muted); font-size: 16px; margin: 4px 0 0; }
+.last-updated { font-size: 15px; color: var(--rk-muted); text-align: right; }
 
 /* ── Theme toggle (sun/moon) — sits beside the sidebar collapse button ── */
 .theme-toggle {
@@ -506,6 +543,14 @@ html.rk-no-anim .dash-card { transition: none !important; }
    the header — even though .rk-collapsible-body was display:none.
    Drop the floor once collapsed; the card should hug its header only. */
 .dash-card.rk-collapsible[data-open="false"] { min-height: 0; }
+/* Simulation results: every .dash-card on this page (scenario context bar,
+   readiness hero, coverage, detail-view toggle, AI brief) is full-width and
+   stacked vertically, never paired beside a taller sibling — the min-height
+   floor above exists to stop a short card looking stray next to a tall
+   neighbor, which doesn't happen here. Left on, it padded out short
+   sections (a 2-line context bar, a header-only toggle card, an
+   AI-unavailable notice) with a large empty gap underneath the content. */
+.dash-card.rk-section { min-height: 0; }
 
 /* ── Admin dashboard: Insights ↔ map row ──────────────────────────
    Collapsing "Insights & Latest Updates" leaves nothing useful in its
@@ -522,9 +567,24 @@ html.rk-no-anim .dash-card { transition: none !important; }
 #insightsMapRow.rk-insights-collapsed #mapCol { order: 2; }
 #insightsMapRow.rk-insights-collapsed #dashMap { height: 480px; }
 
-.stat-card .stat-label { font-size: 13px; color: var(--rk-muted); margin-bottom: 8px; }
+/* ── Admin dashboard: Preparedness ↔ Priority Barangays row ───────────
+   Same pattern as the insights ↔ map row above, one level deeper: this
+   pair lives inside its own col-md-8 (beside "Disaster Incidents by
+   Type", which stays fixed at col-md-4 and never reflows), so "100%"
+   here means 100% of that 8-column nested row, not the full page width.
+   Toggled by JS in admin/dashboard.html; #prepBarangaysRow only exists
+   on that page. */
+#prepBarangaysRow.rk-prep-collapsed #prepCol,
+#prepBarangaysRow.rk-prep-collapsed #barangaysCol {
+    flex: 0 0 100%;
+    max-width: 100%;
+}
+#prepBarangaysRow.rk-prep-collapsed #prepCol { order: 1; }
+#prepBarangaysRow.rk-prep-collapsed #barangaysCol { order: 2; }
+
+.stat-card .stat-label { font-size: 15px; color: var(--rk-muted); margin-bottom: 8px; }
 .stat-card .stat-value { font-size: clamp(15px, 2vw, 26px); font-weight: 700; color: var(--rk-text); margin: 0; word-break: break-word; }
-.stat-card .stat-change { font-size: 13px; margin-top: 6px; }
+.stat-card .stat-change { font-size: 15px; margin-top: 6px; }
 .stat-card .stat-icon {
     width: 38px; height: 38px; border-radius: 12px;
     display: flex; align-items: center; justify-content: center;
@@ -689,7 +749,7 @@ html[data-theme="dark"] .alert-banner .alert-link { color: #ffe8a3; }
 .diff-box { font-size: 12px; border-radius: 6px; padding: 8px 10px; white-space: pre-wrap; word-break: break-word; min-height: 38px; }
 .diff-old { background: #fdecea; border: 1px solid #f4c2bd; color: #842029; }
 .diff-new { background: #eafaf1; border: 1px solid #c8e6d4; color: #14563a; }
-.diff-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--rk-muted); }
+.diff-label { font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--rk-muted); }
 html[data-theme="dark"] .diff-old { background: #3a1f1f; border-color: #6b3535; color: #f2a7a7; }
 html[data-theme="dark"] .diff-new { background: #17301f; border-color: #2f5c40; color: #92e0ae; }
 
@@ -699,11 +759,19 @@ html[data-theme="dark"] .diff-new { background: #17301f; border-color: #2f5c40; 
    main.py drop `style-src 'unsafe-inline'`. See SECURITY_CSP_STYLE_REPORT.md. */
 
 /* Font-size steps (px — matches the existing px-based type scale) */
-.rk-fs-10 { font-size: 11px; }
-.rk-fs-11 { font-size: 12px; }
-.rk-fs-12 { font-size: 13px; }
-.rk-fs-13 { font-size: 13px; }
-.rk-fs-14 { font-size: 14px; }
+/* Subtext scale (11–14px, all below the 15px base body size) bumped ~15%
+   larger per defense feedback — this tier is what kept reading as "small,
+   illegible text": captions, unit labels, table sub-text, muted notes.
+   16px and up are left untouched: they're already at or above base body
+   size and read as emphasized/heading text, not subtext, so enlarging them
+   further wasn't asked for and would throw off the existing hierarchy.
+   Whole-pixel values (~13–18% actual increase) to stay crisp; the two
+   pairs that were already tied (12↔13, and now 12↔13 again) stay tied. */
+.rk-fs-10 { font-size: 13px; }
+.rk-fs-11 { font-size: 14px; }
+.rk-fs-12 { font-size: 15px; }
+.rk-fs-13 { font-size: 15px; }
+.rk-fs-14 { font-size: 16px; }
 .rk-fs-16 { font-size: 16px; }
 .rk-fs-18 { font-size: 18px; }
 .rk-fs-20 { font-size: 20px; }
@@ -733,9 +801,15 @@ html[data-theme="dark"] .rk-bg-soft { background: var(--rk-surface); }
 .rk-th-sticky { background: #f9fafb; position: sticky; top: 0; }
 html[data-theme="dark"] .rk-th-sticky { background: var(--rk-surface); }
 
+/* Date-group divider row inside grouped list tables (Audit Trail, Uploads —
+   "August 29, 2026" style separators). Was Bootstrap's bg-light utility,
+   which stayed light-gray under the dark theme since it isn't theme-aware. */
+.rk-date-divider { background: #f9fafb; }
+html[data-theme="dark"] .rk-date-divider { background: var(--rk-surface); }
+
 /* Soft uppercase table-header row (muted, letter-spaced) */
 .rk-th-soft {
-    font-size: 13px; color: var(--rk-muted);
+    font-size: 15px; color: var(--rk-muted);
     text-transform: uppercase; letter-spacing: 0.04em;
 }
 
@@ -1162,11 +1236,11 @@ html[data-theme="dark"] .map-overlay {
     background: var(--rk-bg-soft, #f3f6f4);
 }
 .picker-search-result-name { font-weight: 600; font-size: 13px; }
-.picker-search-result-sub  { font-size: 12px; color: var(--rk-muted); }
-.picker-search-result-cat  { font-size: 11px; color: var(--rk-muted); text-transform: uppercase; letter-spacing: 0.03em; }
+.picker-search-result-sub  { font-size: 14px; color: var(--rk-muted); }
+.picker-search-result-cat  { font-size: 13px; color: var(--rk-muted); text-transform: uppercase; letter-spacing: 0.03em; }
 .picker-search-empty {
     padding: 8px 12px;
-    font-size: 13px;
+    font-size: 15px;
     color: var(--rk-muted);
 }
 .picker-landmarks-toggle { font-size: 13px; }
@@ -1270,7 +1344,7 @@ html[data-theme="dark"] .hazard-notice { background: #0f2f42; color: #bfe3fa; bo
 }
 .popup-table td { padding: 1px 0; vertical-align: top; }
 .popup-name { font-size: 14px; font-weight: 700; color: var(--rk-text); margin-bottom: 2px; }
-.popup-sub  { font-size: 12px; color: var(--rk-muted); margin-bottom: 8px; }
+.popup-sub  { font-size: 14px; color: var(--rk-muted); margin-bottom: 8px; }
 .popup-badges { margin: 6px 0 8px; display: flex; flex-wrap: wrap; gap: 4px; }
 .popup-badge {
     font-size: 11px; font-weight: 600;
@@ -1291,7 +1365,7 @@ html[data-theme="dark"] .hazard-notice { background: #0f2f42; color: #bfe3fa; bo
 
 /* Section heading level, matching the .card-title-row h6 scale it replaces */
 .rk-h-section {
-    font-size: 14px; font-weight: 600; color: var(--rk-text); margin: 0;
+    font-size: 16px; font-weight: 600; color: var(--rk-text); margin: 0;
 }
 
 /* Lining/tabular figures so columns of numbers align */
@@ -1442,12 +1516,12 @@ html[data-theme="dark"] .rk-draft-banner i { color: #7dd3fc; }
     transition: top 0.25s ease, left 0.25s ease;
 }
 .rk-tour-card h6 { font-size: 14px; font-weight: 700; margin-bottom: 6px; }
-.rk-tour-card p { font-size: 13px; color: var(--rk-muted); margin-bottom: 14px; line-height: 1.5; }
+.rk-tour-card p { font-size: 15px; color: var(--rk-muted); margin-bottom: 14px; line-height: 1.5; }
 .rk-tour-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .rk-tour-dots { display: flex; gap: 5px; }
 .rk-tour-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--rk-border); }
 .rk-tour-dot.rk-active { background: var(--rk-green); }
-.rk-tour-skip { background: none; border: none; color: var(--rk-muted); font-size: 12px; cursor: pointer; padding: 0; }
+.rk-tour-skip { background: none; border: none; color: var(--rk-muted); font-size: 14px; cursor: pointer; padding: 0; }
 .rk-tour-skip:hover { color: var(--rk-text); }
 .rk-tour-help-btn {
     background: none; border: none; color: rgba(255,255,255,0.7);
@@ -1499,13 +1573,9 @@ html[data-theme="dark"] .rk-bulk-toolbar { background: #0d3c2a; }
 /* Anchor targets for "jump to detail" links (warning pills, hero, figure
    cards) — a little top clearance so the target isn't flush against the
    viewport edge when scrolled into view. */
-#rk-attention-h, .rk-concern-card[id] { scroll-margin-top: 16px; }
+#rk-coverage-h { scroll-margin-top: 16px; }
 a.status-pill { cursor: pointer; }
 a.status-pill:hover { filter: brightness(0.95); }
-
-/* Resource-coverage rows */
-.rk-coverage-row { padding: 10px 0; }
-.rk-coverage-row + .rk-coverage-row { border-top: 1px solid #f1f3f5; }
 
 /* Detailed calculations table — roomier rows, subtle status accent */
 .rk-detail-table > tbody > tr > th,
@@ -1601,7 +1671,7 @@ html[data-theme="dark"] .rk-hero-ok   .rk-hero-icon { background: #0d3c2a; color
     display: flex; align-items: flex-start; justify-content: space-between;
     gap: 8px; margin-bottom: 6px;
 }
-.rk-figure-head .stat-label { font-size: 13px; color: var(--rk-muted); }
+.rk-figure-head .stat-label { font-size: 15px; color: var(--rk-muted); }
 /* .stat-icon's box is scoped to .stat-card upstream, so restate it here. */
 .rk-figure-head .stat-icon {
     width: 32px; height: 32px; border-radius: 10px; flex: 0 0 auto;
@@ -1632,3 +1702,22 @@ html[data-theme="dark"] .rk-section-ok   { background: #0f2919; border-color: #2
 .rk-detail-table > tbody > tr.rk-accent-crit { --bs-table-bg: #fef2f2; }
 .rk-detail-table > tbody > tr.rk-accent-warn { --bs-table-bg: #fffbeb; }
 .rk-detail-table > tbody > tr.rk-accent-ok   { --bs-table-bg: #f2fbf5; }
+/* Dark-mode equivalents of the tints above — the light hex values are
+   Bootstrap CSS custom properties, not theme-aware, so without this they
+   painted the same pale pink/yellow/green straight onto the dark table. */
+html[data-theme="dark"] .rk-detail-table > tbody > tr.rk-accent-crit { --bs-table-bg: #3a1f1f; }
+html[data-theme="dark"] .rk-detail-table > tbody > tr.rk-accent-warn { --bs-table-bg: #3a2f0f; }
+html[data-theme="dark"] .rk-detail-table > tbody > tr.rk-accent-ok   { --bs-table-bg: #0f2919; }
+
+/* "Standard" / "Assumption" / action / file-type / status labels across the
+   app use Bootstrap's bg-light + text-dark (or text-secondary) utilities,
+   which paint a plain white pill regardless of theme — the most widespread
+   light-mode remnant in the app (28 templates: audit trail action badges,
+   upload file-type badges, equipment audit labels, the simulator's
+   Standard/Assumption tags, etc). Fixed once, globally, rather than
+   per-page. */
+html[data-theme="dark"] .badge.bg-light {
+    background: var(--rk-surface) !important;
+    color: var(--rk-muted) !important;
+    border-color: var(--rk-border) !important;
+}

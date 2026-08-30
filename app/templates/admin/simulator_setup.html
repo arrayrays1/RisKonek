@@ -129,7 +129,7 @@
                     </div>
                     <input type="hidden" id="date_from" name="date_from" required>
                     <input type="hidden" id="date_to" name="date_to" required>
-                    <div class="form-text" id="duration_hint">
+                    <div class="form-text">
                         Used to estimate water and food requirements.
                     </div>
                 </div>
@@ -189,7 +189,7 @@
                                      aria-valuenow="{{ p.score }}" aria-valuemin="0" aria-valuemax="100"></div>
                             </div>
                             <div class="d-flex justify-content-between align-items-center mt-1">
-                                <a href="/admin/barangays/{{ p.id }} rk-fs-12">
+                                <a href="/admin/barangays/{{ p.id }}" class="rk-fs-12">
                                     View Barangay Profile →
                                 </a>
                                 <span class="text-muted rk-fs-12">Score: {{ p.score }}</span>
@@ -314,16 +314,15 @@
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/flatpickr" nonce="{{ request.state.csp_nonce }}"></script>
 <script nonce="{{ request.state.csp_nonce }}">
-// Estimated Duration — calendar range picker (flatpickr). Two months shown
-// side by side, free navigation month to month with no min/max date, so a
-// planner can pick any span rather than being capped at a fixed preset.
+// Estimated Duration — calendar range picker (flatpickr). Single month view;
+// free navigation month to month with no min/max date, so a planner can
+// pick any span rather than being capped at a fixed preset.
 (function () {
     var display = document.getElementById('date_range_display');
     if (!display || !window.flatpickr) return;
 
     var fromField = document.getElementById('date_from');
     var toField = document.getElementById('date_to');
-    var hint = document.getElementById('duration_hint');
 
     function toISO(d) {
         var m = String(d.getMonth() + 1).padStart(2, '0');
@@ -334,11 +333,6 @@
     function applyRange(from, to) {
         fromField.value = toISO(from);
         toField.value = toISO(to);
-        var days = Math.round((to - from) / 86400000) + 1;
-        if (hint) {
-            hint.textContent = days + (days === 1 ? ' day selected — ' : ' days selected — ')
-                + 'used to estimate water and food requirements.';
-        }
     }
 
     var defaultFrom = "{{ default_date_from }}";
@@ -347,15 +341,15 @@
     flatpickr(display, {
         mode: 'range',
         dateFormat: 'M j, Y',
-        showMonths: window.matchMedia('(max-width: 576px)').matches ? 1 : 2,
+        showMonths: 1,
         defaultDate: [defaultFrom, defaultTo],
         onChange: function (selectedDates) {
             if (selectedDates.length === 2) applyRange(selectedDates[0], selectedDates[1]);
         },
     });
 
-    // Prefill the hidden fields + hint to match the initial default range
-    // (onChange only fires on a user-driven change, not on init).
+    // Prefill the hidden fields to match the initial default range (onChange
+    // only fires on a user-driven change, not on init).
     applyRange(new Date(defaultFrom + 'T00:00:00'), new Date(defaultTo + 'T00:00:00'));
 })();
 </script>

@@ -365,7 +365,69 @@
 })();
 </script>
 <script nonce="{{ request.state.csp_nonce }}">
-// ── Toast notifications ─────────────────────────────────────────────
+// ── Collapsible sidebar categories ──────────────────────────────────
+// Wraps every ".nav-section" label and the nav-item-links that follow it
+// (up to the next .nav-section) into a ".nav-group" the label can toggle.
+// Written generically over the rendered DOM rather than duplicated in the
+// admin/staff/cfau/bdrrmo markup blocks above, so one script covers every
+// role's sidebar — every page gets collapsible categories from this one
+// place. Per-group open/closed state persists in localStorage, keyed by
+// the group's label text; the group containing the current page's active
+// link is always force-expanded regardless of its stored state, so
+// navigating to a page never hides the link that's highlighted on it.
+(function () {
+    var nav = document.querySelector('.sidebar nav[aria-label="Primary"]');
+    if (!nav) return;
+
+    Array.prototype.slice.call(nav.querySelectorAll(':scope > .nav-section')).forEach(function (section) {
+        var items = [];
+        var node = section.nextElementSibling;
+        while (node && !node.classList.contains('nav-section')) {
+            var next = node.nextElementSibling;
+            items.push(node);
+            node = next;
+        }
+        if (!items.length) return;
+
+        var group = document.createElement('div');
+        group.className = 'nav-group';
+        section.parentNode.insertBefore(group, section);
+        group.appendChild(section);
+
+        var body = document.createElement('div');
+        body.className = 'nav-group-body';
+        items.forEach(function (item) { body.appendChild(item); });
+        group.appendChild(body);
+
+        var caret = document.createElement('i');
+        caret.className = 'bi bi-chevron-down nav-section-caret';
+        caret.setAttribute('aria-hidden', 'true');
+
+        var labelKey = 'rk_nav_group_' + section.textContent.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
+        section.appendChild(caret);
+        section.setAttribute('role', 'button');
+        section.setAttribute('tabindex', '0');
+
+        var hasActive = !!body.querySelector('.nav-item-link.active');
+        var stored = hasActive ? null : localStorage.getItem(labelKey);
+        var open = hasActive || stored === null || stored === '1';
+        group.setAttribute('data-open', open ? 'true' : 'false');
+        section.setAttribute('aria-expanded', open ? 'true' : 'false');
+
+        function toggle() {
+            var nowOpen = group.getAttribute('data-open') !== 'true';
+            group.setAttribute('data-open', nowOpen ? 'true' : 'false');
+            section.setAttribute('aria-expanded', nowOpen ? 'true' : 'false');
+            try { localStorage.setItem(labelKey, nowOpen ? '1' : '0'); } catch (e) { /* private mode etc — non-fatal */ }
+        }
+        section.addEventListener('click', toggle);
+        section.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
+        });
+    });
+})();
+</script>
+<script nonce="{{ request.state.csp_nonce }}">
 // One consistent feedback mechanism everywhere. window.rkToast(message,
 // type) can be called directly (e.g. after a fetch()); a page landing
 // with ?success= or ?error= in the URL also gets one automatically, so
@@ -942,10 +1004,17 @@ function rkRepaintCharts() {
 })();
 </script>
 <script nonce="{{ request.state.csp_nonce }}">
-// ── "Jump to detail" links that may point inside a closed Bootstrap
-// .collapse (e.g. a warning pill linking down to a concern card that's
-// past the "View all resource gaps" fold). Expand it first, then scroll,
-// so the link never lands on an invisible element.
+// ── "Jump to detail" links (same-page anchors, e.g. a figure card linking
+// down to its detail section). Previously this only intervened when the
+// target sat inside a closed Bootstrap .collapse — otherwise it left the
+// browser's default anchor jump to happen on its own. That default jump is
+// instant and easy to miss (especially over a short distance), which read
+// as "the link isn't taking me anywhere." Every in-page anchor now always
+// gets an explicit, visibly-animated smooth scroll instead, and this also
+// recognizes the app's own .rk-collapsible[data-open] pattern (used by the
+// simulator's "Detailed Planning View", dashboard cards, etc.), not just
+// Bootstrap's native .collapse, so a link into either kind of hidden
+// section expands it first and then scrolls.
 (function () {
     document.addEventListener('click', function (e) {
         const link = e.target.closest('a[href^="#"]');
@@ -953,15 +1022,31 @@ function rkRepaintCharts() {
         const id = link.getAttribute('href').slice(1);
         const target = id && document.getElementById(id);
         if (!target) return;
-        const hiddenCollapse = target.closest('.collapse:not(.show)');
-        if (!hiddenCollapse) return;
+
         e.preventDefault();
-        const bsCollapse = bootstrap.Collapse.getOrCreateInstance(hiddenCollapse);
-        hiddenCollapse.addEventListener('shown.bs.collapse', function onShown() {
-            hiddenCollapse.removeEventListener('shown.bs.collapse', onShown);
+
+        function scrollToTarget() {
             target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        });
-        bsCollapse.show();
+        }
+
+        const hiddenBsCollapse = target.closest('.collapse:not(.show)');
+        const hiddenRkCollapsible = target.closest('.rk-collapsible[data-open="false"]');
+
+        if (hiddenBsCollapse) {
+            const bsCollapse = bootstrap.Collapse.getOrCreateInstance(hiddenBsCollapse);
+            hiddenBsCollapse.addEventListener('shown.bs.collapse', function onShown() {
+                hiddenBsCollapse.removeEventListener('shown.bs.collapse', onShown);
+                scrollToTarget();
+            });
+            bsCollapse.show();
+        } else if (hiddenRkCollapsible) {
+            hiddenRkCollapsible.setAttribute('data-open', 'true');
+            const rkToggle = hiddenRkCollapsible.querySelector('.rk-collapsible-toggle');
+            if (rkToggle) rkToggle.setAttribute('aria-expanded', 'true');
+            requestAnimationFrame(scrollToTarget);
+        } else {
+            scrollToTarget();
+        }
     });
 })();
 </script>

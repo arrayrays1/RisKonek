@@ -17,6 +17,8 @@
 
 {% set fig = view.figures %}
 
+<div class="rk-sim-results">
+
 <!-- ── 1. Assumptions and limitations (disclaimer, always visible) ──────── -->
 {# Deliberately the FIRST thing on the page: every figure below is a planning
    estimate, so the caveats must be read before the numbers, not after them. #}
@@ -97,7 +99,7 @@
                 </h2>
                 <p class="mb-0 rk-fs-14 rk-lh-16 rk-maxw-720">{{ view.overall.sentence }}</p>
                 {% if view.overall.label != 'Low Priority' %}
-                <a href="#rk-attention-h" class="rk-fs-13 fw-semibold d-inline-block mt-2 text-decoration-none">
+                <a href="#rk-coverage-h" class="rk-fs-13 fw-semibold d-inline-block mt-2 text-decoration-none">
                     See what needs attention and why <i class="bi bi-arrow-down-short"></i>
                 </a>
                 {% endif %}
@@ -119,7 +121,7 @@
                         <i class="bi {{ d.icon }} me-1" aria-hidden="true"></i>{{ d.label }}
                     </span>
                     {% if d.status != 'Adequate' %}
-                    <a href="#rk-attention-h" class="status-pill {{ d.pill }} text-decoration-none"
+                    <a href="#rk-coverage-h" class="status-pill {{ d.pill }} text-decoration-none"
                        title="See what needs attention and why">{{ d.status_label }} <i class="bi bi-arrow-down-short"></i></a>
                     {% else %}
                     <span class="status-pill {{ d.pill }}">{{ d.status_label }}</span>
@@ -188,7 +190,7 @@
         </div>
         <div class="col-6 col-lg-3">
             <{{ 'a' if fig.critical_count else 'div' }}
-                {{ 'href="#rk-attention-h"' if fig.critical_count }}
+                {{ 'href="#rk-coverage-h"' if fig.critical_count }}
                 class="dash-card rk-figure h-100 d-block text-decoration-none text-reset{{ ' rk-figure-linked' if fig.critical_count }}"
                 {% if fig.critical_count %}title="See which resource categories and why"{% endif %}>
                 <div class="rk-figure-head">
@@ -234,51 +236,20 @@
     </div>
 </section>
 
-<!-- ── 5 & 6: Needs Attention + Suggested Actions, paired side by side ──── -->
-<div class="row g-3 mb-3 align-items-start">
-<div class="col-md-6">
-<section class="dash-card rk-section rk-section-warn h-100" aria-labelledby="rk-attention-h">
-    <div class="card-title-row">
-        <h2 id="rk-attention-h" class="rk-h-section">
-            <i class="bi bi-exclamation-diamond me-1" aria-hidden="true"></i>What Needs Attention
-        </h2>
-    </div>
-
-    {% if view.concerns %}
-        {% for c in view.concerns %}
-        {% include "admin/_simulator_concern.html" %}
-        {% endfor %}
-
-        {% if view.more_concerns %}
-        <button class="btn btn-soft rk-fs-13 collapsed" type="button" data-bs-toggle="collapse"
-                data-bs-target="#rk-more-gaps" aria-expanded="false" aria-controls="rk-more-gaps">
-            <i class="bi bi-chevron-down" aria-hidden="true"></i>
-            <span class="rk-when-collapsed">View all resource gaps ({{ view.more_concerns | length }} more)</span>
-            <span class="rk-when-open">Hide the remaining resource gaps</span>
-        </button>
-        <div class="collapse mt-3" id="rk-more-gaps">
-            {% for c in view.more_concerns %}
-            {% include "admin/_simulator_concern.html" %}
-            {% endfor %}
-        </div>
-        {% endif %}
-    {% else %}
-        <p class="text-muted rk-fs-14 mb-0">
-            No resource shortfalls were identified for this scenario. Recorded
-            availability meets every estimated requirement.
-        </p>
-    {% endif %}
-</section>
-</div>
-
-<div class="col-md-6">
+<!-- ── 5. Suggested Actions ──────────────────────────────────────────────
+     "What Needs Attention" used to sit beside this as its own section, but
+     it showed the exact same rows (label, need/available, %, status, note)
+     as the Resource Coverage section below — just as cards instead of bars.
+     That duplication was flagged as overwhelming, so the gap-callout and
+     note now live on the coverage rows themselves (see section 7), and this
+     is the only "what's wrong" narrative left on the page. #}
 {# Rendered from the validated `ai_actions` list, ALWAYS escaped (never |safe)
    and capped at five. The heading and the disclaimer are hardcoded here, not
    model output, so they stay visible when the list is empty or the AI failed.
    Informational only: the system has no assign/deploy workflow, so no such
    control is offered. #}
 {% set actions = (ai_actions | default([], true))[:5] %}
-<section class="dash-card rk-section rk-section-ok h-100" aria-labelledby="rk-actions-h">
+<section class="dash-card rk-section rk-section-ok mb-3" aria-labelledby="rk-actions-h">
     <div class="card-title-row flex-wrap">
         <h2 id="rk-actions-h" class="rk-h-section">
             <i class="bi bi-list-check me-1" aria-hidden="true"></i>Suggested Planning Actions
@@ -312,42 +283,63 @@
         </p>
     {% endif %}
 </section>
-</div>
-</div>
 
 <!-- ── 7. Resource coverage overview ───────────────────────────────────── -->
 {# Replaces the old shared-axis Need-vs-Available bar chart: litres, packs, kits,
    slots and vehicles are not comparable on one numeric axis, so every class is
-   shown as its own 0–100% coverage bar with the exact values beside it. #}
+   shown as its own 0–100% coverage bar with the exact values beside it.
+
+   This is now the single place gap/shortfall info is shown at a glance — it
+   used to be duplicated with a separate "What Needs Attention" card list
+   (same rows, same numbers) plus a Chart.js bar chart directly above these
+   same bars. Both were dropped: rows below half coverage get the accent
+   border + advisory note that the concern cards used to carry, and the
+   bars alone already convey what the chart did.
+
+   Laid out two-up (.col-md-6) as boxed .rk-mini-card tiles rather than one
+   full-width rectangle per resource — six resource classes stacked
+   full-width read as one long slab; paired tiles read as a scannable grid,
+   same information. Single column below md. #}
 <section class="dash-card rk-section mb-3" aria-labelledby="rk-coverage-h">
     <div class="card-title-row">
         <h2 id="rk-coverage-h" class="rk-h-section">
             <i class="bi bi-bar-chart-steps me-1" aria-hidden="true"></i>Resource Coverage
         </h2>
     </div>
-    <canvas id="rk-coverage-chart" height="{{ (view.rows | length * 34) + 20 }}" class="mb-3"></canvas>
-    {% for r in view.rows %}
-    <div class="rk-coverage-row">
-        <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-1">
-            <span class="fw-semibold rk-fs-13">{{ r.label }}</span>
-            <span class="d-flex align-items-center gap-2">
-                <span class="rk-fs-12 text-muted rk-num">{{ r.pct_label }} covered</span>
-                <span class="status-pill {{ r.pill }}">{{ r.status_label }}</span>
-            </span>
+    <div class="row g-3">
+        {% for r in view.rows %}
+        <div class="col-md-6">
+            <div class="rk-mini-card {{ r.accent }} h-100">
+                <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-1">
+                    <span class="fw-semibold rk-fs-13">
+                        {{ r.label }}
+                        {% if r.gap > 0 %}
+                        <span class="d-block text-muted rk-fs-11">{{ r.technical_label }}</span>
+                        {% endif %}
+                    </span>
+                    <span class="d-flex align-items-center gap-2">
+                        <span class="rk-fs-12 text-muted rk-num">{{ r.pct_label }} covered</span>
+                        <span class="status-pill {{ r.pill }}">{{ r.status_label }}</span>
+                    </span>
+                </div>
+                <div class="progress rk-h-10">
+                    <div class="progress-bar {{ r.bar }} rk-w-p{{ r.pct }}" role="progressbar"
+                         aria-label="{{ r.label }} coverage"
+                         aria-valuenow="{{ r.pct }}" aria-valuemin="0" aria-valuemax="100"></div>
+                </div>
+                <div class="text-muted rk-fs-12 mt-1 rk-num">
+                    {{ "{:,}".format(r.available) }} of {{ "{:,}".format(r.need) }} {{ r.unit }} available
+                    {% if r.is_surplus %}
+                        — {{ "{:,}".format(r.surplus) }} {{ r.unit }} above the estimated requirement
+                    {% endif %}
+                </div>
+                {% if r.gap > 0 %}
+                <p class="text-muted rk-fs-12 mb-0 mt-1 rk-lh-16">{{ r.note }}</p>
+                {% endif %}
+            </div>
         </div>
-        <div class="progress rk-h-10">
-            <div class="progress-bar {{ r.bar }} rk-w-p{{ r.pct }}" role="progressbar"
-                 aria-label="{{ r.label }} coverage"
-                 aria-valuenow="{{ r.pct }}" aria-valuemin="0" aria-valuemax="100"></div>
-        </div>
-        <div class="text-muted rk-fs-12 mt-1 rk-num">
-            {{ "{:,}".format(r.available) }} of {{ "{:,}".format(r.need) }} {{ r.unit }} available
-            {% if r.is_surplus %}
-                — {{ "{:,}".format(r.surplus) }} {{ r.unit }} above the estimated requirement
-            {% endif %}
-        </div>
+        {% endfor %}
     </div>
-    {% endfor %}
     <p class="text-muted rk-fs-12 mb-0 mt-2">
         Each bar shows coverage on its own 0–100% scale. Resource classes use
         different units and are not compared against one another.
@@ -520,36 +512,5 @@
     </div>
 </section>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"
-        integrity="sha384-XcS9dtIcQ+RTgo0iDLXGgz7Ai3PcxjjUY0YCyLZ7QIT9tS3wnhAvI4kJ84J0Cakm" crossorigin="anonymous"></script>
-<script nonce="{{ request.state.csp_nonce }}">
-(function () {
-    const rows = {{ view.rows | tojson }};
-    const el = document.getElementById('rk-coverage-chart');
-    if (!el || !rows.length) return;
-    const pillColor = { critical: '#dc2626', partial: '#f59e0b', ok: '#10b981' };
-    Chart.defaults.color = window.rkChartTheme ? window.rkChartTheme().text : '#6c757d';
-    new Chart(el, {
-        type: 'bar',
-        data: {
-            labels: rows.map(r => r.label),
-            datasets: [{
-                label: '% Coverage',
-                data: rows.map(r => r.pct),
-                backgroundColor: rows.map(r => (pillColor[r.status] || '#6c757d')),
-            }]
-        },
-        options: {
-            indexAxis: 'y',
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-            scales: {
-                x: { min: 0, max: 100, ticks: { callback: v => v + '%' },
-                     grid: { color: window.rkChartTheme ? window.rkChartTheme().grid : '#f5f5f5' } },
-                y: { grid: { display: false } },
-            }
-        }
-    });
-})();
-</script>
+</div>
+

@@ -210,10 +210,15 @@
 
 </div>
 
-<!-- ── ROW 3: Bar graph side by side with the needs-attention panel ──── -->
+<!-- ── ROW 3: Disaster Incidents chart beside the Preparedness ↔ Priority
+     Barangays pair. That pair mirrors ROW 2's insights ↔ map pattern:
+     normally side by side, but collapsing "Preparedness Index Overview"
+     drops it to a thin header and lets "Priority Barangays" expand to
+     fill the row underneath it (see #prepBarangaysRow.rk-prep-collapsed
+     in rk.css and the toggle script below). ─────────────────────────── -->
 <div class="row g-3 mb-4 align-items-start">
 
-    <div class="col-md-6">
+    <div class="col-md-4">
         <div class="dash-card">
             <div class="card-title-row">
                 <i class="bi bi-bar-chart-fill rk-text-info"></i>
@@ -223,51 +228,97 @@
         </div>
     </div>
 
-    <div class="col-md-6">
-        <div class="dash-card">
-            <div class="card-title-row">
-                <i class="bi bi-exclamation-triangle-fill text-danger"></i>
-                <h6>Priority Barangays (Needs Attention)</h6>
+    <div class="col-md-8">
+        <div class="row g-3 align-items-start" id="prepBarangaysRow">
+
+            <div class="col-md-7" id="prepCol">
+                <div class="dash-card rk-collapsible" id="prepCard">
+                    <button class="rk-collapsible-toggle" type="button" aria-expanded="true">
+                        <i class="bi bi-chevron-down"></i>
+                        <i class="bi bi-shield-fill-check rk-text-green"></i>
+                        <span>Preparedness Index Overview</span>
+                    </button>
+                    <div class="rk-collapsible-body">
+                        <div class="rk-scroll-cap rk-scroll-cap-table">
+                        <table class="table prep-table">
+                            <thead>
+                                <tr>
+                                    <th>Barangay</th>
+                                    <th>Score</th>
+                                    <th>Planning Priority</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for brgy in all_scores[:10] %}
+                                <tr>
+                                    <td>{{ brgy.name }}</td>
+                                    <td class="fw-medium">{{ brgy.score }}</td>
+                                    <td>
+                                        <span class="risk-badge risk-{{ brgy.level }}">
+                                            {{ brgy.level.title() }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        </div>
+
+                        <a href="/admin/barangays"
+                           class="btn-soft w-100 justify-content-center mt-2 rk-text-green">
+                            View All Barangays <i class="bi bi-arrow-right"></i>
+                        </a>
+                    </div>
+                </div>
             </div>
 
-            <div class="text-muted mb-2 rk-fs-11">
-                <i class="bi bi-info-circle"></i>
-                This score is system-generated for planning support only and is
-                not an official hazard or risk classification.
-            </div>
+            <div class="col-md-5" id="barangaysCol">
+                <div class="dash-card">
+                    <div class="card-title-row">
+                        <i class="bi bi-exclamation-triangle-fill text-danger"></i>
+                        <h6>Priority Barangays (Needs Attention)</h6>
+                    </div>
 
-            <div class="rk-scroll-cap">
-            {% for brgy in top5 %}
-            <div class="brgy-item">
-                <div class="d-flex align-items-center gap-2 mb-1">
-                    <div class="brgy-rank">{{ loop.index }}</div>
-                    <div class="flex-grow-1">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div class="brgy-name">{{ brgy.name }}</div>
-                            <span class="risk-badge risk-{{ brgy.level }}">
-                                {{ brgy.level.title() }}
+                    <div class="text-muted mb-2 rk-fs-11">
+                        <i class="bi bi-info-circle"></i>
+                        This score is system-generated for planning support only and is
+                        not an official hazard or risk classification.
+                    </div>
+
+                    <div class="rk-scroll-cap">
+                    {% for brgy in top5 %}
+                    <div class="brgy-item">
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <div class="brgy-rank">{{ loop.index }}</div>
+                            <div class="flex-grow-1">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div class="brgy-name">{{ brgy.name }}</div>
+                                    <span class="risk-badge risk-{{ brgy.level }}">
+                                        {{ brgy.level.title() }}
+                                    </span>
+                                </div>
+                                <div class="brgy-sub">
+                                    Hazards: {{ brgy.hazard_types.replace(',', ', ').title() if brgy.hazard_types else '—' }}
+                                    &nbsp;·&nbsp; Population: {{ "{:,}".format(brgy.population) }}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="score-bar-track flex-grow-1">
+                                <div class="score-bar-fill rk-fill-{{ brgy.level }} rk-w-p{{ brgy.score | round | int }}"></div>
+                            </div>
+                            <span class="rk-fs-12 text-muted rk-nowrap">
+                                Score: {{ brgy.score }}
                             </span>
                         </div>
-                        <div class="brgy-sub">
-                            Hazards: {{ brgy.hazard_types.replace(',', ', ').title() if brgy.hazard_types else '—' }}
-                            &nbsp;·&nbsp; Population: {{ "{:,}".format(brgy.population) }}
-                        </div>
+                        <a href="/admin/barangays/{{ brgy.id }}"
+                           class="rk-fs-12 rk-text-green text-decoration-none">
+                            View Barangay Profile <i class="bi bi-arrow-right"></i>
+                        </a>
+                    </div>
+                    {% endfor %}
                     </div>
                 </div>
-                <div class="d-flex align-items-center gap-2">
-                    <div class="score-bar-track flex-grow-1">
-                        <div class="score-bar-fill rk-fill-{{ brgy.level }} rk-w-p{{ brgy.score | round | int }}"></div>
-                    </div>
-                    <span class="rk-fs-12 text-muted rk-nowrap">
-                        Score: {{ brgy.score }}
-                    </span>
-                </div>
-                <a href="/admin/barangays/{{ brgy.id }}"
-                   class="rk-fs-12 rk-text-green text-decoration-none">
-                    View Barangay Profile <i class="bi bi-arrow-right"></i>
-                </a>
-            </div>
-            {% endfor %}
             </div>
 
         </div>
@@ -275,57 +326,17 @@
 
 </div>
 
-<!-- ── ROW 4: Trend chart + collapsible preparedness table ───────────── -->
+<!-- ── ROW 4: Incidents Trend (previously paired with Preparedness Index
+     Overview, which now lives in ROW 3 beside Disaster Incidents) ────── -->
 <div class="row g-3 mb-4 align-items-start">
 
-    <div class="col-md-6">
+    <div class="col-md-12">
         <div class="dash-card">
             <div class="card-title-row">
                 <i class="bi bi-graph-up rk-text-green"></i>
                 <h6>Incidents Trend (Last 6 Years)</h6>
             </div>
             <canvas id="trendChart" height="180"></canvas>
-        </div>
-    </div>
-
-    <div class="col-md-6">
-        <div class="dash-card rk-collapsible">
-            <button class="rk-collapsible-toggle" type="button" aria-expanded="true">
-                <i class="bi bi-chevron-down"></i>
-                <i class="bi bi-shield-fill-check rk-text-green"></i>
-                <span>Preparedness Index Overview</span>
-            </button>
-            <div class="rk-collapsible-body">
-                <div class="rk-scroll-cap rk-scroll-cap-table">
-                <table class="table prep-table">
-                    <thead>
-                        <tr>
-                            <th>Barangay</th>
-                            <th>Score</th>
-                            <th>Planning Priority</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for brgy in all_scores[:10] %}
-                        <tr>
-                            <td>{{ brgy.name }}</td>
-                            <td class="fw-medium">{{ brgy.score }}</td>
-                            <td>
-                                <span class="risk-badge risk-{{ brgy.level }}">
-                                    {{ brgy.level.title() }}
-                                </span>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-                </div>
-
-                <a href="/admin/barangays"
-                   class="btn-soft w-100 justify-content-center mt-2 rk-text-green">
-                    View All Barangays <i class="bi bi-arrow-right"></i>
-                </a>
-            </div>
         </div>
     </div>
 
@@ -456,6 +467,26 @@ markers.forEach(m => {
         // Leaflet caches its container size; it needs a nudge to redraw
         // tiles correctly after the map's box changes width/height.
         setTimeout(() => map.invalidateSize(), 200);
+    }
+
+    toggle.addEventListener('click', sync);
+    sync(); // match whatever state the collapsible starts in on load
+})();
+
+// ── Preparedness collapse ↔ Priority Barangays reflow ───────────────
+// Same idea as the insights ↔ map reflow above: when "Preparedness Index
+// Overview" is collapsed, give "Priority Barangays" the full width of
+// their shared 8-column pair instead of leaving it squeezed next to a
+// thin collapsed header.
+(function () {
+    const card = document.getElementById('prepCard');
+    const row = document.getElementById('prepBarangaysRow');
+    const toggle = card && card.querySelector('.rk-collapsible-toggle');
+    if (!card || !row || !toggle) return;
+
+    function sync() {
+        const collapsed = card.getAttribute('data-open') === 'false';
+        row.classList.toggle('rk-prep-collapsed', collapsed);
     }
 
     toggle.addEventListener('click', sync);
