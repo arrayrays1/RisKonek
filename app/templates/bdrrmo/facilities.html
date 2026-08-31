@@ -14,7 +14,7 @@
 {% set status_classes = {'available': 'status-operational', 'under_maintenance': 'status-maintenance', 'unavailable': 'status-unavailable'} %}
 
 <div class="d-flex justify-content-between align-items-start page-header flex-wrap gap-2">
-    <div>
+    <div style="flex: 1 1 0; min-width: 0;">
         <h1>Critical Facilities</h1>
         <p>
             {% if citywide %}
@@ -28,7 +28,7 @@
         </p>
     </div>
     {% if barangay %}
-    <div class="d-flex align-items-center gap-2 flex-wrap">
+    <div class="d-flex align-items-center gap-2 flex-wrap flex-shrink-0">
         <div class="btn-group btn-group-sm" role="group" aria-label="Facility coverage">
             <a href="/bdrrmo/facilities"
                class="btn btn-outline-secondary {{ 'active' if not citywide else '' }}">

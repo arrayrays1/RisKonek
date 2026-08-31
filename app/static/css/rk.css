@@ -538,18 +538,25 @@ html.rk-no-anim .dash-card { transition: none !important; }
 .dash-card:has(> form.js-live-filter),
 .dash-card:has(> form#auditFilterForm),
 .dash-card:has(> form#equipAuditFilterForm) { min-height: 0; }
+/* Table-wrapper cards (.dash-card.p-0, used across every list/report
+   page) render a real table with its own header and rows — the 220px
+   floor was only ever meant for short info cards that could otherwise
+   look like a stray box, not a table. Left on, an empty-state table
+   (header + one "No results found" row) sat inside a tall card with a
+   large blank gap below it. Tables set their own height; drop the floor. */
+.dash-card.p-0 { min-height: 0; }
 /* A collapsed .rk-collapsible still carries the .dash-card min-height
    floor above, so the card stayed ~220px tall — a big empty box below
    the header — even though .rk-collapsible-body was display:none.
    Drop the floor once collapsed; the card should hug its header only. */
-.dash-card.rk-collapsible[data-open="false"] { min-height: 0; }
-/* Simulation results: every .dash-card on this page (scenario context bar,
-   readiness hero, coverage, detail-view toggle, AI brief) is full-width and
-   stacked vertically, never paired beside a taller sibling — the min-height
-   floor above exists to stop a short card looking stray next to a tall
-   neighbor, which doesn't happen here. Left on, it padded out short
-   sections (a 2-line context bar, a header-only toggle card, an
-   AI-unavailable notice) with a large empty gap underneath the content. */
+.dash-card.rk-collapsible[data-open="false"] { min-height: 0; height: auto; }
+/* Full-width dash-cards stacked vertically (never paired beside a taller
+   sibling) don't need the min-height floor above — it just pads out
+   short sections with a large empty gap underneath the content. Used by
+   the Simulation Results page (scenario context bar, readiness hero,
+   coverage, detail-view toggle, AI brief), and by the per-barangay
+   contact cards in the contact directory, whose real height should
+   track how many contacts that barangay has, not a fixed floor. */
 .dash-card.rk-section { min-height: 0; }
 
 /* ── Admin dashboard: Insights ↔ map row ──────────────────────────
@@ -566,21 +573,6 @@ html.rk-no-anim .dash-card { transition: none !important; }
 #insightsMapRow.rk-insights-collapsed #insightsCol { order: 1; }
 #insightsMapRow.rk-insights-collapsed #mapCol { order: 2; }
 #insightsMapRow.rk-insights-collapsed #dashMap { height: 480px; }
-
-/* ── Admin dashboard: Preparedness ↔ Priority Barangays row ───────────
-   Same pattern as the insights ↔ map row above, one level deeper: this
-   pair lives inside its own col-md-8 (beside "Disaster Incidents by
-   Type", which stays fixed at col-md-4 and never reflows), so "100%"
-   here means 100% of that 8-column nested row, not the full page width.
-   Toggled by JS in admin/dashboard.html; #prepBarangaysRow only exists
-   on that page. */
-#prepBarangaysRow.rk-prep-collapsed #prepCol,
-#prepBarangaysRow.rk-prep-collapsed #barangaysCol {
-    flex: 0 0 100%;
-    max-width: 100%;
-}
-#prepBarangaysRow.rk-prep-collapsed #prepCol { order: 1; }
-#prepBarangaysRow.rk-prep-collapsed #barangaysCol { order: 2; }
 
 .stat-card .stat-label { font-size: 15px; color: var(--rk-muted); margin-bottom: 8px; }
 .stat-card .stat-value { font-size: clamp(15px, 2vw, 26px); font-weight: 700; color: var(--rk-text); margin: 0; word-break: break-word; }
@@ -627,9 +619,11 @@ html[data-theme="dark"] .risk-low {
 .status-operational     { background: #d1fae5; color: #047857; }
 .status-maintenance     { background: #fef3c7; color: #b45309; }
 .status-unavailable     { background: #fee2e2; color: #dc2626; }
+.status-info             { background: #dbeafe; color: #1d4ed8; }
 html[data-theme="dark"] .status-operational { background: #0d3c2a; color: #6ee7b7; }
 html[data-theme="dark"] .status-maintenance { background: #3a2f0f; color: #fbd38d; }
 html[data-theme="dark"] .status-unavailable { background: #3a1f1f; color: #fca5a5; }
+html[data-theme="dark"] .status-info { background: #123a66; color: #93c5fd; }
 
 /* ── Tables — app-wide ─────────────────────────────────────────
    No custom table rules existed before this, so every list page ran on
@@ -1415,11 +1409,30 @@ html[data-theme="dark"] .rk-consequence {
     overflow-y: auto;
     padding-right: 4px;
 }
-/* Preparedness Index Overview (admin dashboard): the table can run to 10
-   rows, which used to force the whole card taller than its neighboring
-   chart card once both were height-matched. Cap just the table instead —
-   the chart card sets the pace, the table scrolls internally to match it,
-   and collapsing the card is unaffected either way. */
+/* Preparedness Index Overview (admin dashboard): this card is height-
+   matched (.h-100) to its Priority Barangays sibling. A fixed max-height
+   here left a lot of blank card below the table+button once the two
+   cards were stretched equal — instead, #prepCard lays out as a column
+   (header → scrollable table → button) and the table area is the only
+   flexible piece, so it grows to fill whatever height the pair settles
+   on and only that portion scrolls. */
+/* Preparedness Index Overview (admin dashboard): this card is height-
+   matched (.h-100) to its Priority Barangays sibling, whose own list
+   is capped at 320px via .rk-scroll-cap. Match that same cap here
+   instead of the generic 180px above, so neither card ends up forcing
+   the other much taller than its natural content — the table stays
+   properly scrollable past its 10th row either way.
+   The card is also a flex column so "View All Barangays" (.rk-push-bottom)
+   can sit flush at the bottom once .h-100 stretches the card to match its
+   sibling, instead of leaving a gap underneath. Deliberately NOT flex-grow
+   on the scroll box itself — that collapses to a ~0 hypothetical height
+   during the browser's indeterminate-height sizing pass (used to decide
+   how tall the row's stretch target even is), which flips which sibling
+   ends up stretching which. margin-top:auto on the link has no such
+   effect: it only resolves once the row's height is already settled. */
+#prepCard { display: flex; flex-direction: column; }
+#prepCard .rk-scroll-cap-table { max-height: 320px; }
+.rk-push-bottom { margin-top: auto; }
 .rk-scroll-cap-table {
     max-height: 180px;
 }

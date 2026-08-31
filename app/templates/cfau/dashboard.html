@@ -120,11 +120,11 @@
 
 </div>
 
-<!-- ── ROW 2: Action needed + Fleet status ────────────────────── -->
-<div class="row g-3 mb-4 align-items-start">
+<!-- ── ROW 2: Needs Your Attention + Repair Schedule ───────────── -->
+<div class="row g-3 mb-4">
 
-    <div class="col-md-7">
-        <div class="dash-card rk-collapsible">
+    <div class="col-md-6">
+        <div class="dash-card rk-collapsible h-100">
             <div class="rk-collapsible-toggle-row">
                 <button class="rk-collapsible-toggle" type="button" aria-expanded="true">
                     <i class="bi bi-chevron-down"></i>
@@ -174,51 +174,8 @@
         </div>
     </div>
 
-    <div class="col-md-5">
-        <div class="dash-card">
-            <div class="card-title-row">
-                <i class="bi bi-wrench-adjustable rk-text-green"></i>
-                <h6>Fleet Status</h6>
-                <a href="/admin/equipment" class="ms-auto rk-fs-12 rk-text-green text-decoration-none">
-                    Open <i class="bi bi-arrow-right"></i>
-                </a>
-            </div>
-
-            {% if fleet.total %}
-                <div class="chart-donut"><canvas id="fleetChart"></canvas></div>
-                <div class="mt-3">
-                    {% for value, count in fleet.counts.items() %}
-                    <div class="fleet-row">
-                        <a href="/admin/equipment?status={{ value }}" class="text-decoration-none">
-                            {% if value == 'available' %}
-                                <span class="status-pill status-operational">{{ fleet_labels[value] }}</span>
-                            {% elif value == 'deployed' %}
-                                <span class="badge bg-info text-dark">{{ fleet_labels[value] }}</span>
-                            {% elif value == 'under_repair' %}
-                                <span class="status-pill status-maintenance">{{ fleet_labels[value] }}</span>
-                            {% else %}
-                                <span class="status-pill status-unavailable">{{ fleet_labels[value] }}</span>
-                            {% endif %}
-                        </a>
-                        <span class="fleet-count">{{ count }}</span>
-                    </div>
-                    {% endfor %}
-                </div>
-            {% else %}
-                <div class="text-center text-muted py-4 rk-fs-13">
-                    No equipment recorded yet.
-                </div>
-            {% endif %}
-        </div>
-    </div>
-
-</div>
-
-<!-- ── ROW 3: Repair schedule + Report workflow chart ─────────── -->
-<div class="row g-3 mb-4 align-items-start">
-
     <div class="col-md-6">
-        <div class="dash-card rk-collapsible">
+        <div class="dash-card rk-collapsible h-100">
             <button class="rk-collapsible-toggle" type="button" aria-expanded="true">
                 <i class="bi bi-chevron-down"></i>
                 <i class="bi bi-calendar-check rk-text-info"></i>
@@ -267,8 +224,51 @@
         </div>
     </div>
 
+</div>
+
+<!-- ── ROW 3: Fleet status donut + Report workflow bar chart ──── -->
+<div class="row g-3 mb-4">
+
     <div class="col-md-6">
-        <div class="dash-card">
+        <div class="dash-card h-100">
+            <div class="card-title-row">
+                <i class="bi bi-wrench-adjustable rk-text-green"></i>
+                <h6>Fleet Status</h6>
+                <a href="/admin/equipment" class="ms-auto rk-fs-12 rk-text-green text-decoration-none">
+                    Open <i class="bi bi-arrow-right"></i>
+                </a>
+            </div>
+
+            {% if fleet.total %}
+                <div class="chart-donut"><canvas id="fleetChart"></canvas></div>
+                <div class="mt-3">
+                    {% for value, count in fleet.counts.items() %}
+                    <div class="fleet-row">
+                        <a href="/admin/equipment?status={{ value }}" class="text-decoration-none">
+                            {% if value == 'available' %}
+                                <span class="status-pill status-operational">{{ fleet_labels[value] }}</span>
+                            {% elif value == 'deployed' %}
+                                <span class="badge bg-info text-dark">{{ fleet_labels[value] }}</span>
+                            {% elif value == 'under_repair' %}
+                                <span class="status-pill status-maintenance">{{ fleet_labels[value] }}</span>
+                            {% else %}
+                                <span class="status-pill status-unavailable">{{ fleet_labels[value] }}</span>
+                            {% endif %}
+                        </a>
+                        <span class="fleet-count">{{ count }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="text-center text-muted py-4 rk-fs-13">
+                    No equipment recorded yet.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="dash-card h-100">
             <div class="card-title-row">
                 <i class="bi bi-bar-chart-fill rk-text-info"></i>
                 <h6>My Reports by Workflow Stage</h6>

@@ -10,8 +10,12 @@
         <span class="status-pill status-maintenance">{{ label }}</span>
     {% elif a in ('archived',) %}
         <span class="status-pill status-unavailable">{{ label }}</span>
-    {% elif a in ('created', 'restored') %}
+    {% elif a in ('created', 'restored', 'resolved') %}
         <span class="status-pill status-operational">{{ label }}</span>
+    {% elif a in ('submitted', 'reviewed') %}
+        <span class="status-pill status-info">{{ label }}</span>
+    {% elif a == 'reopened' %}
+        <span class="status-pill status-maintenance">{{ label }}</span>
     {% else %}
         <span class="badge bg-light text-dark border">{{ label }}</span>
     {% endif %}

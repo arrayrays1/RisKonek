@@ -149,8 +149,8 @@
 <!-- ── ROW 2: Insights feed + Mini map ────────────────────────── -->
 <div class="row g-3 mb-4 align-items-start" id="insightsMapRow">
 
-    <div class="col-md-7" id="insightsCol">
-        <div class="dash-card rk-collapsible" id="insightsCard">
+    <div class="col-md-5" id="insightsCol">
+        <div class="dash-card rk-collapsible h-100" id="insightsCard">
             <button class="rk-collapsible-toggle" type="button" aria-expanded="true">
                 <i class="bi bi-chevron-down"></i>
                 <i class="bi bi-bell text-warning"></i>
@@ -189,8 +189,8 @@
         </div>
     </div>
 
-    <div class="col-md-5" id="mapCol">
-        <div class="dash-card">
+    <div class="col-md-7" id="mapCol">
+        <div class="dash-card h-100">
             <div class="card-title-row">
                 <i class="bi bi-map-fill rk-text-green"></i>
                 <h6>Barangay-Level Hazard and Priority Map</h6>
@@ -210,36 +210,21 @@
 
 </div>
 
-<!-- ── ROW 3: Disaster Incidents chart beside the Preparedness ↔ Priority
-     Barangays pair. That pair mirrors ROW 2's insights ↔ map pattern:
-     normally side by side, but collapsing "Preparedness Index Overview"
-     drops it to a thin header and lets "Priority Barangays" expand to
-     fill the row underneath it (see #prepBarangaysRow.rk-prep-collapsed
-     in rk.css and the toggle script below). ─────────────────────────── -->
-<div class="row g-3 mb-4 align-items-start">
+<!-- ── ROW 3: Preparedness ↔ Priority Barangays pair. Mirrors ROW 2's
+     insights ↔ map pattern: normally side by side, but collapsing
+     "Preparedness Index Overview" drops it to a thin header and lets
+     "Priority Barangays" expand to fill the row underneath it (see
+     #prepBarangaysRow.rk-prep-collapsed in rk.css and the toggle
+     script below). ─────────────────────────────────────────────────── -->
+<div class="row g-3 mb-4" id="prepBarangaysRow">
 
-    <div class="col-md-4">
-        <div class="dash-card">
-            <div class="card-title-row">
-                <i class="bi bi-bar-chart-fill rk-text-info"></i>
-                <h6>Disaster Incidents by Type</h6>
-            </div>
-            <canvas id="disasterChart" height="180"></canvas>
-        </div>
-    </div>
-
-    <div class="col-md-8">
-        <div class="row g-3 align-items-start" id="prepBarangaysRow">
-
-            <div class="col-md-7" id="prepCol">
-                <div class="dash-card rk-collapsible" id="prepCard">
-                    <button class="rk-collapsible-toggle" type="button" aria-expanded="true">
-                        <i class="bi bi-chevron-down"></i>
+            <div class="col-md-6" id="prepCol">
+                <div class="dash-card h-100" id="prepCard">
+                    <div class="card-title-row">
                         <i class="bi bi-shield-fill-check rk-text-green"></i>
-                        <span>Preparedness Index Overview</span>
-                    </button>
-                    <div class="rk-collapsible-body">
-                        <div class="rk-scroll-cap rk-scroll-cap-table">
+                        <h6>Preparedness Index Overview</h6>
+                    </div>
+                    <div class="rk-scroll-cap rk-scroll-cap-table">
                         <table class="table prep-table">
                             <thead>
                                 <tr>
@@ -262,18 +247,17 @@
                                 {% endfor %}
                             </tbody>
                         </table>
-                        </div>
-
-                        <a href="/admin/barangays"
-                           class="btn-soft w-100 justify-content-center mt-2 rk-text-green">
-                            View All Barangays <i class="bi bi-arrow-right"></i>
-                        </a>
                     </div>
+
+                    <a href="/admin/barangays"
+                       class="btn-soft w-100 justify-content-center mt-2 rk-text-green rk-push-bottom">
+                        View All Barangays <i class="bi bi-arrow-right"></i>
+                    </a>
                 </div>
             </div>
 
-            <div class="col-md-5" id="barangaysCol">
-                <div class="dash-card">
+            <div class="col-md-6" id="barangaysCol">
+                <div class="dash-card h-100">
                     <div class="card-title-row">
                         <i class="bi bi-exclamation-triangle-fill text-danger"></i>
                         <h6>Priority Barangays (Needs Attention)</h6>
@@ -321,17 +305,23 @@
                 </div>
             </div>
 
+</div>
+
+<!-- ── ROW 4: Disaster Incidents by Type beside Incidents Trend, 50/50 ── -->
+<div class="row g-3 mb-4">
+
+    <div class="col-md-6">
+        <div class="dash-card h-100">
+            <div class="card-title-row">
+                <i class="bi bi-bar-chart-fill rk-text-info"></i>
+                <h6>Disaster Incidents by Type</h6>
+            </div>
+            <canvas id="disasterChart" height="180"></canvas>
         </div>
     </div>
 
-</div>
-
-<!-- ── ROW 4: Incidents Trend (previously paired with Preparedness Index
-     Overview, which now lives in ROW 3 beside Disaster Incidents) ────── -->
-<div class="row g-3 mb-4 align-items-start">
-
-    <div class="col-md-12">
-        <div class="dash-card">
+    <div class="col-md-6">
+        <div class="dash-card h-100">
             <div class="card-title-row">
                 <i class="bi bi-graph-up rk-text-green"></i>
                 <h6>Incidents Trend (Last 6 Years)</h6>
@@ -473,24 +463,5 @@ markers.forEach(m => {
     sync(); // match whatever state the collapsible starts in on load
 })();
 
-// ── Preparedness collapse ↔ Priority Barangays reflow ───────────────
-// Same idea as the insights ↔ map reflow above: when "Preparedness Index
-// Overview" is collapsed, give "Priority Barangays" the full width of
-// their shared 8-column pair instead of leaving it squeezed next to a
-// thin collapsed header.
-(function () {
-    const card = document.getElementById('prepCard');
-    const row = document.getElementById('prepBarangaysRow');
-    const toggle = card && card.querySelector('.rk-collapsible-toggle');
-    if (!card || !row || !toggle) return;
-
-    function sync() {
-        const collapsed = card.getAttribute('data-open') === 'false';
-        row.classList.toggle('rk-prep-collapsed', collapsed);
-    }
-
-    toggle.addEventListener('click', sync);
-    sync(); // match whatever state the collapsible starts in on load
-})();
 </script>
 {% endblock %}

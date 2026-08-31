@@ -120,21 +120,6 @@
     </div>
 </div>
 
-<!-- ── Known hazards ──────────────────────────────────────────── -->
-<div class="dash-card mb-4">
-    <div class="card-title-row">
-        <i class="bi bi-shield-exclamation rk-text-green"></i>
-        <h6>Known Hazard Types</h6>
-    </div>
-    {% if hazard_types %}
-        {% for h in hazard_types %}
-        <span class="badge bg-light text-dark border me-1 rk-fs-12">{{ h.title() }}</span>
-        {% endfor %}
-    {% else %}
-        <span class="text-muted rk-fs-13">No hazards recorded.</span>
-    {% endif %}
-</div>
-
 <!-- ── Planning priority breakdown ────────────────────────────── -->
 <div class="dash-card">
     <div class="card-title-row">
