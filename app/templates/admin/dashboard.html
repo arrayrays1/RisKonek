@@ -41,9 +41,14 @@
     .feed-text { font-size: 13px; color: var(--rk-text); }
     .feed-time { font-size: 11px; color: var(--rk-muted); margin-top: 2px; }
 
-    #dashMap { height: 320px; border-radius: 8px; }
+    /* flex:1 (not a fixed height) lets the map grow to fill whatever
+       height the row stretches the card to, matching the Insights card
+       beside it, instead of sitting fixed at 320px with empty space
+       below when its sibling is taller. min-height keeps it usable
+       before Leaflet/the row have settled on a final size. */
+    #dashMap { flex: 1 1 auto; min-height: 320px; border-radius: 8px; }
 
-    .prep-table th { font-size: 12px; color: var(--rk-muted); font-weight: 500; border: none; }
+    .prep-table th { font-size: 12px; font-weight: 700; border: none; }
     .prep-table td { font-size: 13px; vertical-align: middle; border-color: var(--rk-border); }
 
 </style>
@@ -147,7 +152,7 @@
 </div>
 
 <!-- ── ROW 2: Insights feed + Mini map ────────────────────────── -->
-<div class="row g-3 mb-4 align-items-start" id="insightsMapRow">
+<div class="row g-3 mb-4 align-items-stretch" id="insightsMapRow">
 
     <div class="col-md-5" id="insightsCol">
         <div class="dash-card rk-collapsible h-100" id="insightsCard">
@@ -190,7 +195,7 @@
     </div>
 
     <div class="col-md-7" id="mapCol">
-        <div class="dash-card h-100">
+        <div class="dash-card h-100 d-flex flex-column">
             <div class="card-title-row">
                 <i class="bi bi-map-fill rk-text-green"></i>
                 <h6>Barangay-Level Hazard and Priority Map</h6>

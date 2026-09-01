@@ -12,6 +12,26 @@
 </style>
 {% endblock %}
 
+{% macro action_badge(a) -%}
+    {% if a == 'status_changed' %}
+        <span class="status-pill status-maintenance">{{ a }}</span>
+    {% elif a in ('deleted', 'archived', 'deactivated', 'discarded', 'login_failed', 'login_blocked_inactive', 'login_lockout') %}
+        <span class="status-pill status-unavailable">{{ a }}</span>
+    {% elif a in ('created', 'restored', 'resolved', 'activated', 'confirmed') %}
+        <span class="status-pill status-operational">{{ a }}</span>
+    {% elif a in ('updated', 'submitted', 'reviewed', 'edited') %}
+        <span class="status-pill status-info">{{ a }}</span>
+    {% elif a == 'reopened' %}
+        <span class="status-pill status-maintenance">{{ a }}</span>
+    {% elif a == 'login' %}
+        <span class="status-pill status-operational">{{ a }}</span>
+    {% elif a == 'logout' %}
+        <span class="status-pill rk-pill-low">{{ a }}</span>
+    {% else %}
+        <span class="badge bg-light text-dark border">{{ a }}</span>
+    {% endif %}
+{%- endmacro %}
+
 {% block content %}
 <div class="d-flex justify-content-between align-items-start page-header">
     <div>
@@ -26,7 +46,7 @@
 <div class="dash-card mb-3">
     <div class="kv d-flex flex-column gap-2">
         <div><span class="k">Action performed</span>
-            <span class="v"><span class="badge bg-light text-dark border">{{ log.action }}</span></span></div>
+            <span class="v">{{ action_badge(log.action) }}</span></div>
         <div><span class="k">Category / Module</span><span class="v">{{ category }}</span></div>
         <div><span class="k">Affected table</span><span class="v">{{ log.target_table or '—' }}</span></div>
         <div><span class="k">Affected record ID</span><span class="v">{{ log.target_id if log.target_id is not none else '—' }}</span></div>

@@ -9,7 +9,7 @@
     {% if v == 'submitted' %}
         <span class="status-pill status-maintenance">{{ label }}</span>
     {% elif v == 'reviewed' %}
-        <span class="badge bg-info text-dark">{{ label }}</span>
+        <span class="status-pill status-info">{{ label }}</span>
     {% elif v == 'resolved' %}
         <span class="status-pill status-operational">{{ label }}</span>
     {% else %}
@@ -122,7 +122,7 @@
                     <td class="text-muted">{{ r.reporter }}</td>
                     <td>
                         {% if r.origin == 'uploaded' %}
-                        <span class="badge bg-info text-dark"><i class="bi bi-cloud-arrow-up me-1"></i>Uploaded</span>
+                        <span class="status-pill status-info"><i class="bi bi-cloud-arrow-up me-1"></i>Uploaded</span>
                         {% else %}
                         <span class="badge bg-light text-dark border"><i class="bi bi-pencil me-1"></i>Manual</span>
                         {% endif %}

@@ -11,7 +11,7 @@
     {% elif v == 'submitted' %}
         <span class="status-pill status-maintenance">{{ label }}</span>
     {% elif v == 'reviewed' %}
-        <span class="badge bg-info text-dark">{{ label }}</span>
+        <span class="status-pill status-info">{{ label }}</span>
     {% elif v == 'resolved' %}
         <span class="status-pill status-operational">{{ label }}</span>
     {% else %}
@@ -27,7 +27,7 @@
         <span class="status-pill rk-pill-med">
             <i class="bi bi-exclamation-circle-fill"></i> {{ label }}</span>
     {% elif v == 'moderate' %}
-        <span class="status-pill status-maintenance">{{ label }}</span>
+        <span class="status-pill rk-pill-moderate">{{ label }}</span>
     {% else %}
         <span class="status-pill rk-pill-low">{{ label }}</span>
     {% endif %}

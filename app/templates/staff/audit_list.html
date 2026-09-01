@@ -13,6 +13,26 @@
     <span class="status-pill {{ m.get(cat, 'rk-cat-system') }}">{{ cat }}</span>
 {%- endmacro %}
 
+{% macro action_badge(a) -%}
+    {% if a == 'status_changed' %}
+        <span class="status-pill status-maintenance">{{ a }}</span>
+    {% elif a in ('deleted', 'archived', 'deactivated', 'discarded', 'login_failed', 'login_blocked_inactive', 'login_lockout') %}
+        <span class="status-pill status-unavailable">{{ a }}</span>
+    {% elif a in ('created', 'restored', 'resolved', 'activated', 'confirmed') %}
+        <span class="status-pill status-operational">{{ a }}</span>
+    {% elif a in ('updated', 'submitted', 'reviewed', 'edited') %}
+        <span class="status-pill status-info">{{ a }}</span>
+    {% elif a == 'reopened' %}
+        <span class="status-pill status-maintenance">{{ a }}</span>
+    {% elif a == 'login' %}
+        <span class="status-pill status-operational">{{ a }}</span>
+    {% elif a == 'logout' %}
+        <span class="status-pill rk-pill-low">{{ a }}</span>
+    {% else %}
+        <span class="badge bg-light text-dark border">{{ a }}</span>
+    {% endif %}
+{%- endmacro %}
+
 {% block content %}
 <div class="d-flex justify-content-between align-items-start page-header">
     <div>
@@ -120,7 +140,7 @@
                     </td>
                     <td>{{ it.username }}</td>
                     <td>{{ category_badge(it.category) }}</td>
-                    <td><span class="badge bg-light text-dark border">{{ it.action }}</span></td>
+                    <td>{{ action_badge(it.action) }}</td>
                     <td class="small text-muted">{{ it.deployed_to or '—' }}</td>
                     <td class="small rk-maxw-340">
                         <span class="d-inline-block text-truncate rk-maxw-340" title="{{ it.description }}">

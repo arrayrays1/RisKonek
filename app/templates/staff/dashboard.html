@@ -37,6 +37,15 @@
     }
     .feed-text { font-size: 13px; color: var(--rk-text); }
     .feed-time { font-size: 11px; color: var(--rk-muted); margin-top: 2px; }
+
+    /* Recent activity can grow indefinitely — cap it and let it scroll
+       instead of pushing the card (and the row) taller and taller. */
+    .feed-scroll { max-height: 320px; overflow-y: auto; padding-right: 6px; }
+
+    /* The category chart's card is only as tall as the fleet card next to
+       it; let the chart's own wrapper grow to fill that leftover space
+       instead of sitting fixed-height with empty whitespace below it. */
+    .chart-fill { position: relative; flex: 1 1 auto; min-height: 190px; }
 </style>
 {% endblock %}
 
@@ -121,11 +130,11 @@
 
 </div>
 
-<!-- ── ROW 2: Needs attention + Fleet status ──────────────────── -->
-<div class="row g-3 mb-4 align-items-start">
+<!-- ── ROW 2: Stock needing attention + Recent activity ────────── -->
+<div class="row g-3 mb-4 align-items-stretch">
 
-    <div class="col-md-7">
-        <div class="dash-card rk-collapsible">
+    <div class="col-md-6">
+        <div class="dash-card rk-collapsible h-100">
             <div class="rk-collapsible-toggle-row">
                 <button class="rk-collapsible-toggle" type="button" aria-expanded="true">
                     <i class="bi bi-chevron-down"></i>
@@ -180,61 +189,8 @@
         </div>
     </div>
 
-    <div class="col-md-5">
-        <div class="dash-card">
-            <div class="card-title-row">
-                <i class="bi bi-wrench-adjustable rk-text-green"></i>
-                <h6>Equipment Status</h6>
-                <a href="/admin/equipment" class="ms-auto rk-fs-12 rk-text-green text-decoration-none">
-                    Open <i class="bi bi-arrow-right"></i>
-                </a>
-            </div>
-
-            {% if fleet.total %}
-                <div class="chart-donut"><canvas id="fleetChart"></canvas></div>
-                <div class="mt-3">
-                    {% for value, count in fleet.counts.items() %}
-                    <div class="fleet-row">
-                        <a href="/admin/equipment?status={{ value }}" class="text-decoration-none">
-                            {% if value == 'available' %}
-                                <span class="status-pill status-operational">{{ fleet_labels[value] }}</span>
-                            {% elif value == 'deployed' %}
-                                <span class="badge bg-info text-dark">{{ fleet_labels[value] }}</span>
-                            {% elif value == 'under_repair' %}
-                                <span class="status-pill status-maintenance">{{ fleet_labels[value] }}</span>
-                            {% else %}
-                                <span class="status-pill status-unavailable">{{ fleet_labels[value] }}</span>
-                            {% endif %}
-                        </a>
-                        <span class="fleet-count">{{ count }}</span>
-                    </div>
-                    {% endfor %}
-                </div>
-            {% else %}
-                <div class="text-center text-muted py-4 rk-fs-13">
-                    No equipment recorded yet.
-                </div>
-            {% endif %}
-        </div>
-    </div>
-
-</div>
-
-<!-- ── ROW 3: Category chart + Recent activity ────────────────── -->
-<div class="row g-3 mb-4 align-items-start">
-
     <div class="col-md-6">
-        <div class="dash-card">
-            <div class="card-title-row">
-                <i class="bi bi-bar-chart-fill rk-text-info"></i>
-                <h6>Inventory Items by Category</h6>
-            </div>
-            <canvas id="categoryChart" height="190"></canvas>
-        </div>
-    </div>
-
-    <div class="col-md-6">
-        <div class="dash-card rk-collapsible">
+        <div class="dash-card rk-collapsible h-100">
             <div class="rk-collapsible-toggle-row">
                 <button class="rk-collapsible-toggle" type="button" aria-expanded="true">
                     <i class="bi bi-chevron-down"></i>
@@ -245,7 +201,7 @@
                     Full Trail <i class="bi bi-arrow-right"></i>
                 </a>
             </div>
-            <div class="rk-collapsible-body">
+            <div class="rk-collapsible-body feed-scroll">
 
             {% if recent_logs %}
                 {% for log in recent_logs %}
@@ -277,6 +233,59 @@
                 </div>
             {% endif %}
             </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- ── ROW 3: Equipment Status + Inventory by Category (charts, matched size) -->
+<div class="row g-3 mb-4 align-items-stretch">
+
+    <div class="col-md-6">
+        <div class="dash-card h-100">
+            <div class="card-title-row">
+                <i class="bi bi-wrench-adjustable rk-text-green"></i>
+                <h6>Equipment Status</h6>
+                <a href="/admin/equipment" class="ms-auto rk-fs-12 rk-text-green text-decoration-none">
+                    Open <i class="bi bi-arrow-right"></i>
+                </a>
+            </div>
+
+            {% if fleet.total %}
+                <div class="chart-donut"><canvas id="fleetChart"></canvas></div>
+                <div class="mt-3">
+                    {% for value, count in fleet.counts.items() %}
+                    <div class="fleet-row">
+                        <a href="/admin/equipment?status={{ value }}" class="text-decoration-none">
+                            {% if value == 'available' %}
+                                <span class="status-pill status-operational">{{ fleet_labels[value] }}</span>
+                            {% elif value == 'deployed' %}
+                                <span class="status-pill status-info">{{ fleet_labels[value] }}</span>
+                            {% elif value == 'under_repair' %}
+                                <span class="status-pill status-maintenance">{{ fleet_labels[value] }}</span>
+                            {% else %}
+                                <span class="status-pill status-unavailable">{{ fleet_labels[value] }}</span>
+                            {% endif %}
+                        </a>
+                        <span class="fleet-count">{{ count }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="text-center text-muted py-4 rk-fs-13">
+                    No equipment recorded yet.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="dash-card h-100 d-flex flex-column">
+            <div class="card-title-row">
+                <i class="bi bi-bar-chart-fill rk-text-info"></i>
+                <h6>Inventory Items by Category</h6>
+            </div>
+            <div class="chart-fill"><canvas id="categoryChart"></canvas></div>
         </div>
     </div>
 
@@ -359,6 +368,8 @@ new Chart(document.getElementById('categoryChart'), {
     },
     options: {
         responsive: true,
+        // Fill the capped wrapper rather than forcing a square/default ratio.
+        maintainAspectRatio: false,
         plugins: { legend: { display: false } },
         scales: {
             y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: window.rkChartTheme().grid } },

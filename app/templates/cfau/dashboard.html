@@ -248,7 +248,7 @@
                             {% if value == 'available' %}
                                 <span class="status-pill status-operational">{{ fleet_labels[value] }}</span>
                             {% elif value == 'deployed' %}
-                                <span class="badge bg-info text-dark">{{ fleet_labels[value] }}</span>
+                                <span class="status-pill status-info">{{ fleet_labels[value] }}</span>
                             {% elif value == 'under_repair' %}
                                 <span class="status-pill status-maintenance">{{ fleet_labels[value] }}</span>
                             {% else %}

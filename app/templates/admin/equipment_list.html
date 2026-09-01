@@ -9,7 +9,7 @@
     {% if v in ('available', 'serviceable') %}
         <span class="status-pill status-operational">{{ label }}</span>
     {% elif v == 'deployed' %}
-        <span class="badge bg-info text-dark">{{ label }}</span>
+        <span class="status-pill status-info">{{ label }}</span>
     {% elif v == 'under_repair' %}
         <span class="status-pill status-maintenance">{{ label }}</span>
     {% elif v in ('unserviceable', 'not_serviceable') %}

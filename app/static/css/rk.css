@@ -30,7 +30,7 @@
 
     /* Base type scale — bumped up per defense feedback (small/illegible text) */
     --rk-fs-base: 15px;
-    --rk-fs-h1: clamp(22px, 2.4vw, 28px);
+    --rk-fs-h1: clamp(26px, 2.8vw, 34px);
 }
 
 /* ── Dark mode — toggled via [data-theme="dark"] on <html> ─────────── */
@@ -454,7 +454,7 @@ html.rk-sidebar-collapsed .main-content {
     /* The desktop collapse behavior (narrow rail) doesn't apply here —
        the toggle button now means "open/close the overlay" instead. */
     .sidebar-toggle .bi-chevron-double-left { display: none; }
-    .page-header h1 { font-size: 22px; }
+    .page-header h1 { font-size: 24px; }
     .stat-row, .row.g-3 { row-gap: 12px; }
     .rk-mobile-menu-btn { display: flex; }
 }
@@ -469,7 +469,7 @@ html.rk-no-anim .main-content { transition: none !important; }
 /* ── Page header ───────────────────────────────────────────── */
 .page-header { margin-bottom: 24px; }
 .page-header h1 { font-size: var(--rk-fs-h1); font-weight: 700; color: var(--rk-text); margin: 0; }
-.page-header p { color: var(--rk-muted); font-size: 16px; margin: 4px 0 0; }
+.page-header p { color: var(--rk-muted); font-size: 18px; margin: 4px 0 0; }
 .last-updated { font-size: 15px; color: var(--rk-muted); text-align: right; }
 
 /* ── Theme toggle (sun/moon) — sits beside the sidebar collapse button ── */
@@ -549,7 +549,12 @@ html.rk-no-anim .dash-card { transition: none !important; }
    floor above, so the card stayed ~220px tall — a big empty box below
    the header — even though .rk-collapsible-body was display:none.
    Drop the floor once collapsed; the card should hug its header only. */
-.dash-card.rk-collapsible[data-open="false"] { min-height: 0; height: auto; }
+/* !important because a collapsible paired with a taller sibling (e.g.
+   Stock Needing Attention beside Recent Logistics Activity) also carries
+   Bootstrap's .h-100 (itself !important) to match that sibling's height
+   while open — collapsing must still be able to override it and hug the
+   header, not stay stretched to the open sibling's height. */
+.dash-card.rk-collapsible[data-open="false"] { min-height: 0 !important; height: auto !important; }
 /* Full-width dash-cards stacked vertically (never paired beside a taller
    sibling) don't need the min-height floor above — it just pads out
    short sections with a large empty gap underneath the content. Used by
@@ -574,7 +579,7 @@ html.rk-no-anim .dash-card { transition: none !important; }
 #insightsMapRow.rk-insights-collapsed #mapCol { order: 2; }
 #insightsMapRow.rk-insights-collapsed #dashMap { height: 480px; }
 
-.stat-card .stat-label { font-size: 15px; color: var(--rk-muted); margin-bottom: 8px; }
+.stat-card .stat-label { font-size: 15px; color: var(--rk-text); margin-bottom: 8px; }
 .stat-card .stat-value { font-size: clamp(15px, 2vw, 26px); font-weight: 700; color: var(--rk-text); margin: 0; word-break: break-word; }
 .stat-card .stat-change { font-size: 15px; margin-top: 6px; }
 .stat-card .stat-icon {
@@ -642,7 +647,12 @@ html[data-theme="dark"] .status-info { background: #123a66; color: #93c5fd; }
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.03em;
-    color: var(--rk-muted);
+    /* Solid black (not the muted grey) so column labels read clearly at
+       a glance — this is the rule that actually governs every <th> in
+       every list/table page app-wide; .rk-th-soft on the <tr> above it
+       doesn't reach the <th> text color, since this selector is more
+       specific and wins. */
+    color: #000;
     border-bottom-width: 1px;
 }
 /* Numeric/quantity columns: right-align consistently instead of the
@@ -651,7 +661,7 @@ html[data-theme="dark"] .status-info { background: #123a66; color: #93c5fd; }
 .table th.text-end {
     font-variant-numeric: tabular-nums;
 }
-html[data-theme="dark"] .table thead th { color: var(--rk-muted); border-color: var(--rk-border); }
+html[data-theme="dark"] .table thead th { color: #fff; border-color: var(--rk-border); }
 html[data-theme="dark"] .table > :not(caption) > * > * { border-color: var(--rk-border); }
 
 /* ── Form fields — de-emphasize optional inputs app-wide ────────────
@@ -801,9 +811,10 @@ html[data-theme="dark"] .rk-th-sticky { background: var(--rk-surface); }
 .rk-date-divider { background: #f9fafb; }
 html[data-theme="dark"] .rk-date-divider { background: var(--rk-surface); }
 
-/* Soft uppercase table-header row (muted, letter-spaced) */
+/* Uppercase table-header row — bold and dark so column labels read
+   clearly at a glance rather than blending into the muted body text. */
 .rk-th-soft {
-    font-size: 15px; color: var(--rk-muted);
+    font-size: 15px; color: var(--rk-text); font-weight: 700;
     text-transform: uppercase; letter-spacing: 0.04em;
 }
 
@@ -936,9 +947,15 @@ html[data-theme="dark"] .rk-cat-system   { background: var(--rk-surface); color:
 /* Severity status pills (serviceability priority) */
 .rk-pill-high { background: #fde8e8; color: #c0392b; border: 1px solid #f4c2bd; }
 .rk-pill-med  { background: #fdebd0; color: #b9770e; border: 1px solid #f5cba7; }
+/* A deeper, more saturated gold — not the same pale amber as
+   .status-maintenance ("Submitted", "Under Repair", etc.) — so a
+   "Moderate" urgency pill never reads as the same status as those,
+   even sitting in the same or an adjacent column. */
+.rk-pill-moderate { background: #fde68a; color: #78350f; border: 1px solid #fbbf24; }
 .rk-pill-low  { background: #eef0f2; color: #6c757d; border: 1px solid #dee2e6; }
 html[data-theme="dark"] .rk-pill-high { background: #3a1f1f; color: #fca5a5; border-color: #6b3535; }
 html[data-theme="dark"] .rk-pill-med  { background: #3a2f0f; color: #fbd38d; border-color: #6b5a2f; }
+html[data-theme="dark"] .rk-pill-moderate { background: #4a3510; color: #fcd34d; border-color: #78500f; }
 html[data-theme="dark"] .rk-pill-low  { background: var(--rk-surface); color: var(--rk-muted); border-color: var(--rk-border); }
 
 /* Numbered rank circle (simulator priority list) */
@@ -1555,6 +1572,22 @@ html[data-theme="dark"] .rk-draft-banner i { color: #7dd3fc; }
 }
 .rk-bulk-toolbar.rk-open { display: flex; }
 html[data-theme="dark"] .rk-bulk-toolbar { background: #0d3c2a; }
+
+/* ── Checkboxes — app-wide ────────────────────────────────────
+   Bootstrap's default unchecked border (~1px, very light grey at
+   reduced opacity) reads as nearly invisible against a white card,
+   especially the row-select checkboxes sitting alone in their own
+   column. Darken and thicken the border for every checkbox in the
+   system, not just the table row-selects. */
+.form-check-input {
+    border: 1.5px solid #4b5563;
+}
+.form-check-input:checked {
+    border-color: var(--rk-green);
+}
+html[data-theme="dark"] .form-check-input {
+    border-color: #9aa3b2;
+}
 
 /* ── Row-select checkboxes — the header "select all" and per-row bulk
    checkboxes on tables like Vehicle & Equipment and Resources. Bootstrap's
