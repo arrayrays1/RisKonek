@@ -489,6 +489,47 @@ def simulator_results(request: Request, run_id: str, db: Session = Depends(get_d
     )
 
 
+@router.post("/results/{run_id}/regenerate-brief")
+def simulator_regenerate_brief(request: Request, run_id: str):
+    """Retry the AI planning brief for an already-computed run, without
+    re-running the simulation itself. Only reachable for a live (unsaved) run
+    still sitting in the store — a saved snapshot never calls Groq again, by
+    design (see saved_scenario_detail). Same failure handling as the
+    original /run call: any exception degrades to the same visible
+    'unavailable' note rather than a broken page."""
+    user = require_role(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
+
+    run = _RUN_STORE.get(run_id)
+    if run is None or run.get("user_id") != user["id"]:
+        return RedirectResponse(url="/admin/simulator/setup", status_code=303)
+
+    try:
+        raw_briefing = ai_layer.explain_simulation(run["result"])
+        parsed = ai_layer.parse_briefing(raw_briefing)
+        run["ai_briefing"] = ai_layer.to_safe_html(parsed["briefing_markdown"])
+        run["ai_actions"] = parsed["suggested_actions"]
+        run["ai_advisory_note"] = parsed["advisory_note"] or None
+        run["ai_note"] = None
+    except Exception as exc:
+        status = getattr(exc, "status_code", None)
+        if status == 429 or type(exc).__name__ == "RateLimitError":
+            run["ai_note"] = (
+                "The AI summary is temporarily unavailable (usage limit reached). "
+                "The numeric report below is complete and unaffected."
+            )
+        else:
+            run["ai_note"] = (
+                "The AI summary is temporarily unavailable. The numeric report "
+                "below is complete and unaffected."
+            )
+        run["ai_briefing"] = None
+        print(f"[simulator] AI briefing retry failed: {type(exc).__name__}")
+
+    return RedirectResponse(url=f"/admin/simulator/results/{run_id}", status_code=303)
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # SAVED SCENARIOS (frozen snapshots — save / view / delete)
 # ═══════════════════════════════════════════════════════════════════════════

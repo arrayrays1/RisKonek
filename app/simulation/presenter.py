@@ -145,6 +145,14 @@ def _row(cls, gap, status):
     is_surplus = status == "Adequate" and surplus > 0
     ui = SURPLUS_UI if is_surplus else STATUS_UI.get(status, STATUS_UI["Critical"])
 
+    # Real (uncapped) percent for surplus rows, so a 233%-covered resource can
+    # say "233%" instead of just filling the same bar as a 100%-covered one.
+    pct_uncapped = int(round(available / need * 100)) if need > 0 else 100
+    # Bar-fill floor: a resource with SOME stock (however little) should never
+    # render an empty-looking bar identical to zero stock. 1% is invisible on
+    # a 0-100 scale in practice, so floor any nonzero availability at 2%.
+    bar_pct = pct if pct > 0 else (2 if available > 0 else 0)
+
     unit = gap.get("unit", "") or "units"
     if shortfall > 0:
         note = (
@@ -169,6 +177,8 @@ def _row(cls, gap, status):
         "gap": shortfall,
         "surplus": surplus,
         "pct": pct,
+        "pct_uncapped": pct_uncapped,
+        "bar_pct": bar_pct,
         # Honest label for a non-zero but sub-1% coverage, which rounds to 0%.
         "pct_label": ("less than 1%" if (0 < ratio < 0.005) else f"{pct}%"),
         "status": status,

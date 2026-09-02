@@ -5,11 +5,12 @@
    `ai_briefing`, `ai_note`, `ai_actions` and `ai_advisory_note` from the parent
    context. The page-specific header/action row lives in each wrapper, NOT here.
 
-   Information order (most understandable first): assumptions disclaimer ->
-   scenario context -> overall readiness -> key figures -> what needs attention
-   -> suggested actions -> resource coverage -> detailed calculations ->
-   consequences -> AI brief. Everything below "Resource Coverage" is
-   collapsible detail.
+   Information order (most actionable first): assumptions disclaimer
+   (collapsed) -> scenario context -> overall readiness -> priority gaps
+   (what to act on, ranked) -> key figures -> suggested AI actions ->
+   resource coverage (each row expands in place for its full calculation —
+   there is no separate detailed-calculations table anymore) -> consequences
+   -> AI brief. Everything below "Resource Coverage" is collapsible detail.
 
    No inline style="" attributes (CSP): bar widths use the static .rk-w-p<0..100>
    utilities in rk.css. No inline on* handlers: disclosure uses Bootstrap's
@@ -19,54 +20,85 @@
 
 <div class="rk-sim-results">
 
-<!-- ── 1. Assumptions and limitations (disclaimer, always visible) ──────── -->
-{# Deliberately the FIRST thing on the page: every figure below is a planning
-   estimate, so the caveats must be read before the numbers, not after them. #}
+<!-- ── 0. Sticky quick-jump nav ──────────────────────────────────────────
+     A lightweight alternative to full tab panels: plain anchor links, so
+     every existing "See what needs attention" / "See which ones" jump link
+     elsewhere on this page keeps working unmodified, and the saved-scenario
+     view (admin/scenario_detail.html) and PDF export, which both reuse this
+     same partial, are unaffected — nothing here is hidden/shown by JS, it's
+     just position:sticky. Cuts the distance from "I want the AI brief" to
+     the AI brief from a full-page scroll to one tap. #}
+<nav class="rk-quicknav mb-3" aria-label="Jump to section">
+    {% if view.concerns %}
+    <a href="#rk-priority-h"><i class="bi bi-exclamation-octagon-fill" aria-hidden="true"></i> Priority</a>
+    {% endif %}
+    <a href="#rk-readiness-h"><i class="bi bi-speedometer2" aria-hidden="true"></i> Readiness</a>
+    <a href="#rk-figures-h"><i class="bi bi-grid-1x2-fill" aria-hidden="true"></i> Key Figures</a>
+    <a href="#rk-coverage-h"><i class="bi bi-bar-chart-steps" aria-hidden="true"></i> Coverage</a>
+    <a href="#rk-detail-h"><i class="bi bi-sliders" aria-hidden="true"></i> Details &amp; AI Brief</a>
+</nav>
+
+<!-- ── 1. Assumptions and limitations (disclaimer, collapsed by default) ─
+     Still the first thing in the DOM — every figure below is a planning
+     estimate, not a forecast — but a full paragraph of caveats no longer
+     has to be scrolled past before the reader sees a single result. A
+     one-line summary is always visible; the four supporting bullets are one
+     tap away and keyboard/screen-reader accessible via Bootstrap collapse. #}
 <section class="rk-disclaimer mb-3" aria-labelledby="rk-assumptions-h">
-    <h2 id="rk-assumptions-h" class="rk-h-section rk-disclaimer-title">
-        <i class="bi bi-exclamation-triangle-fill me-1" aria-hidden="true"></i>
-        Assumptions and Limitations
-    </h2>
-    <ul class="mb-0 rk-fs-13 rk-lh-16">
-        <li>
-            The affected population is an exposure estimate for
-            {{ result.inputs.barangay_name }} at its recorded
-            <span class="text-capitalize">{{ result.inputs.risk_level }}</span>
-            risk level over {{ result.inputs.horizon_days }} day(s) — not a forecast.
-        </li>
-        <li>
-            Availability figures are the quantities currently recorded in
-            RisKonek; stock held elsewhere is not counted.
-        </li>
-        <li>
-            Figures marked <strong>Assumption</strong> are adjustable CDRRMO
-            planning targets and can be changed in Planning Thresholds.
-        </li>
-        <li>
-            AI-generated text is advisory. CDRRMO personnel retain final
-            authority over every planning and deployment decision.
-        </li>
-    </ul>
+    <button type="button" class="rk-disclaimer-toggle d-flex align-items-center justify-content-between w-100 collapsed"
+            data-bs-toggle="collapse" data-bs-target="#rk-assumptions-body"
+            aria-expanded="false" aria-controls="rk-assumptions-body">
+        <span id="rk-assumptions-h" class="rk-h-section rk-disclaimer-title mb-0">
+            <i class="bi bi-exclamation-triangle-fill me-1" aria-hidden="true"></i>
+            Assumptions and Limitations
+            <span class="fw-normal rk-fs-12 text-muted d-none d-sm-inline">
+                — figures below are planning estimates, not a forecast
+            </span>
+        </span>
+        <i class="bi bi-chevron-down rk-disclaimer-chevron" aria-hidden="true"></i>
+    </button>
+    <div class="collapse" id="rk-assumptions-body">
+        <ul class="mb-0 mt-2 rk-fs-13 rk-lh-16">
+            <li>
+                The affected population is an exposure estimate for
+                {{ result.inputs.barangay_name }} at its recorded
+                <span class="text-capitalize">{{ result.inputs.risk_level }}</span>
+                risk level over {{ result.inputs.horizon_days }} day(s) — not a forecast.
+            </li>
+            <li>
+                Availability figures are the quantities currently recorded in
+                RisKonek; stock held elsewhere is not counted.
+            </li>
+            <li>
+                Figures marked <strong>Assumption</strong> are adjustable CDRRMO
+                planning targets and can be changed in Planning Thresholds.
+            </li>
+            <li>
+                AI-generated text is advisory. CDRRMO personnel retain final
+                authority over every planning and deployment decision.
+            </li>
+        </ul>
+    </div>
 </section>
 
 <!-- ── 2. Scenario context bar ─────────────────────────────────────────── -->
+{# Condensed from three full-width stat columns to one scannable line — the
+   barangay/disaster/period is context for reading the page, not a headline
+   figure in its own right, so it shouldn't compete with the hero below for
+   vertical space. The day-count used to be appended unconditionally
+   ("Jun 1-5 (5 days) (5 days)"); duration_label already spells out the day
+   count for calendar-picked runs, so the day-count span only renders for
+   legacy preset labels ("1 week") that don't already say so. #}
 <div class="dash-card rk-section mb-3">
-    <div class="row g-3 rk-scenario-bar">
-        <div class="col-md-4">
-            <div class="stat-label">Barangay</div>
-            <div class="fw-semibold">{{ result.inputs.barangay_name }}</div>
-        </div>
-        <div class="col-md-4">
-            <div class="stat-label">Disaster Type</div>
-            <div class="fw-semibold text-capitalize">{{ result.inputs.disaster_type }}</div>
-        </div>
-        <div class="col-md-4">
-            <div class="stat-label">Planning Period</div>
-            <div class="fw-semibold">
-                {{ result.duration_label }}
-                <span class="text-muted rk-fs-12">({{ result.inputs.horizon_days }} days)</span>
-            </div>
-        </div>
+    <div class="rk-scenario-line rk-fs-13">
+        <span class="fw-semibold">{{ result.inputs.barangay_name }}</span>
+        <span class="rk-scenario-sep" aria-hidden="true">·</span>
+        <span class="text-capitalize fw-semibold">{{ result.inputs.disaster_type }}</span>
+        <span class="rk-scenario-sep" aria-hidden="true">·</span>
+        <span>
+            {{ result.duration_label }}{% if 'day' not in (result.duration_label or '') %}
+            <span class="text-muted">({{ result.inputs.horizon_days }} days)</span>{% endif %}
+        </span>
     </div>
     {% if not result.hazard_recorded %}
     <div class="alert-banner mt-3 mb-0">
@@ -139,6 +171,40 @@
     </div>
 </section>
 
+<!-- ── 3b. Priority gaps ────────────────────────────────────────────────
+     The single most actionable block on the page: what to go get, ranked by
+     urgency, in front of the reader before any supporting figures or
+     narrative. Built from `view.concerns` (deterministic, engine-derived —
+     same ranking the presenter already computed for this purpose but that
+     had no home in the template before now), so it's available even when
+     the AI layer is down. Only renders when there's something to act on. #}
+{% if view.concerns %}
+<section class="dash-card rk-section rk-section-crit mb-3" aria-labelledby="rk-priority-h">
+    <div class="card-title-row">
+        <h2 id="rk-priority-h" class="rk-h-section">
+            <i class="bi bi-exclamation-octagon-fill me-1" aria-hidden="true"></i>
+            What Needs Attention First
+        </h2>
+    </div>
+    <ol class="rk-priority-list mb-0">
+        {% for r in view.concerns %}
+        <li class="rk-priority-item {{ r.accent }}">
+            <span class="status-pill {{ r.pill }}">{{ r.status_label }}</span>
+            <div>
+                <div class="fw-semibold rk-fs-14">{{ r.label }}</div>
+                <p class="text-muted rk-fs-13 mb-0 rk-lh-16">{{ r.note }}</p>
+            </div>
+        </li>
+        {% endfor %}
+    </ol>
+    {% if view.more_concerns %}
+    <a href="#rk-coverage-h" class="rk-fs-13 fw-semibold d-inline-block mt-2 text-decoration-none">
+        + {{ view.more_concerns | length }} more resource {{ 'gap' if view.more_concerns | length == 1 else 'gaps' }} below <i class="bi bi-arrow-down-short"></i>
+    </a>
+    {% endif %}
+</section>
+{% endif %}
+
 <!-- ── 4. Key figure cards ─────────────────────────────────────────────── -->
 <section class="mb-3" aria-labelledby="rk-figures-h">
     <h2 id="rk-figures-h" class="visually-hidden">Key figures</h2>
@@ -201,9 +267,10 @@
                     </span>
                 </div>
                 <div class="rk-fs-26 rk-fw-800 rk-num">{{ fig.critical_count }}</div>
-                <div class="rk-figure-dots my-2" aria-hidden="true">
+                <div class="rk-figure-dots my-2">
                     {% for r in view.rows %}
-                    <span class="rk-dot {{ 'rk-bg-red' if r.status == 'Critical' else ('rk-bg-amber' if r.status == 'Partial' else 'rk-bg-green') }}"></span>
+                    <span class="rk-dot {{ 'rk-bg-red' if r.status == 'Critical' else ('rk-bg-amber' if r.status == 'Partial' else 'rk-bg-green') }}"
+                          title="{{ r.label }}: {{ r.status_label }}" tabindex="0"></span>
                     {% endfor %}
                 </div>
                 <div class="text-muted rk-fs-12">
@@ -306,24 +373,34 @@
             <i class="bi bi-bar-chart-steps me-1" aria-hidden="true"></i>Resource Coverage
         </h2>
     </div>
+    {# Each card is now the single source of truth for one resource class:
+       the bar + status at a glance, and — one tap away — the exact
+       required/available/basis figures that used to live in a wholly
+       separate "Detailed Resource Calculations" table further down the
+       page, repeating these same six rows. That table is gone; this is it.
+
+       Two bar fixes vs. the old version: (1) a resource with SOME stock but
+       under 1% coverage (e.g. water here) used to render a bar
+       indistinguishable from zero — r.bar_pct floors any nonzero
+       availability at a visible 2% sliver. (2) a resource with a large
+       surplus used to fill the same capped 100% bar as one exactly at
+       100%, hiding how far over it actually is — the caption now states
+       the real, uncapped percentage for surplus rows. #}
     <div class="row g-3">
         {% for r in view.rows %}
         <div class="col-md-6">
             <div class="rk-mini-card {{ r.accent }} h-100">
                 <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-1">
-                    <span class="fw-semibold rk-fs-13">
-                        {{ r.label }}
-                        {% if r.gap > 0 %}
-                        <span class="d-block text-muted rk-fs-11">{{ r.technical_label }}</span>
-                        {% endif %}
-                    </span>
+                    <span class="fw-semibold rk-fs-13">{{ r.label }}</span>
                     <span class="d-flex align-items-center gap-2">
-                        <span class="rk-fs-12 text-muted rk-num">{{ r.pct_label }} covered</span>
+                        <span class="rk-fs-12 text-muted rk-num">
+                            {% if r.is_surplus %}{{ r.pct_uncapped }}%{% else %}{{ r.pct_label }}{% endif %} covered
+                        </span>
                         <span class="status-pill {{ r.pill }}">{{ r.status_label }}</span>
                     </span>
                 </div>
                 <div class="progress rk-h-10">
-                    <div class="progress-bar {{ r.bar }} rk-w-p{{ r.pct }}" role="progressbar"
+                    <div class="progress-bar {{ r.bar }} rk-w-p{{ r.bar_pct }}" role="progressbar"
                          aria-label="{{ r.label }} coverage"
                          aria-valuenow="{{ r.pct }}" aria-valuemin="0" aria-valuemax="100"></div>
                 </div>
@@ -336,6 +413,48 @@
                 {% if r.gap > 0 %}
                 <p class="text-muted rk-fs-12 mb-0 mt-1 rk-lh-16">{{ r.note }}</p>
                 {% endif %}
+
+                <button class="rk-row-expand-btn rk-fs-12 fw-semibold mt-2 collapsed" type="button"
+                        data-bs-toggle="collapse" data-bs-target="#rk-row-{{ r.key }}"
+                        aria-expanded="false" aria-controls="rk-row-{{ r.key }}">
+                    <span class="rk-when-collapsed">Show calculation <i class="bi bi-chevron-down"></i></span>
+                    <span class="rk-when-open">Hide calculation <i class="bi bi-chevron-down"></i></span>
+                </button>
+                <div class="collapse" id="rk-row-{{ r.key }}">
+                    <div class="rk-row-detail">
+                        <dl class="rk-row-detail-grid mb-2">
+                            <div>
+                                <dt>Required</dt>
+                                <dd class="rk-num">{{ "{:,}".format(r.need) }} {{ r.unit }}</dd>
+                            </div>
+                            <div>
+                                <dt>Available</dt>
+                                <dd class="rk-num">{{ "{:,}".format(r.available) }} {{ r.unit }}</dd>
+                            </div>
+                            <div>
+                                <dt>{{ 'Surplus' if r.gap == 0 else 'Additional needed' }}</dt>
+                                <dd class="rk-num {{ 'rk-text-crit' if r.gap > 0 else 'rk-text-ok' }}">
+                                    {% if r.gap > 0 %}{{ "{:,}".format(r.gap) }} {{ r.unit }}
+                                    {% elif r.surplus > 0 %}{{ "{:,}".format(r.surplus) }} {{ r.unit }}
+                                    {% else %}None — exactly covered{% endif %}
+                                </dd>
+                            </div>
+                            <div>
+                                <dt>Basis</dt>
+                                <dd>
+                                    {% if r.basis == 'standard' %}
+                                        <span class="badge bg-light text-dark border fw-normal">Standard</span>
+                                    {% else %}
+                                        <span class="badge bg-light text-secondary border fw-normal">Assumption</span>
+                                    {% endif %}
+                                </dd>
+                            </div>
+                        </dl>
+                        <p class="text-muted rk-fs-11 mb-0">
+                            Recorded field: <span class="rk-num">{{ r.technical_label }}</span>
+                        </p>
+                    </div>
+                </div>
             </div>
         </div>
         {% endfor %}
@@ -343,10 +462,15 @@
     <p class="text-muted rk-fs-12 mb-0 mt-2">
         Each bar shows coverage on its own 0–100% scale. Resource classes use
         different units and are not compared against one another.
+        <strong>Standard</strong> figures follow Sphere / DSWD guidance;
+        <strong>Assumption</strong> figures are adjustable CDRRMO planning
+        targets. Statuses use the system's readiness bands: below half of the
+        requirement is Critical, at least half is At Risk, and the full
+        requirement is Sufficient.
     </p>
 </section>
 
-<!-- ── 8–10. Detailed planning view (collapsed by default) ─────────────── -->
+<!-- ── Detailed planning view (collapsed by default) ────────────────────── -->
 <section class="mb-3" aria-labelledby="rk-detail-h">
     <div class="dash-card rk-section">
         <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
@@ -355,8 +479,9 @@
                     <i class="bi bi-sliders me-1" aria-hidden="true"></i>Detailed Planning View
                 </h2>
                 <p class="text-muted rk-fs-12 mb-0">
-                    Full calculations, potential consequences, the complete AI brief,
-                    and the assumptions behind each figure.
+                    Potential consequences and the complete AI planning brief.
+                    (Per-resource calculations are one tap away on each card in
+                    Resource Coverage above.)
                 </p>
             </div>
             <button class="btn btn-soft rk-fs-13 collapsed" type="button" data-bs-toggle="collapse"
@@ -369,75 +494,6 @@
     </div>
 
     <div class="collapse" id="rk-detail">
-        <!-- ── 8. Detailed resource calculations ───────────────────────── -->
-        <div class="dash-card rk-section mt-3">
-            <div class="card-title-row">
-                <h3 class="rk-h-section">
-                    <i class="bi bi-table me-1" aria-hidden="true"></i>Detailed Resource Calculations
-                </h3>
-            </div>
-            <div class="table-responsive">
-                <table class="table align-middle rk-detail-table">
-                    <caption class="visually-hidden">
-                        Estimated requirement, recorded availability, shortfall or
-                        surplus, calculation basis and status for each resource class.
-                    </caption>
-                    <thead>
-                        <tr>
-                            <th scope="col">Resource Availability</th>
-                            <th scope="col" class="text-end">Required</th>
-                            <th scope="col" class="text-end">Available</th>
-                            <th scope="col" class="text-end">Additional Amount Needed</th>
-                            <th scope="col">Basis</th>
-                            <th scope="col">Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for r in view.rows %}
-                        <tr class="{{ r.accent }}">
-                            <th scope="row" class="fw-normal">
-                                {{ r.label }}
-                                <span class="d-block text-muted rk-fs-11">
-                                    {{ r.technical_label }} ({{ r.unit }})
-                                </span>
-                            </th>
-                            <td class="text-end rk-num">{{ "{:,}".format(r.need) }}</td>
-                            <td class="text-end rk-num">{{ "{:,}".format(r.available) }}</td>
-                            <td class="text-end rk-num">
-                                {% if r.gap > 0 %}
-                                    <span class="rk-text-crit fw-semibold">{{ "{:,}".format(r.gap) }}</span>
-                                {% elif r.surplus > 0 %}
-                                    <span class="rk-text-ok fw-semibold">
-                                        None — {{ "{:,}".format(r.surplus) }} surplus
-                                    </span>
-                                {% else %}
-                                    <span class="rk-text-ok fw-semibold">None — exactly covered</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if r.basis == 'standard' %}
-                                    <span class="badge bg-light text-dark border">Standard</span>
-                                {% else %}
-                                    <span class="badge bg-light text-secondary border">Assumption</span>
-                                {% endif %}
-                            </td>
-                            <td><span class="status-pill {{ r.pill }}">{{ r.status_label }}</span></td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            <p class="text-muted mb-0 rk-fs-12 rk-lh-16">
-                <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
-                <strong>Standard</strong> figures follow Sphere / DSWD guidance.
-                <strong>Assumption</strong> figures are adjustable CDRRMO planning
-                targets, not standard-based requirements. Statuses use the
-                system's readiness bands: below half of the requirement is
-                Critical, at least half is At Risk, and the full requirement is
-                Sufficient.
-            </p>
-        </div>
-
         <!-- ── 9. Potential consequences if gaps remain ────────────────── -->
         {% if view.consequences or result.operational_risks %}
         <div class="dash-card rk-section mt-3">
@@ -498,9 +554,17 @@
                     <div class="ai-briefing rk-fs-14 rk-lh-16">{{ ai_briefing | safe }}</div>
                 </div>
             {% else %}
-                <div class="alert-banner mb-0">
+                <div class="alert-banner mb-0 flex-wrap">
                     <i class="bi bi-info-circle-fill" aria-hidden="true"></i>
                     <span>{{ ai_note or "The AI summary is unavailable. The numeric report above is complete and unaffected." }}</span>
+                    {% if run_id %}
+                    <form method="POST" action="/admin/simulator/results/{{ run_id }}/regenerate-brief" class="ms-auto">
+                        <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+                        <button type="submit" class="btn btn-soft rk-fs-12">
+                            <i class="bi bi-arrow-clockwise"></i> Try again
+                        </button>
+                    </form>
+                    {% endif %}
                 </div>
             {% endif %}
 

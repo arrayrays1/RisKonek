@@ -41,6 +41,7 @@ from app.services.geocoding import (
     is_within_san_pedro, get_san_pedro_bounds, get_san_pedro_boundary,
 )
 from app.services.contact_directory import build_directory_context
+from app.services import global_search
 from app.services.facility_details import (
     parse_coord as _parse_coord,
     find_duplicate_facility as _find_duplicate,
@@ -148,6 +149,18 @@ def api_nearby_landmarks(
 # as the dashboard). The old /dashboard URL redirects here for any stale
 # links/bookmarks.
 # ══════════════════════════════════════════════════════════════════════
+
+@router.get("/api/search")
+def api_global_search(request: Request, db: Session = Depends(get_db), q: Optional[str] = None):
+    """Sidebar global search (#rkSearchInput in base.html). See
+    app/services/global_search.py for why this route didn't exist before."""
+    user, barangay = _resolve_scope(request, db)
+    if isinstance(user, RedirectResponse):
+        return user
+    if not q or len(q.strip()) < 2:
+        return {"results": []}
+    return global_search.search_bdrrmo(db, q, barangay.id if barangay else None)
+
 
 @router.get("/dashboard")
 def dashboard(request: Request):

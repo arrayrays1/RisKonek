@@ -29,6 +29,7 @@ from app.services.facility_details import (
     EO_MOA_MOU_STATUSES,
 )
 from app.services.contact_directory import build_directory_context
+from app.services import global_search
 from app.utils.pagination import (
     paginate, parse_per_page, parse_page, build_base_query,
 )
@@ -1502,6 +1503,18 @@ def admin_facility_edit(
         f"Admin updated critical facility '{facility.name}' in {barangay.name}",
     )
     return RedirectResponse(url="/admin/map?success=Facility+updated", status_code=302)
+
+
+@router.get("/api/search")
+def api_global_search(request: Request, db: Session = Depends(get_db), q: Optional[str] = None):
+    """Sidebar global search (#rkSearchInput in base.html). See
+    app/services/global_search.py for why this route didn't exist before."""
+    user = require_role(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
+    if not q or len(q.strip()) < 2:
+        return {"results": []}
+    return global_search.search_admin(db, q)
 
 
 @router.get("/api/location-search")

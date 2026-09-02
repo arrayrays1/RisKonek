@@ -708,6 +708,10 @@ html[data-theme="dark"] .form-select:not(:required):not(:disabled):not(:focus) {
 .btn-rk:disabled, .btn-rk.disabled {
     background: #cbd5e1; box-shadow: none; opacity: 1; color: #fff;
 }
+html[data-theme="dark"] .btn-rk:disabled,
+html[data-theme="dark"] .btn-rk.disabled {
+    background: var(--rk-border); color: var(--rk-muted);
+}
 
 /* Soft "ghost" pill button — used for secondary row actions like
    "View Profile" so they read as calm, not competing with .btn-rk. */
@@ -725,7 +729,78 @@ html[data-theme="dark"] .btn-soft {
 }
 html[data-theme="dark"] .btn-soft:hover { background: var(--rk-border); }
 
-/* Rounded search bar used in list/filter toolbars */
+/* Plain inline-link button — for the lowest-emphasis action in a header row
+   (e.g. "New Simulation" next to a primary "Save Scenario"), so it reads as
+   available but clearly secondary rather than a second bordered button
+   competing for the same visual weight. */
+.btn-plain-link {
+    background: none; border: none; color: var(--rk-muted);
+    font-size: 12.5px; font-weight: 500;
+    padding: 6px 8px;
+    display: inline-flex; align-items: center; gap: 4px;
+    text-decoration: none;
+}
+.btn-plain-link:hover { color: var(--rk-text); text-decoration: underline; }
+
+/* ── Flatpickr (calendar range picker) — dark mode ────────────────────
+   The library ships light-only CSS from its CDN stylesheet and has no idea
+   the app has a theme toggle, so without this the popup calendar stays a
+   plain white box even when everything around it is dark. Restyled to the
+   app's own dark palette (--rk-surface/--rk-border/--rk-text) rather than
+   flatpickr's built-in "dark" theme, so it matches this page exactly
+   instead of introducing a third, slightly-different dark. Selected/range
+   days reuse --rk-green so the picker reads as part of this app, not a
+   generic embedded widget. */
+html[data-theme="dark"] .flatpickr-calendar {
+    background: var(--rk-surface);
+    border: 1px solid var(--rk-border);
+    box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+    color: var(--rk-text);
+}
+html[data-theme="dark"] .flatpickr-calendar.arrowTop:before { border-bottom-color: var(--rk-border); }
+html[data-theme="dark"] .flatpickr-calendar.arrowTop:after { border-bottom-color: var(--rk-surface); }
+html[data-theme="dark"] .flatpickr-months,
+html[data-theme="dark"] .flatpickr-weekdays { background: var(--rk-surface); }
+html[data-theme="dark"] .flatpickr-current-month,
+html[data-theme="dark"] .flatpickr-weekday {
+    color: var(--rk-text);
+    fill: var(--rk-text);
+}
+html[data-theme="dark"] .flatpickr-current-month input.cur-year,
+html[data-theme="dark"] .numInputWrapper span.arrowUp:after { border-bottom-color: var(--rk-text); }
+html[data-theme="dark"] .numInputWrapper span.arrowDown:after { border-top-color: var(--rk-text); }
+html[data-theme="dark"] .flatpickr-prev-month,
+html[data-theme="dark"] .flatpickr-next-month { color: var(--rk-muted); fill: var(--rk-muted); }
+html[data-theme="dark"] .flatpickr-prev-month:hover,
+html[data-theme="dark"] .flatpickr-next-month:hover { color: var(--rk-text); }
+html[data-theme="dark"] .flatpickr-prev-month:hover svg,
+html[data-theme="dark"] .flatpickr-next-month:hover svg { fill: var(--rk-text); }
+html[data-theme="dark"] .flatpickr-day { color: var(--rk-text); }
+html[data-theme="dark"] .flatpickr-day.flatpickr-disabled,
+html[data-theme="dark"] .flatpickr-day.flatpickr-disabled:hover,
+html[data-theme="dark"] .flatpickr-day.prevMonthDay,
+html[data-theme="dark"] .flatpickr-day.nextMonthDay { color: var(--rk-muted); opacity: 0.5; }
+html[data-theme="dark"] .flatpickr-day:hover,
+html[data-theme="dark"] .flatpickr-day:focus {
+    background: var(--rk-border); border-color: var(--rk-border); color: var(--rk-text);
+}
+html[data-theme="dark"] .flatpickr-day.today { border-color: var(--rk-green); }
+html[data-theme="dark"] .flatpickr-day.today:hover { background: var(--rk-green); color: #fff; }
+html[data-theme="dark"] .flatpickr-day.selected,
+html[data-theme="dark"] .flatpickr-day.startRange,
+html[data-theme="dark"] .flatpickr-day.endRange {
+    background: var(--rk-green); border-color: var(--rk-green); color: #fff;
+}
+html[data-theme="dark"] .flatpickr-day.selected:hover,
+html[data-theme="dark"] .flatpickr-day.startRange:hover,
+html[data-theme="dark"] .flatpickr-day.endRange:hover {
+    background: var(--rk-green-mid); border-color: var(--rk-green-mid);
+}
+html[data-theme="dark"] .flatpickr-day.inRange {
+    background: var(--rk-green-light); border-color: var(--rk-green-light);
+    box-shadow: -5px 0 0 var(--rk-green-light), 5px 0 0 var(--rk-green-light);
+    color: var(--rk-text);
+}
 .search-bar-rk .input-group-text { background: white; border-right: 0; border-radius: 10px 0 0 10px; }
 html[data-theme="dark"] .search-bar-rk .input-group-text,
 html[data-theme="dark"] .input-group-text.bg-white {
@@ -1668,7 +1743,7 @@ html[data-theme="dark"] .rk-ai-panel { background: var(--rk-surface); border-col
     border-left: 4px solid #ffc107; border-radius: 10px;
     padding: 14px 18px; color: #856404;
 }
-.rk-disclaimer-title { color: #7a5b00; margin-bottom: 8px; }
+.rk-disclaimer-title { color: #7a5b00; margin-bottom: 0; }
 .rk-disclaimer ul { padding-left: 20px; }
 .rk-disclaimer strong { color: #6b4e00; }
 html[data-theme="dark"] .rk-disclaimer {
@@ -1676,6 +1751,46 @@ html[data-theme="dark"] .rk-disclaimer {
 }
 html[data-theme="dark"] .rk-disclaimer-title { color: #ffe8a3; }
 html[data-theme="dark"] .rk-disclaimer strong { color: #ffe8a3; }
+/* Collapsed-by-default toggle header for the disclaimer: a plain button
+   styled to look like the section heading it replaces, so opening it never
+   feels like leaving the page's visual language. */
+.rk-disclaimer-toggle {
+    background: none; border: none; padding: 0; text-align: left; cursor: pointer;
+}
+.rk-disclaimer-chevron { color: #7a5b00; transition: transform 0.15s; flex: 0 0 auto; }
+.rk-disclaimer-toggle.collapsed .rk-disclaimer-chevron { transform: rotate(0deg); }
+.rk-disclaimer-toggle:not(.collapsed) .rk-disclaimer-chevron { transform: rotate(180deg); }
+html[data-theme="dark"] .rk-disclaimer-chevron { color: #ffe8a3; }
+
+/* Condensed one-line scenario context (barangay · disaster · period) */
+.rk-scenario-line { color: var(--rk-text); }
+.rk-scenario-sep { color: var(--rk-muted); margin: 0 8px; }
+
+/* ── Sticky quick-jump nav ─────────────────────────────────────────────
+   Plain anchor links, not JS-driven tabs: nothing on the page is hidden or
+   shown by this, so it can't get out of sync with print/PDF output or the
+   collapse-based disclosures elsewhere on the page. */
+.rk-quicknav {
+    position: sticky; top: 0; z-index: 40;
+    display: flex; align-items: center; gap: 4px; flex-wrap: nowrap;
+    overflow-x: auto; -webkit-overflow-scrolling: touch;
+    background: var(--rk-surface); border: 1px solid #e5e7eb; border-radius: 10px;
+    padding: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+html[data-theme="dark"] .rk-quicknav { border-color: var(--rk-border); }
+.rk-quicknav a {
+    flex: 0 0 auto;
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 12.5px; font-weight: 600; color: var(--rk-muted);
+    text-decoration: none; white-space: nowrap;
+    padding: 6px 12px; border-radius: 7px;
+}
+.rk-quicknav a:hover { background: #f3f4f6; color: var(--rk-text); }
+html[data-theme="dark"] .rk-quicknav a:hover { background: var(--rk-border); }
+/* Land just below the sticky nav instead of directly under it. */
+#rk-priority-h, #rk-readiness-h, #rk-figures-h, #rk-coverage-h, #rk-detail-h {
+    scroll-margin-top: 68px;
+}
 
 /* ── Readiness hero (status-tinted) ────────────────────────────
    Light status tints so the situation reads at a glance. Kept pale (not a
@@ -1736,10 +1851,42 @@ html[data-theme="dark"] .rk-hero-ok   .rk-hero-icon { background: #0d3c2a; color
 .rk-section-ok {
     background: #f2fbf5; border: 1px solid #cdeddb; border-left: 4px solid #047857;
 }
+.rk-section-crit {
+    background: #fef2f2; border: 1px solid #fbd5d5; border-left: 4px solid #dc2626;
+}
 html[data-theme="dark"] .rk-section-warn { background: #2a2210; border-color: #6b5a2f; }
 html[data-theme="dark"] .rk-section-ok   { background: #0f2919; border-color: #2f5c40; }
+html[data-theme="dark"] .rk-section-crit { background: #2a1414; border-color: #6b3535; }
 .rk-section-warn .rk-h-section { color: #92620b; }
 .rk-section-ok   .rk-h-section { color: #046c4e; }
+.rk-section-crit .rk-h-section { color: #b91c1c; }
+
+/* ── Priority gaps list (leads the page, above the fold) ─────────────── */
+.rk-priority-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
+.rk-priority-item {
+    display: flex; align-items: flex-start; gap: 12px;
+    background: #fff; border-radius: 8px; padding: 10px 12px;
+}
+html[data-theme="dark"] .rk-priority-item { background: var(--rk-surface); }
+.rk-priority-item .status-pill { flex: 0 0 auto; margin-top: 2px; }
+
+/* ── Expandable resource row (Resource Coverage ↔ detail merge) ──────── */
+.rk-row-expand-btn {
+    background: none; border: none; padding: 4px; color: var(--rk-muted);
+    line-height: 1; cursor: pointer;
+}
+.rk-row-expand-btn .bi { transition: transform 0.15s; }
+.rk-row-expand-btn:not(.collapsed) .bi { transform: rotate(180deg); }
+.rk-row-detail {
+    border-top: 1px dashed #e5e7eb; margin-top: 10px; padding-top: 10px;
+}
+html[data-theme="dark"] .rk-row-detail { border-top-color: var(--rk-border); }
+.rk-row-detail-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    gap: 8px 16px;
+}
+.rk-row-detail-grid dt { font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; color: var(--rk-muted); }
+.rk-row-detail-grid dd { font-size: 13px; font-weight: 600; margin-bottom: 0; }
 
 /* Detailed-calculations rows tinted by status. Bootstrap 5.3 cells paint
    var(--bs-table-bg), so setting it on the row is what actually tints the

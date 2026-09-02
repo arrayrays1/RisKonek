@@ -6,8 +6,10 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 <style nonce="{{ request.state.csp_nonce }}">
     /* Calendar range picker reuses the app's date-input sizing so it drops
-       into the form like any other .form-control. */
-    #date_range_display { background-color: #fff; cursor: pointer; }
+       into the form like any other .form-control. Colors are theme-aware
+       (not hardcoded white) — see the flatpickr dark-mode block in rk.css
+       for the popup itself. */
+    #date_range_display { cursor: pointer; }
     .flatpickr-calendar { box-shadow: 0 4px 14px rgba(0,0,0,0.15); }
 </style>
 {% endblock %}

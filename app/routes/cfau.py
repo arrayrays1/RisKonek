@@ -16,6 +16,7 @@ from app.utils.pagination import (
     paginate, parse_per_page, parse_page, build_base_query,
 )
 from app.services.contact_directory import build_directory_context
+from app.services import global_search
 from typing import Optional
 from datetime import date, datetime, timezone, timedelta
 import csv
@@ -100,6 +101,18 @@ def _is_admin(user) -> bool:
 # ══════════════════════════════════════════════════════════════════════
 # DASHBOARD
 # ══════════════════════════════════════════════════════════════════════
+
+@router.get("/api/search")
+def api_global_search(request: Request, db: Session = Depends(get_db), q: Optional[str] = None):
+    """Sidebar global search (#rkSearchInput in base.html). See
+    app/services/global_search.py for why this route didn't exist before."""
+    user = require_role(request, CFAU_ROLES)
+    if isinstance(user, RedirectResponse):
+        return user
+    if not q or len(q.strip()) < 2:
+        return {"results": []}
+    return global_search.search_cfau(db, q, user["id"], _is_admin(user))
+
 
 @router.get("/dashboard", response_class=HTMLResponse)
 def dashboard(request: Request, db: Session = Depends(get_db)):

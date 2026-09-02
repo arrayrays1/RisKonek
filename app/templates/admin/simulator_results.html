@@ -9,9 +9,9 @@
         <p>Advisory planning estimate — review and validate with CDRRMO personnel
            before any operational use.</p>
     </div>
-    <div class="d-flex gap-2">
+    <div class="d-flex gap-2 align-items-center">
         {% if saved_scenario_id %}
-        <a href="/admin/simulator/scenarios/{{ saved_scenario_id }}" class="btn btn-soft">
+        <a href="/admin/simulator/scenarios/{{ saved_scenario_id }}" class="btn btn-rk">
             <i class="bi bi-bookmark-check-fill"></i> View Saved Scenario
         </a>
         {% else %}
@@ -20,7 +20,10 @@
             <i class="bi bi-save"></i> Save Scenario
         </button>
         {% endif %}
-        <a href="/admin/simulator/setup" class="btn btn-soft">
+        {# Deliberately the lowest-emphasis action here: it's always available,
+           but starting over should never visually compete with saving this
+           run's results — see .btn-plain-link in rk.css. #}
+        <a href="/admin/simulator/setup" class="btn-plain-link">
             <i class="bi bi-arrow-repeat"></i> New Simulation
         </a>
     </div>
