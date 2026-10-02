@@ -12,7 +12,7 @@ from app.models import (
     DisasterType, Severity, FacilityType, FacilityStatus,
     UploadedReport, ReportStatus, FileType, LifecycleStatus, UploadEvent,
     add_upload_history, BarangayEquipment, EquipmentType,
-    IncidentReport, ServiceabilityStatus,
+    IncidentReport, ServiceabilityStatus, Resource, ResourceCategory
 )
 from app.auth import require_role, require_barangay_access
 from app.utils.pagination import (
@@ -2375,4 +2375,129 @@ def contacts_update(
     )
     return RedirectResponse(
         url="/bdrrmo/contacts?success=Contact+details+updated", status_code=302
+    )
+
+FOOD_TYPE_LABELS = {
+    "rice": "Rice",
+    "canned_goods": "Canned Goods",
+    "drinking_water": "Drinking Water",
+    "rte_meals": "Ready-to-Eat Meals",
+    "baby_food": "Baby Food",
+    "medical_nutrition": "Medical Nutrition",
+}
+FOOD_TYPE_CHOICES = list(FOOD_TYPE_LABELS.keys())
+
+_NEAR_EXPIRY_DAYS = 30
+
+def _resource_alert(r: Resource) -> str:
+    """Rule-based alert tier for a resource. Order matters: expired
+    beats near-expiry, and stock alerts are reported alongside expiry.
+    Returns one of: 'expired', 'near_expiry', 'low_stock', 'ok'.
+    """
+    today = date.today()
+    if r.is_perishable and r.expiry_date:
+        if r.expiry_date < today:
+            return "expired"
+        if r.expiry_date <= today + timedelta(days=_NEAR_EXPIRY_DAYS):
+            return "near_expiry"
+    if (r.quantity or 0) <= (r.restock_threshold or 0):
+        return "low_stock"
+    return "ok"
+
+def _resource_summary(resources):
+    """Counts for the dashboard cards at the top of the list page."""
+    total = len(resources)
+    low = sum(1 for r in resources if _resource_alert(r) == "low_stock")
+    near = sum(1 for r in resources if _resource_alert(r) == "near_expiry")
+    exp = sum(1 for r in resources if _resource_alert(r) == "expired")
+    return {"total": total, "low_stock": low, "near_expiry": near, "expired": exp}
+
+@router.get("/resources", response_class=HTMLResponse)
+def resources_list(
+    request: Request,
+    db: Session = Depends(get_db),
+    q: Optional[str] = None,
+    category: Optional[str] = None,
+    food_type: Optional[str] = None,
+    alert: Optional[str] = None,
+    archived: Optional[str] = None,
+    page: Optional[str] = None,
+    per_page: Optional[str] = None,
+):
+    user = require_role(request, ["bdrrmo"])
+    if isinstance(user, RedirectResponse):
+        return user
+
+    query = db.query(Resource)
+    show_archived = (archived == "1")
+    query = query.filter(Resource.is_archived == show_archived)
+
+    if q:
+        like = f"%{q.strip()}%"
+        query = query.filter(
+            (Resource.name.ilike(like)) | (Resource.storage_location.ilike(like))
+        )
+    if category and category in {c.value for c in ResourceCategory}:
+        query = query.filter(Resource.category == ResourceCategory(category))
+    if food_type and food_type in FOOD_TYPE_CHOICES:
+        query = query.filter(Resource.food_type == food_type)
+
+    rows = query.order_by(Resource.name).all()
+
+    # Alert filter is derived, so apply after SQL filtering.
+    if alert in ("low_stock", "near_expiry", "expired"):
+        rows = [r for r in rows if _resource_alert(r) == alert]
+
+    # Summary cards always reflect the full *active* inventory, not the
+    # filtered view — so users see the real backlog of issues.
+    active_inventory = db.query(Resource).filter(Resource.is_archived == False).all()
+    summary = _resource_summary(active_inventory)
+
+    view_rows = []
+    for r in rows:
+        view_rows.append({
+            "id": r.id,
+            "name": r.name,
+            "category": r.category.value if r.category else "",
+            "category_label": r.category.value.title() if r.category else "—",
+            "food_type": r.food_type or "",
+            "food_type_label": FOOD_TYPE_LABELS.get(r.food_type or "", ""),
+            "is_perishable": r.is_perishable,
+            "quantity": r.quantity or 0,
+            "unit": r.unit or "",
+            "storage_location": r.storage_location or "—",
+            "restock_threshold": r.restock_threshold or 0,
+            "expiry_date": r.expiry_date,
+            "is_archived": r.is_archived,
+            "alert": _resource_alert(r),
+            "last_updated": r.last_updated,
+        })
+
+    page_obj = paginate(view_rows, parse_page(page), parse_per_page(per_page))
+    base_query = build_base_query({
+        "q": q or "", "category": category or "", "food_type": food_type or "",
+        "alert": alert or "", "archived": "1" if show_archived else "",
+    })
+
+    return templates.TemplateResponse(
+        request=request,
+        name="bdrrmo/resources_list.html",
+        context={
+            "user": user,
+            "active_nav": "resources",
+            "rows": page_obj.items,
+            "page_obj": page_obj,
+            "base_query": base_query,
+            "summary": summary,
+            "categories": [c.value for c in ResourceCategory],
+            "food_types": [(v, FOOD_TYPE_LABELS[v]) for v in FOOD_TYPE_CHOICES],
+            "f_q": q or "",
+            "f_category": category or "",
+            "f_food_type": food_type or "",
+            "f_alert": alert or "",
+            "f_archived": "1" if show_archived else "",
+            "show_archived": show_archived,
+            # Default + max for the stock modal's date-time field (PHT).
+            "now_local": datetime.now(_PHT).strftime("%Y-%m-%dT%H:%M"),
+        },
     )
