@@ -201,7 +201,7 @@
                            class="btn-soft" title="Edit">
                             <i class="bi bi-pencil"></i>
                         </a>
-                        <form method="POST" action="/admin/resources/{{ r.id }}/archive" class="d-inline"
+                        <form method="POST" action="/bdrrmo/resources/{{ r.id }}/archive" class="d-inline"
                               data-confirm='Archive {{ r.name }}?'>
                             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                             <button type="submit" class="btn-soft rk-text-amber" title="Archive">
@@ -209,7 +209,7 @@
                             </button>
                         </form>
                         {% else %}
-                        <form method="POST" action="/admin/resources/{{ r.id }}/archive" class="d-inline">
+                        <form method="POST" action="/bdrrmo/resources/{{ r.id }}/archive" class="d-inline">
                             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                             <button type="submit" class="btn-soft rk-text-ok">
                                 <i class="bi bi-arrow-counterclockwise"></i> Restore
