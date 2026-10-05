@@ -2424,13 +2424,13 @@ def resources_list(
     page: Optional[str] = None,
     per_page: Optional[str] = None,
 ):
-    user = require_role(request, ["bdrrmo"])
+    user, _ = _resolve_scope(request, db)
     if isinstance(user, RedirectResponse):
         return user
 
     query = db.query(Resource)
     show_archived = (archived == "1")
-    query = query.filter(Resource.is_archived == show_archived)
+    query = query.filter(Resource.is_archived == show_archived, Resource.barangay_id == user['barangay_id'])
 
     if q:
         like = f"%{q.strip()}%"
@@ -2458,6 +2458,7 @@ def resources_list(
         view_rows.append({
             "id": r.id,
             "name": r.name,
+            "barangay_id": r.barangay_id,
             "category": r.category.value if r.category else "",
             "category_label": r.category.value.title() if r.category else "—",
             "food_type": r.food_type or "",
