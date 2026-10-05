@@ -2450,7 +2450,7 @@ def resources_list(
 
     # Summary cards always reflect the full *active* inventory, not the
     # filtered view — so users see the real backlog of issues.
-    active_inventory = db.query(Resource).filter(Resource.is_archived == False).all()
+    active_inventory = db.query(Resource).filter(Resource.is_archived == False, Resource.barangay_id == user['barangay_id']).all()
     summary = _resource_summary(active_inventory)
 
     view_rows = []
