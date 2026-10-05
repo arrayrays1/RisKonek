@@ -2715,3 +2715,105 @@ def resource_edit(
         url="/bdrrmo/resources?success=Resource+updated+successfully",
         status_code=302,
     )
+
+def _movement_fields(reason, deployed_to, occurred_at, location_required):
+    """Validate and normalise the accountability fields. Returns
+    (values, error): `error` is a user-facing message when validation
+    fails, otherwise None. Mirrors the client-side rules in rk-forms.js —
+    JS is convenience, this is the enforcement."""
+    r = (reason or "").strip()
+    if len(r) < 3:
+        return None, "Reason is required (at least 3 characters)."
+
+    loc = (deployed_to or "").strip() or None
+    if location_required and not loc:
+        return None, "Deployment location is required for this change."
+
+    raw = (occurred_at or "").strip()
+    if not raw:
+        return None, "Date and time is required."
+    try:
+        # <input type="datetime-local"> submits "YYYY-MM-DDTHH:MM" (PHT,
+        # as typed by the user); seconds may be appended by some browsers.
+        local = datetime.strptime(raw[:16], "%Y-%m-%dT%H:%M")
+    except ValueError:
+        return None, "Invalid date and time."
+
+    # Stored UTC-naive, like every other timestamp in the system.
+    dt_utc = local.replace(tzinfo=_PHT).astimezone(timezone.utc).replace(tzinfo=None)
+    if dt_utc > datetime.utcnow() + timedelta(minutes=5):
+        return None, "Date and time cannot be in the future."
+
+    return {"reason": r, "deployed_to": loc, "occurred_at": dt_utc}, None
+
+@router.post("/resources/{resource_id}/stock")
+def resource_stock_change(
+    resource_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    action: str = Form(...),       # "add" or "deduct"
+    amount: int = Form(...),
+    reason: str = Form(""),
+    deployed_to: str = Form(""),
+    occurred_at: str = Form(""),
+):
+    user, _ = _resolve_scope(request, db)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    r = db.query(Resource).filter(Resource.id == resource_id).first()
+    if not r:
+        return RedirectResponse(url="/bdrrmo/resources", status_code=302)
+
+    if action not in ("add", "deduct"):
+        return RedirectResponse(
+            url="/bdrrmo/resources?error=Invalid+stock+action", status_code=302
+        )
+    if not amount or amount <= 0:
+        return RedirectResponse(
+            url=f"/bdrrmo/resources/{resource_id}/edit?error=Amount+must+be+positive",
+            status_code=302,
+        )
+
+    # Deducting stock moves goods somewhere, so a destination is required;
+    # adding stock (supplier delivery, returned goods) does not need one.
+    movement, err = _movement_fields(
+        reason, deployed_to, occurred_at, location_required=(action == "deduct")
+    )
+    if err:
+        return RedirectResponse(
+            url=f"/bdrrmo/resources?error={quote_plus(err)}", status_code=302
+        )
+
+    before = r.quantity or 0
+    if action == "add":
+        after = before + amount
+        verb = "stock_added"
+    else:
+        if amount > before:
+            return RedirectResponse(
+                url=f"/bdrrmo/resources/{resource_id}/edit?error=Cannot+deduct+more+than+current+stock",
+                status_code=302,
+            )
+        after = before - amount
+        verb = "stock_deducted"
+
+    r.quantity = after
+    r.updated_by = user["id"]
+    db.commit()
+
+    note = f" — reason: {movement['reason']}"
+    if movement["deployed_to"]:
+        note += f"; deployed to: {movement['deployed_to']}"
+    log_action(
+        db, user["id"], verb, "resources", r.id,
+        f"Resource '{r.name}' quantity {before} → {after} ({'+' if action == 'add' else '-'}{amount} {r.unit or ''}){note}",
+        reason=movement["reason"],
+        deployed_to=movement["deployed_to"],
+        occurred_at=movement["occurred_at"],
+    )
+
+    return RedirectResponse(
+        url=f"/bdrrmo/resources?success=Stock+{'added' if action == 'add' else 'deducted'}+successfully",
+        status_code=302,
+    )
