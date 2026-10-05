@@ -2817,3 +2817,34 @@ def resource_stock_change(
         url=f"/bdrrmo/resources?success=Stock+{'added' if action == 'add' else 'deducted'}+successfully",
         status_code=302,
     )
+
+@router.post("/resources/{resource_id}/archive")
+def resource_archive_toggle(
+    resource_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    user, _ = _resolve_scope(request, db)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    r = db.query(Resource).filter(Resource.id == resource_id).first()
+    if not r:
+        return RedirectResponse(url="/bdrrmo/resources", status_code=302)
+
+    r.is_archived = not bool(r.is_archived)
+    r.updated_by = user["id"]
+    db.commit()
+
+    verb = "archived" if r.is_archived else "restored"
+    log_action(
+        db, user["id"], verb, "resources", r.id,
+        f"Resource '{r.name}' {verb}.",
+    )
+
+    url = (
+        f"/bdrrmo/resources?archived=1&success=Resource+{verb}"
+        if r.is_archived
+        else f"/bdrrmo/resources?success=Resource+{verb}"
+    )
+    return RedirectResponse(url=url, status_code=302)
