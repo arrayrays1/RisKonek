@@ -228,6 +228,7 @@ for r in resources_data:
 
         resource = Resource(
             name=r["name"],
+            barangay_id=random.randint(1, 27),
             category=r["category"],
             is_perishable=r["perishable"],
             quantity=r["qty"],
