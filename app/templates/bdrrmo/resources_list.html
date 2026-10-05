@@ -240,7 +240,7 @@
 {% if not r.is_archived %}
 <div class="modal fade" id="stockModal-{{ r.id }}" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog">
-    <form method="POST" action="/admin/resources/{{ r.id }}/stock" class="modal-content" data-validate>
+    <form method="POST" action="/bdrrmo/resources/{{ r.id }}/stock" class="modal-content" data-validate>
             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
       <div class="modal-header">
         <h6 class="modal-title">Stock change — {{ r.name }}</h6>
