@@ -3232,6 +3232,32 @@ def equipment_status_change(
         status_code=302,
     )
 
+@router.post("/equipment_bdrrmo/{equipment_id}/archive")
+def equipment_archive_toggle(
+    equipment_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    user, _ = _resolve_scope(request, db)
+    if isinstance(user, RedirectResponse):
+        return user
+    e = db.query(Equipment).filter(Equipment.id == equipment_id).first()
+    if not e:
+        return RedirectResponse(url="/bdrrmo/equipment_bdrrmo", status_code=302)
+
+    e.is_archived = not bool(e.is_archived)
+    db.commit()
+
+    verb = "archived" if e.is_archived else "restored"
+    log_action(
+        db, user["id"], verb, "equipment", e.id,
+        f"Equipment '{e.name}' {verb}.",
+    )
+
+    url = "/bdrrmo/equipment_bdrrmo?archived=1&success=" + verb.title() if e.is_archived \
+        else "/bdrrmo/equipment_bdrrmo?success=" + verb.title()
+    return RedirectResponse(url=url, status_code=302)
+
 _REPAIR_OPEN_STATUSES = {"under_repair", "unserviceable", "not_serviceable"}
 
 def repair_reminder_state(report, today=None):
