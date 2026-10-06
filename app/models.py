@@ -161,6 +161,7 @@ class Barangay(Base):
     uploaded_reports = relationship("UploadedReport", back_populates="barangay")
     equipment_items = relationship("BarangayEquipment", back_populates="barangay")
     resources = relationship("Resource", back_populates="barangay")
+    equipment = relationship("Equipment", back_populates="barangay")
 
 # ==========================
 # TABLE 2: Users (4 roles)
@@ -378,6 +379,7 @@ class Equipment(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     assigned_to = Column(Integer, ForeignKey("users.id"), nullable=True)
+    barangay_id = Column(Integer, ForeignKey("barangays.id"), nullable=False)
     name = Column(String(150), nullable=False)
     equipment_type = Column(Enum(EquipmentType), nullable=False)
     status = Column(Enum(EquipmentStatus), default=EquipmentStatus.serviceable)
@@ -389,6 +391,7 @@ class Equipment(Base):
     #relationships
     assigned_to_user = relationship("User")
     equipment_reports = relationship("EquipmentReport", back_populates="equipment")
+    barangay = relationship("Barangay", back_populates="equipment")
 
 # ==========================
 # TABLE 8: Equipment Reports
