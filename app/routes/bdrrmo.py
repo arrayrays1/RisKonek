@@ -3175,6 +3175,63 @@ def equipment_edit(
         status_code=302,
     )
 
+@router.post("/equipment_bdrrmo/{equipment_id}/status")
+def equipment_status_change(
+    equipment_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    status: str = Form(...),
+    reason: str = Form(""),
+    deployed_to: str = Form(""),
+    occurred_at: str = Form(""),
+):
+    user, _ = _resolve_scope(request, db)
+    if isinstance(user, RedirectResponse):
+        return user
+    e = db.query(Equipment).filter(Equipment.id == equipment_id).first()
+    if not e:
+        return RedirectResponse(url="/bdrrmo/equipment_bdrrmo", status_code=302)
+
+    if status not in EQUIPMENT_STATUS_CHOICES:
+        return RedirectResponse(
+            url="/bdrrmo/equipment_bdrrmo?error=Invalid+status", status_code=302
+        )
+
+    old = e.status.value if e.status else "—"
+    if status == old:
+        return RedirectResponse(
+            url="/bdrrmo/equipment_bdrrmo?success=Status+unchanged", status_code=302
+        )
+
+    # A unit going to "deployed" must name where; repairs and returns
+    # to the motorpool may leave the location blank.
+    movement, err = _movement_fields(
+        reason, deployed_to, occurred_at, location_required=(status == "deployed")
+    )
+    if err:
+        return RedirectResponse(
+            url=f"/bdrrmo/equipment_bdrrmo?error={quote_plus(err)}", status_code=302
+        )
+
+    e.status = EquipmentStatus(status)
+    db.commit()
+
+    note = f" — reason: {movement['reason']}"
+    if movement["deployed_to"]:
+        note += f"; deployed to: {movement['deployed_to']}"
+    log_action(
+        db, user["id"], "status_changed", "equipment", e.id,
+        f"Equipment '{e.name}' status {old} → {status}{note}",
+        reason=movement["reason"],
+        deployed_to=movement["deployed_to"],
+        occurred_at=movement["occurred_at"],
+    )
+
+    return RedirectResponse(
+        url="/bdrrmo/equipment_bdrrmo?success=Status+updated+successfully",
+        status_code=302,
+    )
+
 _REPAIR_OPEN_STATUSES = {"under_repair", "unserviceable", "not_serviceable"}
 
 def repair_reminder_state(report, today=None):
