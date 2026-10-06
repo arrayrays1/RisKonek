@@ -178,16 +178,16 @@
                            class="btn btn-outline-secondary btn-sm">
                             <i class="bi bi-pencil"></i>
                         </a>
-                        <form method="POST" action="/admin/equipment/{{ e.id }}/archive" class="d-inline"
+                        <form method="POST" action="/bdrrmo/equipment_bdrrmo/{{ e.id }}/archive" class="d-inline"
                               data-confirm='Archive {{ e.name }}?'>
-            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+                            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                             <button type="submit" class="btn btn-outline-warning btn-sm">
                                 <i class="bi bi-archive"></i>
                             </button>
                         </form>
                         {% else %}
-                        <form method="POST" action="/admin/equipment/{{ e.id }}/archive" class="d-inline">
-            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+                        <form method="POST" action="/bdrrmo/equipment_bdrrmo/{{ e.id }}/archive" class="d-inline">
+                            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                             <button type="submit" class="btn btn-outline-success btn-sm">
                                 <i class="bi bi-arrow-counterclockwise"></i> Restore
                             </button>
