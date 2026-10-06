@@ -5,6 +5,8 @@
 
 {% set active_nav = 'equipment' %}
 
+{% set equipment_route = '/bdrrmo/equipment_bdrrmo' %}
+
 {% macro status_pill(v, label) -%}
     {% if v in ('available', 'serviceable') %}
         <span class="status-pill status-operational">{{ label }}</span>
@@ -95,7 +97,7 @@
 
 <!-- ── Filters ────────────────────────────────────────────────── -->
 <div class="dash-card mb-3">
-    <form method="GET" action="/admin/equipment" class="row g-2 align-items-end js-live-filter">
+    <form method="GET" action={{equipment_route}} class="row g-2 align-items-end js-live-filter">
         <div class="col-md-4">
             <label class="form-label small fw-semibold mb-1">Search</label>
             <input type="text" name="q" value="{{ f_q }}" class="form-control form-control-sm"
@@ -127,7 +129,7 @@
             </select>
         </div>
         <div class="col-md-1 d-grid">
-            <a href="/admin/equipment" class="btn btn-outline-secondary btn-sm" title="Reset filters">
+            <a href={{equipment_route}} class="btn btn-outline-secondary btn-sm" title="Reset filters">
                 <i class="bi bi-x-circle"></i>
             </a>
         </div>
@@ -198,7 +200,7 @@
                     <td colspan="7" class="text-center text-muted py-4">
                         No equipment matches your filters.
                         {% if f_q or f_type or f_status or f_archived %}
-                        <a href="/admin/equipment" class="ms-2">Clear filters</a>
+                        <a href={{equipment_route}} class="ms-2">Clear filters</a>
                         {% endif %}
                     </td>
                 </tr>
@@ -208,7 +210,7 @@
     </div>
 </div>
 
-{{ pager(page_obj, "/admin/equipment", base_query) }}
+{{ pager(page_obj, equipment_route, base_query) }}
 
 <!-- ── Status change modals ───────────────────────────────────── -->
 {% for e in rows %}
