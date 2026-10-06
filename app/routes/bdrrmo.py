@@ -3009,6 +3009,88 @@ def equipment_list(
         },
     )
 
+@router.get("/equipment_bdrrmo/new", response_class=HTMLResponse)
+def equipment_new_form(request: Request, db: Session = Depends(get_db)):
+    user, _ = _resolve_scope(request, db)
+    if isinstance(user, RedirectResponse):
+        return user
+    return templates.TemplateResponse(
+        request=request,
+        name="bdrrmo/equipment_form.html",
+        context={
+            "user": user,
+            "active_nav": "equipment",
+            "edit_mode": False,
+            "target": None,
+            "types": [(t.value, EQUIPMENT_TYPE_LABELS.get(t.value, t.value.title()))
+                      for t in EquipmentType],
+            "status_choices": [(v, EQUIPMENT_STATUS_LABELS[v]) for v in EQUIPMENT_STATUS_CHOICES],
+            "error": None,
+        },
+    )
+
+
+@router.post("/equipment_bdrrmo/new")
+def equipment_create(
+    request: Request,
+    db: Session = Depends(get_db),
+    name: str = Form(...),
+    equipment_type: str = Form(...),
+    status: str = Form("available"),
+    plate_or_serial: str = Form(""),
+    last_inspected: str = Form(""),
+):
+    user, _ = _resolve_scope(request, db)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    def render_error(msg):
+        return templates.TemplateResponse(
+            request=request,
+            name="bdrrmo/equipment_form.html",
+            context={
+                "user": user,
+                "active_nav": "equipment",
+                "edit_mode": False,
+                "target": None,
+                "types": [(t.value, EQUIPMENT_TYPE_LABELS.get(t.value, t.value.title()))
+                          for t in EquipmentType],
+                "status_choices": [(v, EQUIPMENT_STATUS_LABELS[v]) for v in EQUIPMENT_STATUS_CHOICES],
+                "error": msg,
+            },
+        )
+
+    name = name.strip()
+    if not name:
+        return render_error("Equipment name is required.")
+    if equipment_type not in {t.value for t in EquipmentType}:
+        return render_error("Invalid equipment type.")
+    if status not in {s.value for s in EquipmentStatus}:
+        status = "available"
+
+    e = Equipment(
+        name=name,
+        barangay_id=user['barangay_id'],
+        equipment_type=EquipmentType(equipment_type),
+        status=EquipmentStatus(status),
+        plate_or_serial=plate_or_serial.strip() or None,
+        last_inspected=_parse_date_or_none(last_inspected),
+        is_archived=False,
+    )
+    db.add(e)
+    db.commit()
+    db.refresh(e)
+
+    log_action(
+        db, user["id"], "created", "equipment", e.id,
+        f"Created equipment '{e.name}' ({e.equipment_type.value}, status={e.status.value})",
+    )
+
+    return RedirectResponse(
+        url="/bdrrmo/equipment_bdrrmo?success=Equipment+created+successfully",
+        status_code=302,
+    )
+
 _REPAIR_OPEN_STATUSES = {"under_repair", "unserviceable", "not_serviceable"}
 
 def repair_reminder_state(report, today=None):
