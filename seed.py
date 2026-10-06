@@ -274,6 +274,7 @@ for e in equipment_data:
     if not existing:
         equip = Equipment(
             name=e["name"],
+            barangay_id=random.randint(1, 27),
             equipment_type=e["type"],
             status=e["status"],
             plate_or_serial=e["serial"],
