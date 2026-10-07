@@ -296,7 +296,7 @@
     btn.addEventListener('click', function () {
         var sel = checked();
         if (sel.length !== 2) return;
-        window.location.href = '/admin/simulator/scenarios/compare?a='
+        window.location.href = '/bdrrmo/simulator/scenarios/compare?a='
             + encodeURIComponent(sel[0].value) + '&b=' + encodeURIComponent(sel[1].value);
     });
 })();
