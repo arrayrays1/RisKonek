@@ -716,7 +716,7 @@ def saved_scenario_pdf(
     row = db.query(SavedScenario).filter(SavedScenario.id == scenario_id).first()
     if row is None:
         return RedirectResponse(
-            url="/admin/simulator/setup?"
+            url="/bdrrmo/simulator/setup?"
                 + urlencode({"error": "Saved scenario not found."}),
             status_code=303,
         )
