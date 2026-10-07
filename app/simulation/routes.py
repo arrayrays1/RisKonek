@@ -596,13 +596,13 @@ def saved_scenario_compare(
     ida, idb = _coerce(a), _coerce(b)
     if ida is None or idb is None:
         return RedirectResponse(
-            url="/admin/simulator/setup?"
+            url="/bdrrmo/simulator/setup?"
                 + urlencode({"error": "Select two scenarios to compare."}),
             status_code=303,
         )
     if ida == idb:
         return RedirectResponse(
-            url="/admin/simulator/setup?"
+            url="/bdrrmo/simulator/setup?"
                 + urlencode({"error": "Select two different scenarios to compare."}),
             status_code=303,
         )
@@ -611,7 +611,7 @@ def saved_scenario_compare(
     sb = db.query(SavedScenario).filter(SavedScenario.id == idb).first()
     if sa is None or sb is None:
         return RedirectResponse(
-            url="/admin/simulator/setup?"
+            url="/bdrrmo/simulator/setup?"
                 + urlencode({"error": "One or both scenarios were not found."}),
             status_code=303,
         )
@@ -651,7 +651,7 @@ def saved_scenario_compare(
 
     return templates.TemplateResponse(
         request=request,
-        name="admin/scenario_compare.html",
+        name="bdrrmo/scenario_compare.html",
         context={
             "title": "Compare Scenarios — RisKonek",
             "user": user,
