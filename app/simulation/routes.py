@@ -481,13 +481,13 @@ def simulator_save(
 
     run = _RUN_STORE.get(run_id)
     if run is None or run.get("user_id") != user["id"]:
-        return RedirectResponse(url="/admin/simulator/setup", status_code=303)
+        return RedirectResponse(url="/bdrrmo/simulator/setup", status_code=303)
 
     # Already saved (double-submit / refresh) → go to the existing record.
     existing_id = run.get("saved_scenario_id")
     if existing_id:
         return RedirectResponse(
-            url=f"/admin/simulator/scenarios/{existing_id}?"
+            url=f"/bdrrmo/simulator/scenarios/{existing_id}?"
                 + urlencode({"success": "This run was already saved."}),
             status_code=303,
         )
@@ -530,7 +530,7 @@ def simulator_save(
     )
 
     return RedirectResponse(
-        url=f"/admin/simulator/scenarios/{scenario.id}?"
+        url=f"/bdrrmo/simulator/scenarios/{scenario.id}?"
             + urlencode({"success": "Scenario saved."}),
         status_code=303,
     )
@@ -676,7 +676,7 @@ def saved_scenario_detail(
     row = db.query(SavedScenario).filter(SavedScenario.id == scenario_id).first()
     if row is None:
         return RedirectResponse(
-            url="/admin/simulator/setup?"
+            url="/bdrrmo/simulator/setup?"
                 + urlencode({"error": "Saved scenario not found."}),
             status_code=303,
         )
@@ -687,7 +687,7 @@ def saved_scenario_detail(
 
     return templates.TemplateResponse(
         request=request,
-        name="admin/scenario_detail.html",
+        name="bdrrmo/scenario_detail.html",
         context={
             "title": f"{row.name} — Saved Scenario — RisKonek",
             "user": user,
