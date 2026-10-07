@@ -143,7 +143,7 @@ def simulator_setup(
     # Compact by default: 10 most recent, with a "View all" toggle so the form
     # stays visible at the top.
     show_all = request.query_params.get("all") == "1"
-    saved_q = db.query(SavedScenario).order_by(SavedScenario.created_at.desc())
+    saved_q = db.query(SavedScenario).filter(SavedScenario.barangay_id == user['barangay_id']).order_by(SavedScenario.created_at.desc())
     total_saved = saved_q.count()
     rows = saved_q.all() if show_all else saved_q.limit(10).all()
     saved_rows = [
@@ -222,7 +222,6 @@ def simulator_setup(
 def simulator_run(
     request: Request,
     db: Session = Depends(get_db),
-    barangay_id: int = Form(...),
     disaster_type: str = Form(...),
     duration: str = Form(...),
 ):
@@ -238,7 +237,7 @@ def simulator_run(
     # Validate the submitted scenario (disaster type + duration + barangay id).
     try:
         scenario = ScenarioInput(
-            barangay_id=barangay_id,
+            barangay_id=user['barangay_id'],
             disaster_type=disaster_type,
             duration=duration,
         )
@@ -255,7 +254,7 @@ def simulator_run(
     # ── Population — latest record for this barangay ──────────────────────
     pop = (
         db.query(Population)
-        .filter(Population.barangay_id == barangay.id)
+        .filter(Population.barangay_id == user['barangay_id'])
         .order_by(Population.recorded_at.desc())
         .first()
     )
@@ -416,7 +415,7 @@ def simulator_run(
         # When this run was generated (UTC) — used to autofill the save name.
         "generated_at": datetime.utcnow(),
     })
-    return RedirectResponse(url=f"/admin/simulator/results/{run_id}", status_code=303)
+    return RedirectResponse(url=f"/bdrrmo/simulator/results/{run_id}", status_code=303)
 
 
 @router.get("/results/{run_id}", response_class=HTMLResponse)
@@ -430,7 +429,7 @@ def simulator_results(request: Request, run_id: str, db: Session = Depends(get_d
     run = _RUN_STORE.get(run_id)
     # Missing (evicted/invalid) or owned by another user -> back to setup.
     if run is None or run.get("user_id") != user["id"]:
-        return RedirectResponse(url="/admin/simulator/setup", status_code=303)
+        return RedirectResponse(url="/bdrrmo/simulator/setup", status_code=303)
 
     # Suggested save name: barangay — duration — disaster type — generated date/time.
     # Editable in the modal; the planner can override before saving.
@@ -442,7 +441,7 @@ def simulator_results(request: Request, run_id: str, db: Session = Depends(get_d
 
     return templates.TemplateResponse(
         request=request,
-        name="admin/simulator_results.html",
+        name="bdrrmo/simulator_results.html",
         context={
             "title": "Simulation Results — RisKonek",
             "user": user,
