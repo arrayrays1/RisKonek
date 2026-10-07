@@ -20,7 +20,7 @@
             <i class="bi bi-save"></i> Save Scenario
         </button>
         {% endif %}
-        <a href="/admin/simulator/setup" class="btn btn-soft">
+        <a href="/bdrrmo/simulator/setup" class="btn btn-soft">
             <i class="bi bi-arrow-repeat"></i> New Simulation
         </a>
     </div>
@@ -32,7 +32,7 @@
 <!-- ── Save Scenario modal ─────────────────────────────────────────────── -->
 <div class="modal fade" id="saveScenarioModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog">
-    <form method="POST" action="/admin/simulator/save" class="modal-content">
+    <form method="POST" action="/bdrrmo/simulator/save" class="modal-content">
       <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
       <input type="hidden" name="run_id" value="{{ run_id }}">
       <div class="modal-header">
