@@ -222,13 +222,13 @@
 
     {% if total_saved > saved_rows | length and not show_all %}
     <div class="text-center mt-3">
-        <a href="/admin/simulator/setup?all=1#saved-scenarios" class="btn btn-outline-secondary btn-sm">
+        <a href="/bdrrmo/simulator/setup?all=1#saved-scenarios" class="btn btn-outline-secondary btn-sm">
             View all {{ total_saved }} saved scenarios
         </a>
     </div>
     {% elif show_all and total_saved > 10 %}
     <div class="text-center mt-3">
-        <a href="/admin/simulator/setup#saved-scenarios" class="btn btn-outline-secondary btn-sm">
+        <a href="/bdrrmo/simulator/setup#saved-scenarios" class="btn btn-outline-secondary btn-sm">
             Show recent only
         </a>
     </div>
