@@ -205,7 +205,7 @@
                         <a href="/bdrrmo/simulator/scenarios/{{ s.id }}" class="btn-soft" title="View">
                             <i class="bi bi-eye"></i> View
                         </a>
-                        <form method="POST" action="/admin/simulator/scenarios/{{ s.id }}/delete"
+                        <form method="POST" action="/bdrrmo/simulator/scenarios/{{ s.id }}/delete"
                               class="d-inline"
                               data-confirm="Delete saved scenario '{{ s.name }}'? This cannot be undone.">
                             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">

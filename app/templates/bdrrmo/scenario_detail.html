@@ -15,7 +15,7 @@
         <a href="/bdrrmo/simulator/scenarios/{{ scenario.id }}/pdf" class="btn btn-soft">
             <i class="bi bi-file-earmark-pdf"></i> Export PDF
         </a>
-        <form method="POST" action="/admin/simulator/scenarios/{{ scenario.id }}/delete"
+        <form method="POST" action="/bdrrmo/simulator/scenarios/{{ scenario.id }}/delete"
               class="d-inline"
               data-confirm="Delete saved scenario '{{ scenario.name }}'? This cannot be undone.">
             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
