@@ -822,7 +822,7 @@ def simulator_settings(
     thresholds_svc.ensure_seeded(db)
     return templates.TemplateResponse(
         request=request,
-        name="admin/simulator_settings.html",
+        name="bdrrmo/simulator_settings.html",
         context={
             "title": "Planning Thresholds — RisKonek",
             "user": user,
