@@ -854,7 +854,7 @@ def simulator_settings_save(
 
     def _redirect(**params):
         return RedirectResponse(
-            url="/admin/simulator/settings?" + urlencode(params), status_code=303
+            url="/bdrrmo/simulator/settings?" + urlencode(params), status_code=303
         )
 
     def _apply(key, new_value):
