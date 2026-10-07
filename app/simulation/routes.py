@@ -30,7 +30,7 @@ from app.simulation import pdf_export
 from app.analytics.simulator import compute_risk_score
 from typing import Optional
 
-router = APIRouter(prefix="/admin/simulator")
+router = APIRouter(prefix="/bdrrmo/simulator")
 templates = Jinja2Templates(directory="app/templates")
 
 # Timestamps are stored UTC; display in Philippine Standard Time (UTC+8),
@@ -126,7 +126,7 @@ def simulator_setup(
     db: Session = Depends(get_db),
     barangay_id: Optional[str] = None,
 ):
-    user = require_role(request, ["admin"])
+    user = require_role(request, ["bdrrmo"])
     if isinstance(user, RedirectResponse):
         return user
 
@@ -199,7 +199,7 @@ def simulator_setup(
 
     return templates.TemplateResponse(
         request=request,
-        name="admin/simulator_setup.html",
+        name="bdrrmo/simulator_setup.html",
         context={
             "title": "Resource Simulator — RisKonek",
             "user": user,
@@ -231,7 +231,7 @@ def simulator_run(
     The ROUTE does every query; the engine receives only plain ints/strings/
     dicts — no ORM objects. Stage 4 will render this; for now it returns JSON.
     """
-    user = require_role(request, ["admin"])
+    user = require_role(request, ["bdrrmo"])
     if isinstance(user, RedirectResponse):
         return user
 
@@ -423,7 +423,7 @@ def simulator_run(
 def simulator_results(request: Request, run_id: str, db: Session = Depends(get_db)):
     """Render a stored simulation run. Refreshing this page never triggers a new
     simulation or Groq call — it only reads the server-side store."""
-    user = require_role(request, ["admin"])
+    user = require_role(request, ["bdrrmo"])
     if isinstance(user, RedirectResponse):
         return user
 
@@ -476,7 +476,7 @@ def simulator_save(
     """Freeze a stored run into a SavedScenario. Reads the run store (never
     recomputes), persists the computed result + the thresholds used, audits it,
     and redirects to the saved-scenario view."""
-    user = require_role(request, ["admin"])
+    user = require_role(request, ["bdrrmo"])
     if isinstance(user, RedirectResponse):
         return user
 
@@ -584,7 +584,7 @@ def saved_scenario_compare(
     """Side-by-side comparison built ONLY from two stored result_json snapshots.
     No recomputation, no Groq call. Declared before /scenarios/{scenario_id} so
     the literal 'compare' path isn't captured by the int id route."""
-    user = require_role(request, ["admin"])
+    user = require_role(request, ["bdrrmo"])
     if isinstance(user, RedirectResponse):
         return user
 
@@ -670,7 +670,7 @@ def saved_scenario_detail(
     """Render one saved scenario from its stored snapshot. This path NEVER
     recomputes and NEVER calls Groq — result + AI briefing come straight from
     the row, so it always reflects the data and thresholds at run time."""
-    user = require_role(request, ["admin"])
+    user = require_role(request, ["bdrrmo"])
     if isinstance(user, RedirectResponse):
         return user
 
@@ -710,7 +710,7 @@ def saved_scenario_pdf(
 ):
     """Download the stored snapshot as a PDF. Built purely from result_json +
     the saved AI briefing — no recomputation, no Groq call. Audited."""
-    user = require_role(request, ["admin"])
+    user = require_role(request, ["bdrrmo"])
     if isinstance(user, RedirectResponse):
         return user
 
@@ -752,7 +752,7 @@ def saved_scenario_delete(
     request: Request, scenario_id: int, db: Session = Depends(get_db)
 ):
     """Delete a saved scenario (admin only), audited."""
-    user = require_role(request, ["admin"])
+    user = require_role(request, ["bdrrmo"])
     if isinstance(user, RedirectResponse):
         return user
 
@@ -816,7 +816,7 @@ def simulator_settings(
     success: Optional[str] = None,
     error: Optional[str] = None,
 ):
-    user = require_role(request, ["admin"])
+    user = require_role(request, ["bdrrmo"])
     if isinstance(user, RedirectResponse):
         return user
 
@@ -847,7 +847,7 @@ def simulator_settings_save(
     MEDICINE_KITS_PER_AFFECTED: Optional[str] = Form(None),
     VEHICLES_PER_AFFECTED: Optional[str] = Form(None),
 ):
-    user = require_role(request, ["admin"])
+    user = require_role(request, ["bdrrmo"])
     if isinstance(user, RedirectResponse):
         return user
 
