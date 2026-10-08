@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Request, Depends, Form
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, Response
 from fastapi.templating import Jinja2Templates
-from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import func, select
 from app.database import get_db
 from app.models import (
     User, UserRole, Barangay, AuditLog, Incident,
@@ -1612,6 +1612,7 @@ def resources_list(
     db: Session = Depends(get_db),
     q: Optional[str] = None,
     category: Optional[str] = None,
+    barangay_id: Optional[int] = None,
     food_type: Optional[str] = None,
     alert: Optional[str] = None,
     archived: Optional[str] = None,
@@ -1622,21 +1623,30 @@ def resources_list(
     if isinstance(user, RedirectResponse):
         return user
 
-    query = db.query(Resource)
+    stmt = (
+        select(Resource)
+        .options(joinedload(Resource.barangay))
+    )
+
     show_archived = (archived == "1")
-    query = query.filter(Resource.is_archived == show_archived)
+
+    stmt = stmt.where(Resource.is_archived == show_archived)
 
     if q:
         like = f"%{q.strip()}%"
-        query = query.filter(
-            (Resource.name.ilike(like)) | (Resource.storage_location.ilike(like))
-        )
+        stmt = stmt.where((Resource.name.ilike(like)) | (Resource.storage_location.ilike(like)))
     if category and category in {c.value for c in ResourceCategory}:
-        query = query.filter(Resource.category == ResourceCategory(category))
+        stmt = stmt.where(Resource.category == ResourceCategory(category))
+    if barangay_id:
+            stmt = stmt.where(Resource.barangay_id == barangay_id)
     if food_type and food_type in FOOD_TYPE_CHOICES:
-        query = query.filter(Resource.food_type == food_type)
+        stmt = stmt.where(Resource.food_type == food_type)
 
-    rows = query.order_by(Resource.name).all()
+    stmt = stmt.order_by(Resource.name)
+
+    result = db.execute(stmt)
+
+    rows = result.scalars().all()
 
     # Alert filter is derived, so apply after SQL filtering.
     if alert in ("low_stock", "near_expiry", "expired"):
@@ -1652,6 +1662,7 @@ def resources_list(
         view_rows.append({
             "id": r.id,
             "name": r.name,
+            "barangay": r.barangay.name,
             "category": r.category.value if r.category else "",
             "category_label": r.category.value.title() if r.category else "—",
             "food_type": r.food_type or "",
@@ -1669,9 +1680,11 @@ def resources_list(
 
     page_obj = paginate(view_rows, parse_page(page), parse_per_page(per_page))
     base_query = build_base_query({
-        "q": q or "", "category": category or "", "food_type": food_type or "",
+        "q": q or "","barangay_id": barangay_id or "", "category": category or "", "food_type": food_type or "",
         "alert": alert or "", "archived": "1" if show_archived else "",
     })
+
+    barangays = db.query(Barangay).order_by(Barangay.name).all()
 
     return templates.TemplateResponse(
         request=request,
@@ -1683,12 +1696,14 @@ def resources_list(
             "page_obj": page_obj,
             "base_query": base_query,
             "summary": summary,
+            "barangays": barangays,
             "categories": [c.value for c in ResourceCategory],
             "food_types": [(v, FOOD_TYPE_LABELS[v]) for v in FOOD_TYPE_CHOICES],
             "f_q": q or "",
             "f_category": category or "",
             "f_food_type": food_type or "",
             "f_alert": alert or "",
+            "f_barangay_id": barangay_id or "",
             "f_archived": "1" if show_archived else "",
             "show_archived": show_archived,
             # Default + max for the stock modal's date-time field (PHT).
