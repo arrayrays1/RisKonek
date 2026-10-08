@@ -106,10 +106,20 @@
 <!-- ── Filters ────────────────────────────────────────────────── -->
 <div class="dash-card mb-3">
     <form method="GET" action="/admin/resources" class="row g-2 align-items-end js-live-filter">
-        <div class="col-md-3">
+        <div class="col-md-2">
             <label class="form-label small fw-semibold mb-1">Search</label>
             <input type="text" name="q" value="{{ f_q }}" class="form-control form-control-sm"
                    placeholder="Search name or location…" autocomplete="off">
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small fw-semibold mb-1">Barangay</label>
+            <select name="barangay_id" class="form-select form-select-sm">
+                
+                <option value=0>All Barangay</option>
+                {% for b in barangays %}
+                <option value="{{ b.id }}" {% if f_barangay_id == b.id %}selected{% endif %}>{{ b.name }}</option>
+                {% endfor %}
+            </select>
         </div>
         <div class="col-md-2">
             <label class="form-label small fw-semibold mb-1">Category</label>
@@ -138,7 +148,7 @@
                 <option value="expired"     {% if f_alert == 'expired'     %}selected{% endif %}>Expired</option>
             </select>
         </div>
-        <div class="col-md-2">
+        <div class="col-md-1">
             <label class="form-label small fw-semibold mb-1">View</label>
             <select name="archived" class="form-select form-select-sm">
                 <option value=""  {% if not show_archived %}selected{% endif %}>Active</option>
@@ -159,6 +169,7 @@
         <table class="table table-hover align-middle mb-0">
             <thead class="rk-bg-soft">
                 <tr class="rk-th-soft">
+                    <th class="px-3 py-3">Barangay</th>
                     <th class="px-3 py-3">Item</th>
                     <th class="py-3">Category</th>
                     <th class="py-3 text-end">Qty</th>
@@ -173,6 +184,7 @@
             <tbody>
                 {% for r in rows %}
                 <tr class="rk-fs-13">
+                    <td class="px-3 fw-semibold">{{ r.barangay }}</td>
                     <td class="px-3">
                         <div class="fw-semibold">{{ r.name }}</div>
                         <div class="text-muted small">
