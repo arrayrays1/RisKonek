@@ -1757,38 +1757,6 @@ def _movement_fields(reason, deployed_to, occurred_at, location_required):
 
     return {"reason": r, "deployed_to": loc, "occurred_at": dt_utc}, None
 
-@router.post("/resources/{resource_id}/archive")
-def resource_archive_toggle(
-    resource_id: int,
-    request: Request,
-    db: Session = Depends(get_db),
-):
-    user = require_role(request, RESOURCE_ROLES)
-    if isinstance(user, RedirectResponse):
-        return user
-
-    r = db.query(Resource).filter(Resource.id == resource_id).first()
-    if not r:
-        return RedirectResponse(url="/admin/resources", status_code=302)
-
-    r.is_archived = not bool(r.is_archived)
-    r.updated_by = user["id"]
-    db.commit()
-
-    verb = "archived" if r.is_archived else "restored"
-    log_action(
-        db, user["id"], verb, "resources", r.id,
-        f"Resource '{r.name}' {verb}.",
-    )
-
-    url = (
-        f"/admin/resources?archived=1&success=Resource+{verb}"
-        if r.is_archived
-        else f"/admin/resources?success=Resource+{verb}"
-    )
-    return RedirectResponse(url=url, status_code=302)
-
-
 # ─────────────────────────────────────────────────────────────────────
 # WEEK 7 — VEHICLE & EQUIPMENT MONITORING (Module B)
 # Roles: admin, cdrrmo_staff, cfau_oic
