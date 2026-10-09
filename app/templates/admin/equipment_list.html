@@ -176,22 +176,6 @@
                             <i class="bi bi-clock-history"></i>
                         </a>
                         {% endif %}
-                        {% if not e.is_archived %}
-                        <form method="POST" action="/admin/equipment/{{ e.id }}/archive" class="d-inline"
-                              data-confirm='Archive {{ e.name }}?'>
-            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
-                            <button type="submit" class="btn btn-outline-warning btn-sm">
-                                <i class="bi bi-archive"></i>
-                            </button>
-                        </form>
-                        {% else %}
-                        <form method="POST" action="/admin/equipment/{{ e.id }}/archive" class="d-inline">
-            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
-                            <button type="submit" class="btn btn-outline-success btn-sm">
-                                <i class="bi bi-arrow-counterclockwise"></i> Restore
-                            </button>
-                        </form>
-                        {% endif %}
                     </td>
                 </tr>
                 {% else %}
