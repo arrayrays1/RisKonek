@@ -204,20 +204,6 @@
                                 data-bs-toggle="modal" data-bs-target="#stockModal-{{ r.id }}">
                             <i class="bi bi-plus-slash-minus"></i> Stock
                         </button>
-                        <form method="POST" action="/admin/resources/{{ r.id }}/archive" class="d-inline"
-                              data-confirm='Archive {{ r.name }}?'>
-            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
-                            <button type="submit" class="btn-soft rk-text-amber" title="Archive">
-                                <i class="bi bi-archive"></i>
-                            </button>
-                        </form>
-                        {% else %}
-                        <form method="POST" action="/admin/resources/{{ r.id }}/archive" class="d-inline">
-            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
-                            <button type="submit" class="btn-soft rk-text-ok">
-                                <i class="bi bi-arrow-counterclockwise"></i> Restore
-                            </button>
-                        </form>
                         {% endif %}
                     </td>
                 </tr>
