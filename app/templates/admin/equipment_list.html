@@ -177,10 +177,6 @@
                         </a>
                         {% endif %}
                         {% if not e.is_archived %}
-                        <a href="/admin/equipment/{{ e.id }}/edit"
-                           class="btn btn-outline-secondary btn-sm">
-                            <i class="bi bi-pencil"></i>
-                        </a>
                         <form method="POST" action="/admin/equipment/{{ e.id }}/archive" class="d-inline"
                               data-confirm='Archive {{ e.name }}?'>
             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
