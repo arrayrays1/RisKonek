@@ -2137,6 +2137,7 @@ def equipment_list(
     request: Request,
     db: Session = Depends(get_db),
     q: Optional[str] = None,
+    barangay_id: Optional[int] = None,
     equipment_type: Optional[str] = None,
     status: Optional[str] = None,
     archived: Optional[str] = None,
@@ -2147,21 +2148,30 @@ def equipment_list(
     if isinstance(user, RedirectResponse):
         return user
 
-    query = db.query(Equipment)
+    stmt = (
+        select(Equipment)
+        .options(joinedload(Equipment.barangay))
+    )
+
     show_archived = (archived == "1")
-    query = query.filter(Equipment.is_archived == show_archived)
+
+    stmt = stmt.where(Equipment.is_archived == show_archived)
 
     if q:
         like = f"%{q.strip()}%"
-        query = query.filter(
-            (Equipment.name.ilike(like)) | (Equipment.plate_or_serial.ilike(like))
-        )
+        stmt = stmt.where(Equipment.name.ilike(like)) | (Equipment.plate_or_serial.ilike(like))
     if equipment_type and equipment_type in {t.value for t in EquipmentType}:
-        query = query.filter(Equipment.equipment_type == EquipmentType(equipment_type))
+        stmt = stmt.where(Equipment.equipment_type == EquipmentType(equipment_type))
+    if barangay_id:
+        stmt = stmt.where(Equipment.barangay_id == barangay_id)
     if status and status in {s.value for s in EquipmentStatus}:
-        query = query.filter(Equipment.status == EquipmentStatus(status))
+        stmt = stmt.where(Equipment.status == EquipmentStatus(status))
 
-    rows = query.order_by(Equipment.name).all()
+    stmt = stmt.order_by(Equipment.name)
+
+    result = db.execute(stmt)
+
+    rows = result.scalars().all()
 
     # Repair-follow-up reminders, keyed by equipment id (archived excluded
     # by the helper). Reused as-is for both the badges and the count.
@@ -2173,6 +2183,7 @@ def equipment_list(
         view_rows.append({
             "id": e.id,
             "name": e.name,
+            "barangay": e.barangay.name,
             "type_value": e.equipment_type.value if e.equipment_type else "",
             "type_label": EQUIPMENT_TYPE_LABELS.get(
                 e.equipment_type.value if e.equipment_type else "", "—"
@@ -2208,9 +2219,11 @@ def equipment_list(
 
     page_obj = paginate(view_rows, parse_page(page), parse_per_page(per_page))
     base_query = build_base_query({
-        "q": q or "", "equipment_type": equipment_type or "",
+        "q": q or "","barangay_id": barangay_id or "", "equipment_type": equipment_type or "",
         "status": status or "", "archived": "1" if show_archived else "",
     })
+
+    barangays = db.query(Barangay).order_by(Barangay.name).all()
 
     return templates.TemplateResponse(
         request=request,
@@ -2221,6 +2234,7 @@ def equipment_list(
             "rows": page_obj.items,
             "page_obj": page_obj,
             "base_query": base_query,
+            "barangays": barangays,
             "summary": summary,
             "types": [(t.value, EQUIPMENT_TYPE_LABELS.get(t.value, t.value.title()))
                       for t in EquipmentType],
@@ -2230,6 +2244,7 @@ def equipment_list(
             "f_q": q or "",
             "f_type": equipment_type or "",
             "f_status": status or "",
+            "f_barangay_id": barangay_id or "",
             "f_archived": "1" if show_archived else "",
             "show_archived": show_archived,
             # Default + max for the status modal's date-time field (PHT).
