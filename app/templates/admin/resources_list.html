@@ -111,7 +111,7 @@
             <input type="text" name="q" id="fltSearch" value="{{ f_q }}" class="form-control form-control-sm"
                    placeholder="Search name or location…" autocomplete="off">
         </div>
-        <div class="col-md-2">
+        <div class="col-md-4">
             <label class="form-label small fw-semibold mb-1" for="fltCategory">Category</label>
             <select name="category" id="fltCategory" class="form-select form-select-sm">
                 <option value="">All categories</option>
@@ -120,7 +120,7 @@
                 {% endfor %}
             </select>
         </div>
-        <div class="col-md-2">
+        <div class="col-md-4">
             <label class="form-label small fw-semibold mb-1" for="fltFoodType">Food Type</label>
             <select name="food_type" id="fltFoodType" class="form-select form-select-sm">
                 <option value="">All food</option>
@@ -129,7 +129,15 @@
                 {% endfor %}
             </select>
         </div>
-        <div class="col-md-2">
+        <div class="col-md-4">
+            <label class="form-label small fw-semibold mb-1" for="fltPerishable">Perishability</label>
+            <select name="perishable" id="fltPerishable" class="form-select form-select-sm">
+                <option value="">Any</option>
+                <option value="yes" {% if f_perishable == 'yes' %}selected{% endif %}>Perishable</option>
+                <option value="no"  {% if f_perishable == 'no'  %}selected{% endif %}>Non-Perishable</option>
+            </select>
+        </div>
+        <div class="col-md-4">
             <label class="form-label small fw-semibold mb-1" for="fltAlert">Alert</label>
             <select name="alert" id="fltAlert" class="form-select form-select-sm">
                 <option value="">Any</option>
@@ -138,7 +146,7 @@
                 <option value="expired"     {% if f_alert == 'expired'     %}selected{% endif %}>Expired</option>
             </select>
         </div>
-        <div class="col-md-2">
+        <div class="col-md-4">
             <label class="form-label small fw-semibold mb-1" for="fltArchived">View</label>
             <select name="archived" id="fltArchived" class="form-select form-select-sm">
                 <option value=""  {% if not show_archived %}selected{% endif %}>Active</option>
@@ -261,7 +269,8 @@
 {% if not r.is_archived %}
 <div class="modal fade" id="stockModal-{{ r.id }}" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog">
-    <form method="POST" action="/admin/resources/{{ r.id }}/stock" class="modal-content" data-validate>
+    <form method="POST" action="/admin/resources/{{ r.id }}/stock" class="modal-content" data-validate
+          data-confirm-review="Review Stock Change — {{ r.name }}">
             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
       <div class="modal-header">
         <h6 class="modal-title">Stock change — {{ r.name }}</h6>

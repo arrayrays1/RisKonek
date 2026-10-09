@@ -36,7 +36,8 @@
         <i class="bi bi-person-vcard rk-text-green"></i>
         <h6>Officials &amp; Emergency Responders</h6>
     </div>
-    <form method="POST" action="/bdrrmo/contacts" class="row g-3" data-validate>
+    <form method="POST" action="/bdrrmo/contacts" class="row g-3" data-validate
+          data-confirm-review="Review Contact Details">
             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
         <div class="col-md-6">
             <label class="form-label small fw-semibold mb-1">Barangay Captain</label>

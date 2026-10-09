@@ -66,7 +66,7 @@
                 <h6><i class="bi bi-sliders me-1"></i>Scenario Setup</h6>
             </div>
 
-            <form method="post" action="/admin/simulator/run">
+            <form method="post" action="/admin/simulator/run" data-confirm-review="Review Simulation Setup">
                 <input type="hidden" name="csrf_token"
                        value="{{ request.session.get('csrf_token', '') }}">
 

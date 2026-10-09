@@ -48,9 +48,6 @@
        before Leaflet/the row have settled on a final size. */
     #dashMap { flex: 1 1 auto; min-height: 320px; border-radius: 8px; }
 
-    .prep-table th { font-size: 12px; font-weight: 700; border: none; }
-    .prep-table td { font-size: 13px; vertical-align: middle; border-color: var(--rk-border); }
-
 </style>
 {% endblock %}
 
@@ -215,57 +212,21 @@
 
 </div>
 
-<!-- ── ROW 3: Preparedness ↔ Priority Barangays pair. Mirrors ROW 2's
-     insights ↔ map pattern: normally side by side, but collapsing
-     "Preparedness Index Overview" drops it to a thin header and lets
-     "Priority Barangays" expand to fill the row underneath it (see
-     #prepBarangaysRow.rk-prep-collapsed in rk.css and the toggle
-     script below). ─────────────────────────────────────────────────── -->
-<div class="row g-3 mb-4" id="prepBarangaysRow">
+<!-- ── ROW 3: Priority Barangays ────────────────────────────────
+     (Previously paired with a "Preparedness Index Overview" table
+     showing the same ranked barangay list in plainer form — removed
+     as duplicate data; this card already covers it with more detail
+     — hazards, population, score bar — plus a per-barangay link.) ── -->
+<div class="row g-3 mb-4">
 
-            <div class="col-md-6" id="prepCol">
-                <div class="dash-card h-100" id="prepCard">
-                    <div class="card-title-row">
-                        <i class="bi bi-shield-fill-check rk-text-green"></i>
-                        <h6>Preparedness Index Overview</h6>
-                    </div>
-                    <div class="rk-scroll-cap rk-scroll-cap-table">
-                        <table class="table prep-table">
-                            <thead>
-                                <tr>
-                                    <th>Barangay</th>
-                                    <th>Score</th>
-                                    <th>Planning Priority</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for brgy in all_scores[:10] %}
-                                <tr>
-                                    <td>{{ brgy.name }}</td>
-                                    <td class="fw-medium">{{ brgy.score }}</td>
-                                    <td>
-                                        <span class="risk-badge risk-{{ brgy.level }}">
-                                            {{ brgy.level.title() }}
-                                        </span>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <a href="/admin/barangays"
-                       class="btn-soft w-100 justify-content-center mt-2 rk-text-green rk-push-bottom">
-                        View All Barangays <i class="bi bi-arrow-right"></i>
-                    </a>
-                </div>
-            </div>
-
-            <div class="col-md-6" id="barangaysCol">
-                <div class="dash-card h-100">
+            <div class="col-12">
+                <div class="dash-card">
                     <div class="card-title-row">
                         <i class="bi bi-exclamation-triangle-fill text-danger"></i>
                         <h6>Priority Barangays (Needs Attention)</h6>
+                        <a href="/admin/barangays" class="ms-auto rk-fs-12 rk-text-green text-decoration-none">
+                            View All Barangays <i class="bi bi-arrow-right"></i>
+                        </a>
                     </div>
 
                     <div class="text-muted mb-2 rk-fs-11">
@@ -275,7 +236,7 @@
                     </div>
 
                     <div class="rk-scroll-cap">
-                    {% for brgy in top5 %}
+                    {% for brgy in all_scores[:8] %}
                     <div class="brgy-item">
                         <div class="d-flex align-items-center gap-2 mb-1">
                             <div class="brgy-rank">{{ loop.index }}</div>

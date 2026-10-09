@@ -137,7 +137,6 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
         })
 
     barangay_scores.sort(key=lambda x: x["score"], reverse=True)
-    top5 = barangay_scores[:5]
     all_scores = barangay_scores
 
     # ── Map markers ──────────────────────────────────────────────────
@@ -173,7 +172,6 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
             # the inline <script> block (XSS-safe).
             "disaster_counts": disaster_counts,
             "yearly_data": yearly_data,
-            "top5": top5,
             "all_scores": all_scores,
             "map_markers": map_markers,
             "recent_logs": recent_logs,
@@ -1626,6 +1624,7 @@ def resources_list(
     q: Optional[str] = None,
     category: Optional[str] = None,
     food_type: Optional[str] = None,
+    perishable: Optional[str] = None,
     alert: Optional[str] = None,
     archived: Optional[str] = None,
     page: Optional[str] = None,
@@ -1648,6 +1647,10 @@ def resources_list(
         query = query.filter(Resource.category == ResourceCategory(category))
     if food_type and food_type in FOOD_TYPE_CHOICES:
         query = query.filter(Resource.food_type == food_type)
+    if perishable == "yes":
+        query = query.filter(Resource.is_perishable == True)
+    elif perishable == "no":
+        query = query.filter(Resource.is_perishable == False)
 
     rows = query.order_by(Resource.name).all()
 
@@ -1683,7 +1686,7 @@ def resources_list(
     page_obj = paginate(view_rows, parse_page(page), parse_per_page(per_page))
     base_query = build_base_query({
         "q": q or "", "category": category or "", "food_type": food_type or "",
-        "alert": alert or "", "archived": "1" if show_archived else "",
+        "perishable": perishable or "", "alert": alert or "", "archived": "1" if show_archived else "",
     })
 
     return templates.TemplateResponse(
@@ -1701,6 +1704,7 @@ def resources_list(
             "f_q": q or "",
             "f_category": category or "",
             "f_food_type": food_type or "",
+            "f_perishable": perishable or "",
             "f_alert": alert or "",
             "f_archived": "1" if show_archived else "",
             "show_archived": show_archived,

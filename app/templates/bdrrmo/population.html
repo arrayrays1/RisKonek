@@ -77,7 +77,7 @@
         <h6>Record New Population Data</h6>
     </div>
     <form method="POST" action="/bdrrmo/population" class="row g-3" data-validate
-          data-confirm='Save this population record? It will be added as a new dated entry.'>
+          data-confirm-review="Review Population Record">
             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
         <div class="col-md-4">
             <label class="form-label small fw-semibold mb-1">Total Population</label>

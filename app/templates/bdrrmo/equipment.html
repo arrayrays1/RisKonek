@@ -55,7 +55,8 @@
     </div>
     <form method="POST"
           action="/bdrrmo/equipment{{ '/' ~ editing.id ~ '/edit' if editing else '' }}"
-          class="row g-3" data-validate>
+          class="row g-3" data-validate
+          data-confirm-review="{{ 'Review Equipment Changes' if editing else 'Review New Equipment' }}">
             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
         <div class="col-md-5">
             <label class="form-label small fw-semibold mb-1">Name</label>

@@ -24,7 +24,8 @@
 {% endif %}
 
 <div class="dash-card rk-maxw-720">
-    <form method="POST" action="/bdrrmo/incident-reports/upload" enctype="multipart/form-data" data-validate>
+    <form method="POST" action="/bdrrmo/incident-reports/upload" enctype="multipart/form-data" data-validate
+          data-confirm-review="Review Upload">
         <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
         <div class="mb-3">
             <label class="form-label fw-semibold">Report file</label>

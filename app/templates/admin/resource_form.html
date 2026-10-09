@@ -25,7 +25,8 @@
 <div class="dash-card">
     <form method="POST"
           action="{{ '/admin/resources/' ~ target.id ~ '/edit' if edit_mode else '/admin/resources/new' }}"
-          class="row g-3" data-validate data-autosave="resource">
+          class="row g-3" data-validate data-autosave="resource"
+          data-confirm-review="{{ 'Review Resource Changes' if edit_mode else 'Review New Resource' }}">
             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
 
         <div class="col-md-8">

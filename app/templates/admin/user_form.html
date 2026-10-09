@@ -32,6 +32,7 @@
             {% endif %}
 
             <form method="POST" data-validate
+                  data-confirm-review="{{ 'Review Changes — ' + target_user.username if edit_mode else 'Review New User Details' }}"
                   action="{{ '/admin/users/' + target_user.id|string + '/edit' if edit_mode else '/admin/users/create' }}">
             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
 

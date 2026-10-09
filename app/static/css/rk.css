@@ -28,6 +28,14 @@
     --sidebar-w: 240px;
     --sidebar-w-collapsed: 64px;
 
+    /* Sidebar gradient endpoints — split out from the palette above so dark
+       mode can darken just the sidebar (below) without touching the shared
+       green/cool colors that buttons, badges, etc. also read from. */
+    --sidebar-grad-from: var(--rk-green-mid);
+    --sidebar-grad-to: var(--rk-green-dark);
+    --sidebar-grad-from-cool: var(--rk-cool);
+    --sidebar-grad-to-cool: var(--rk-cool-dark);
+
     /* Base type scale — bumped up per defense feedback (small/illegible text) */
     --rk-fs-base: 15px;
     --rk-fs-h1: clamp(26px, 2.8vw, 34px);
@@ -42,6 +50,14 @@ html[data-theme="dark"] {
     --rk-muted: #9aa3b2;
     --rk-green-light: #06301f;
     --rk-cool-light: #062a30;
+
+    /* Darker sidebar gradient for every role in dark mode — admin's green
+       sidebar and the personnel (BDRRMO / CFAU / Staff) teal→navy sidebar
+       both step down a shade further than their light-mode colors. */
+    --sidebar-grad-from: #047857;
+    --sidebar-grad-to: #022c1e;
+    --sidebar-grad-from-cool: #155e75;
+    --sidebar-grad-to-cool: #082f3a;
 }
 
 /* ── Simulation results: more prominent secondary text ───────────────────
@@ -70,9 +86,7 @@ html[data-theme="dark"] .modal-content {
     border-color: var(--rk-border);
     color: var(--rk-text);
 }
-html[data-theme="dark"] .table,
-html[data-theme="dark"] .prep-table td,
-html[data-theme="dark"] .prep-table th {
+html[data-theme="dark"] .table {
     color: var(--rk-text);
 }
 html[data-theme="dark"] .feed-item,
@@ -116,7 +130,7 @@ body {
 .sidebar {
     width: var(--sidebar-w);
     height: 100vh;           /* exact viewport height — no overflow */
-    background: linear-gradient(180deg, var(--rk-green-mid) 0%, var(--rk-green-dark) 100%);
+    background: linear-gradient(180deg, var(--sidebar-grad-from) 0%, var(--sidebar-grad-to) 100%);
     position: fixed;
     top: 0; left: 0;
     display: flex; flex-direction: column;
@@ -145,7 +159,7 @@ body {
    gradient matching the RisKonek logo palette, replacing the old warm
    red-orange look per defense feedback. Admin keeps the original green. */
 .sidebar.sidebar-personnel {
-    background: linear-gradient(180deg, var(--rk-cool) 0%, var(--rk-cool-dark) 100%);
+    background: linear-gradient(180deg, var(--sidebar-grad-from-cool) 0%, var(--sidebar-grad-to-cool) 100%);
 }
 .sidebar.sidebar-personnel .brand-icon {
     color: var(--rk-cool-dark);
@@ -1501,42 +1515,6 @@ html[data-theme="dark"] .rk-consequence {
     overflow-y: auto;
     padding-right: 4px;
 }
-/* Preparedness Index Overview (admin dashboard): this card is height-
-   matched (.h-100) to its Priority Barangays sibling. A fixed max-height
-   here left a lot of blank card below the table+button once the two
-   cards were stretched equal — instead, #prepCard lays out as a column
-   (header → scrollable table → button) and the table area is the only
-   flexible piece, so it grows to fill whatever height the pair settles
-   on and only that portion scrolls. */
-/* Preparedness Index Overview (admin dashboard): this card is height-
-   matched (.h-100) to its Priority Barangays sibling, whose own list
-   is capped at 320px via .rk-scroll-cap. Match that same cap here
-   instead of the generic 180px above, so neither card ends up forcing
-   the other much taller than its natural content — the table stays
-   properly scrollable past its 10th row either way.
-   The card is also a flex column so "View All Barangays" (.rk-push-bottom)
-   can sit flush at the bottom once .h-100 stretches the card to match its
-   sibling, instead of leaving a gap underneath. Deliberately NOT flex-grow
-   on the scroll box itself — that collapses to a ~0 hypothetical height
-   during the browser's indeterminate-height sizing pass (used to decide
-   how tall the row's stretch target even is), which flips which sibling
-   ends up stretching which. margin-top:auto on the link has no such
-   effect: it only resolves once the row's height is already settled. */
-#prepCard { display: flex; flex-direction: column; }
-#prepCard .rk-scroll-cap-table { max-height: 320px; }
-.rk-push-bottom { margin-top: auto; }
-.rk-scroll-cap-table {
-    max-height: 180px;
-}
-.rk-scroll-cap-table thead th {
-    position: sticky;
-    top: 0;
-    background: white;
-    z-index: 1;
-}
-html[data-theme="dark"] .rk-scroll-cap-table thead th {
-    background: var(--rk-surface);
-}
 
 .rk-legend-dot {
     display: inline-block; width: 9px; height: 9px; border-radius: 50%;
@@ -1913,4 +1891,23 @@ html[data-theme="dark"] .badge.bg-light {
     background: var(--rk-surface) !important;
     color: var(--rk-muted) !important;
     border-color: var(--rk-border) !important;
+}
+
+/* ── "Review before saving" confirmation modal (rk-confirm-review.js) ── */
+.rk-review-list dt {
+    font-weight: 500;
+}
+.rk-review-list dd {
+    color: var(--rk-text);
+    font-weight: 500;
+}
+.rk-review-list dt,
+.rk-review-list dd {
+    border-bottom: 1px solid var(--rk-border);
+    padding-bottom: .5rem;
+    padding-top: .35rem;
+}
+.rk-review-list dt:first-of-type,
+.rk-review-list dd:first-of-type {
+    padding-top: 0;
 }

@@ -124,6 +124,7 @@ class UploadEvent(str, enum.Enum):
 
 class ResourceCategory(str, enum.Enum):
     food = "food"
+    non_perishable = "non_perishable"
     medicine = "medicine"
     shelter = "shelter"
     water = "water"

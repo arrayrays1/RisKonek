@@ -238,7 +238,8 @@
 {% if not e.is_archived %}
 <div class="modal fade" id="statusModal-{{ e.id }}" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog">
-    <form method="POST" action="/admin/equipment/{{ e.id }}/status" class="modal-content" data-validate>
+    <form method="POST" action="/admin/equipment/{{ e.id }}/status" class="modal-content" data-validate
+          data-confirm-review="Review Status Change — {{ e.name }}">
             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
       <div class="modal-header">
         <h6 class="modal-title">Change status — {{ e.name }}</h6>

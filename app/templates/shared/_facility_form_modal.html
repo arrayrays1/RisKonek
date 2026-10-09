@@ -26,7 +26,8 @@
   <div class="modal-dialog modal-xl modal-dialog-scrollable">
     <form method="POST" id="facilityForm" novalidate data-autosave="facility"
           action="{{ action_edit_prefix ~ '/' ~ editing.id ~ '/edit' if editing else action_add }}"
-          class="modal-content">
+          class="modal-content"
+          data-confirm-review="{{ 'Review Facility Changes' if editing else 'Review New Facility' }}">
         <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
         <div class="modal-header">
             <div>

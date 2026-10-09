@@ -103,7 +103,7 @@
             </div>
             {% if can_review %}
             <form method="POST" action="/admin/serviceability/{{ r.id }}/review"
-                  onsubmit="return this.new_status.value !== 'resolved' || confirm('Mark this report as RESOLVED?\n\n• The report will be marked Resolved.\n• Equipment status will NOT be changed automatically.\n• Repair reminders are based on the equipment status, not the report status.');">
+                  data-confirm-review="Review Before Saving">
                 <div class="mb-3">
                     <label class="form-label small fw-semibold">Update Status</label>
                     <select name="new_status" class="form-select" required>

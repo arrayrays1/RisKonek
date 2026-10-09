@@ -18,7 +18,8 @@
 <div class="dash-card">
     <form method="POST"
           action="{{ '/cfau/serviceability/' ~ target.id ~ '/edit' if edit_mode else '/cfau/serviceability/new' }}"
-          class="row g-3" data-validate data-autosave="serviceability">
+          class="row g-3" data-validate data-autosave="serviceability"
+          data-confirm-review="{{ 'Review Report Changes' if edit_mode else 'Review New Serviceability Report' }}">
             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
 
         <div class="col-md-8">
@@ -83,8 +84,7 @@
             <button type="submit" name="action" value="draft" class="btn btn-outline-primary">
                 <i class="bi bi-save"></i> {{ 'Save Draft' if not edit_mode else 'Save Changes' }}
             </button>
-            <button type="submit" name="action" value="submit" class="btn btn-rk"
-                    data-confirm='Submit this report for review? You will no longer be able to edit it.'>
+            <button type="submit" name="action" value="submit" class="btn btn-rk">
                 <i class="bi bi-send"></i> Submit for Review
             </button>
         </div>
