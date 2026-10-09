@@ -1712,26 +1712,6 @@ def resources_list(
     )
 
 
-@router.get("/resources/new", response_class=HTMLResponse)
-def resource_new_form(request: Request, db: Session = Depends(get_db)):
-    user = require_role(request, RESOURCE_ROLES)
-    if isinstance(user, RedirectResponse):
-        return user
-    return templates.TemplateResponse(
-        request=request,
-        name="admin/resource_form.html",
-        context={
-            "user": user,
-            "active_nav": "resources",
-            "edit_mode": False,
-            "target": None,
-            "categories": [c.value for c in ResourceCategory],
-            "food_types": [(v, FOOD_TYPE_LABELS[v]) for v in FOOD_TYPE_CHOICES],
-            "error": None,
-        },
-    )
-
-
 def _parse_date_or_none(s: Optional[str]):
     if not s:
         return None
@@ -1739,82 +1719,6 @@ def _parse_date_or_none(s: Optional[str]):
         return datetime.strptime(s.strip(), "%Y-%m-%d").date()
     except ValueError:
         return None
-
-
-@router.post("/resources/new")
-def resource_create(
-    request: Request,
-    db: Session = Depends(get_db),
-    name: str = Form(...),
-    category: str = Form(...),
-    food_type: str = Form(""),
-    is_perishable: Optional[str] = Form(None),
-    quantity: int = Form(0),
-    unit: str = Form(""),
-    storage_location: str = Form(""),
-    restock_threshold: int = Form(0),
-    expiry_date: str = Form(""),
-):
-    user = require_role(request, RESOURCE_ROLES)
-    if isinstance(user, RedirectResponse):
-        return user
-
-    def render_error(msg):
-        return templates.TemplateResponse(
-            request=request,
-            name="admin/resource_form.html",
-            context={
-                "user": user,
-                "active_nav": "resources",
-                "edit_mode": False,
-                "target": None,
-                "categories": [c.value for c in ResourceCategory],
-                "food_types": [(v, FOOD_TYPE_LABELS[v]) for v in FOOD_TYPE_CHOICES],
-                "error": msg,
-            },
-        )
-
-    name = name.strip()
-    if not name:
-        return render_error("Resource name is required.")
-    if category not in {c.value for c in ResourceCategory}:
-        return render_error("Invalid category.")
-
-    perish = bool(is_perishable)
-    exp = _parse_date_or_none(expiry_date) if perish else None
-    # Food sub-classification applies only to the food category.
-    food_type_value = (
-        food_type if (category == ResourceCategory.food.value
-                      and food_type in FOOD_TYPE_CHOICES)
-        else None
-    )
-
-    r = Resource(
-        name=name,
-        category=ResourceCategory(category),
-        food_type=food_type_value,
-        is_perishable=perish,
-        quantity=max(0, quantity or 0),
-        unit=unit.strip() or None,
-        storage_location=storage_location.strip() or None,
-        restock_threshold=max(0, restock_threshold or 0),
-        expiry_date=exp,
-        is_archived=False,
-        updated_by=user["id"],
-    )
-    db.add(r)
-    db.commit()
-    db.refresh(r)
-
-    log_action(
-        db, user["id"], "created", "resources", r.id,
-        f"Created resource '{r.name}' ({r.category.value}, qty={r.quantity} {r.unit or ''})".strip(),
-    )
-
-    return RedirectResponse(
-        url="/admin/resources?success=Resource+created+successfully",
-        status_code=302,
-    )
 
 
 @router.get("/resources/{resource_id}/edit", response_class=HTMLResponse)
