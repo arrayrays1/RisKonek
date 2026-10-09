@@ -154,7 +154,6 @@
                     <th class="py-3">Assigned</th>
                     <th class="py-3">Plate / Serial</th>
                     <th class="py-3">Last Inspected</th>
-                    <th class="py-3 text-end px-3">Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -167,16 +166,6 @@
                     <td class="text-muted">{{ e.assigned }}</td>
                     <td class="text-muted">{{ e.plate_or_serial }}</td>
                     <td class="text-muted">{{ e.last_inspected.strftime('%Y-%m-%d') if e.last_inspected else '—' }}</td>
-                    <td class="text-end px-3">
-                        {# History stays available for archived units too. #}
-                        {% if user.role in ('cfau_oic', 'admin') %}
-                        <a href="/cfau/equipment-audit?equipment_id={{ e.id }}"
-                           class="btn btn-outline-secondary btn-sm"
-                           title="View this unit's audit log">
-                            <i class="bi bi-clock-history"></i>
-                        </a>
-                        {% endif %}
-                    </td>
                 </tr>
                 {% else %}
                 <tr>
