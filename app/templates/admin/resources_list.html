@@ -175,7 +175,6 @@
                     <th class="py-3 text-end">Threshold</th>
                     <th class="py-3">Expiry</th>
                     <th class="py-3">Alert</th>
-                    <th class="py-3 text-end px-3">Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -198,14 +197,6 @@
                     <td class="text-end text-muted">{{ r.restock_threshold }}</td>
                     <td>{{ r.expiry_date.strftime('%Y-%m-%d') if r.expiry_date else '—' }}</td>
                     <td>{{ alert_pill(r.alert) }}</td>
-                    <td class="text-end px-3">
-                        {% if not r.is_archived %}
-                        <button type="button" class="btn-soft rk-text-ok"
-                                data-bs-toggle="modal" data-bs-target="#stockModal-{{ r.id }}">
-                            <i class="bi bi-plus-slash-minus"></i> Stock
-                        </button>
-                        {% endif %}
-                    </td>
                 </tr>
                 {% else %}
                 <tr>
