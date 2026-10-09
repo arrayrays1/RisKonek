@@ -204,10 +204,6 @@
                                 data-bs-toggle="modal" data-bs-target="#stockModal-{{ r.id }}">
                             <i class="bi bi-plus-slash-minus"></i> Stock
                         </button>
-                        <a href="/admin/resources/{{ r.id }}/edit"
-                           class="btn-soft" title="Edit">
-                            <i class="bi bi-pencil"></i>
-                        </a>
                         <form method="POST" action="/admin/resources/{{ r.id }}/archive" class="d-inline"
                               data-confirm='Archive {{ r.name }}?'>
             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
