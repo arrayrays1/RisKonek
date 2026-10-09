@@ -30,7 +30,7 @@ from app.simulation import pdf_export
 from app.analytics.simulator import compute_risk_score
 from typing import Optional
 
-router = APIRouter(prefix="/admin/simulator")
+router = APIRouter(prefix="/bdrrmo/simulator")
 templates = Jinja2Templates(directory="app/templates")
 
 # Timestamps are stored UTC; display in Philippine Standard Time (UTC+8),
@@ -126,7 +126,7 @@ def simulator_setup(
     db: Session = Depends(get_db),
     barangay_id: Optional[str] = None,
 ):
-    user = require_role(request, ["admin"])
+    user = require_role(request, ["bdrrmo"])
     if isinstance(user, RedirectResponse):
         return user
 
@@ -143,7 +143,7 @@ def simulator_setup(
     # Compact by default: 10 most recent, with a "View all" toggle so the form
     # stays visible at the top.
     show_all = request.query_params.get("all") == "1"
-    saved_q = db.query(SavedScenario).order_by(SavedScenario.created_at.desc())
+    saved_q = db.query(SavedScenario).filter(SavedScenario.barangay_id == user['barangay_id']).order_by(SavedScenario.created_at.desc())
     total_saved = saved_q.count()
     rows = saved_q.all() if show_all else saved_q.limit(10).all()
     saved_rows = [
@@ -199,7 +199,7 @@ def simulator_setup(
 
     return templates.TemplateResponse(
         request=request,
-        name="admin/simulator_setup.html",
+        name="bdrrmo/simulator_setup.html",
         context={
             "title": "Resource Simulator — RisKonek",
             "user": user,
@@ -222,7 +222,6 @@ def simulator_setup(
 def simulator_run(
     request: Request,
     db: Session = Depends(get_db),
-    barangay_id: int = Form(...),
     disaster_type: str = Form(...),
     duration: str = Form(...),
 ):
@@ -231,14 +230,14 @@ def simulator_run(
     The ROUTE does every query; the engine receives only plain ints/strings/
     dicts — no ORM objects. Stage 4 will render this; for now it returns JSON.
     """
-    user = require_role(request, ["admin"])
+    user = require_role(request, ["bdrrmo"])
     if isinstance(user, RedirectResponse):
         return user
 
     # Validate the submitted scenario (disaster type + duration + barangay id).
     try:
         scenario = ScenarioInput(
-            barangay_id=barangay_id,
+            barangay_id=user['barangay_id'],
             disaster_type=disaster_type,
             duration=duration,
         )
@@ -255,7 +254,7 @@ def simulator_run(
     # ── Population — latest record for this barangay ──────────────────────
     pop = (
         db.query(Population)
-        .filter(Population.barangay_id == barangay.id)
+        .filter(Population.barangay_id == user['barangay_id'])
         .order_by(Population.recorded_at.desc())
         .first()
     )
@@ -416,21 +415,21 @@ def simulator_run(
         # When this run was generated (UTC) — used to autofill the save name.
         "generated_at": datetime.utcnow(),
     })
-    return RedirectResponse(url=f"/admin/simulator/results/{run_id}", status_code=303)
+    return RedirectResponse(url=f"/bdrrmo/simulator/results/{run_id}", status_code=303)
 
 
 @router.get("/results/{run_id}", response_class=HTMLResponse)
 def simulator_results(request: Request, run_id: str, db: Session = Depends(get_db)):
     """Render a stored simulation run. Refreshing this page never triggers a new
     simulation or Groq call — it only reads the server-side store."""
-    user = require_role(request, ["admin"])
+    user = require_role(request, ["bdrrmo"])
     if isinstance(user, RedirectResponse):
         return user
 
     run = _RUN_STORE.get(run_id)
     # Missing (evicted/invalid) or owned by another user -> back to setup.
     if run is None or run.get("user_id") != user["id"]:
-        return RedirectResponse(url="/admin/simulator/setup", status_code=303)
+        return RedirectResponse(url="/bdrrmo/simulator/setup", status_code=303)
 
     # Suggested save name: barangay — duration — disaster type — generated date/time.
     # Editable in the modal; the planner can override before saving.
@@ -442,7 +441,7 @@ def simulator_results(request: Request, run_id: str, db: Session = Depends(get_d
 
     return templates.TemplateResponse(
         request=request,
-        name="admin/simulator_results.html",
+        name="bdrrmo/simulator_results.html",
         context={
             "title": "Simulation Results — RisKonek",
             "user": user,
@@ -476,19 +475,19 @@ def simulator_save(
     """Freeze a stored run into a SavedScenario. Reads the run store (never
     recomputes), persists the computed result + the thresholds used, audits it,
     and redirects to the saved-scenario view."""
-    user = require_role(request, ["admin"])
+    user = require_role(request, ["bdrrmo"])
     if isinstance(user, RedirectResponse):
         return user
 
     run = _RUN_STORE.get(run_id)
     if run is None or run.get("user_id") != user["id"]:
-        return RedirectResponse(url="/admin/simulator/setup", status_code=303)
+        return RedirectResponse(url="/bdrrmo/simulator/setup", status_code=303)
 
     # Already saved (double-submit / refresh) → go to the existing record.
     existing_id = run.get("saved_scenario_id")
     if existing_id:
         return RedirectResponse(
-            url=f"/admin/simulator/scenarios/{existing_id}?"
+            url=f"/bdrrmo/simulator/scenarios/{existing_id}?"
                 + urlencode({"success": "This run was already saved."}),
             status_code=303,
         )
@@ -531,7 +530,7 @@ def simulator_save(
     )
 
     return RedirectResponse(
-        url=f"/admin/simulator/scenarios/{scenario.id}?"
+        url=f"/bdrrmo/simulator/scenarios/{scenario.id}?"
             + urlencode({"success": "Scenario saved."}),
         status_code=303,
     )
@@ -584,7 +583,7 @@ def saved_scenario_compare(
     """Side-by-side comparison built ONLY from two stored result_json snapshots.
     No recomputation, no Groq call. Declared before /scenarios/{scenario_id} so
     the literal 'compare' path isn't captured by the int id route."""
-    user = require_role(request, ["admin"])
+    user = require_role(request, ["bdrrmo"])
     if isinstance(user, RedirectResponse):
         return user
 
@@ -597,13 +596,13 @@ def saved_scenario_compare(
     ida, idb = _coerce(a), _coerce(b)
     if ida is None or idb is None:
         return RedirectResponse(
-            url="/admin/simulator/setup?"
+            url="/bdrrmo/simulator/setup?"
                 + urlencode({"error": "Select two scenarios to compare."}),
             status_code=303,
         )
     if ida == idb:
         return RedirectResponse(
-            url="/admin/simulator/setup?"
+            url="/bdrrmo/simulator/setup?"
                 + urlencode({"error": "Select two different scenarios to compare."}),
             status_code=303,
         )
@@ -612,7 +611,7 @@ def saved_scenario_compare(
     sb = db.query(SavedScenario).filter(SavedScenario.id == idb).first()
     if sa is None or sb is None:
         return RedirectResponse(
-            url="/admin/simulator/setup?"
+            url="/bdrrmo/simulator/setup?"
                 + urlencode({"error": "One or both scenarios were not found."}),
             status_code=303,
         )
@@ -652,7 +651,7 @@ def saved_scenario_compare(
 
     return templates.TemplateResponse(
         request=request,
-        name="admin/scenario_compare.html",
+        name="bdrrmo/scenario_compare.html",
         context={
             "title": "Compare Scenarios — RisKonek",
             "user": user,
@@ -670,14 +669,14 @@ def saved_scenario_detail(
     """Render one saved scenario from its stored snapshot. This path NEVER
     recomputes and NEVER calls Groq — result + AI briefing come straight from
     the row, so it always reflects the data and thresholds at run time."""
-    user = require_role(request, ["admin"])
+    user = require_role(request, ["bdrrmo"])
     if isinstance(user, RedirectResponse):
         return user
 
     row = db.query(SavedScenario).filter(SavedScenario.id == scenario_id).first()
     if row is None:
         return RedirectResponse(
-            url="/admin/simulator/setup?"
+            url="/bdrrmo/simulator/setup?"
                 + urlencode({"error": "Saved scenario not found."}),
             status_code=303,
         )
@@ -688,7 +687,7 @@ def saved_scenario_detail(
 
     return templates.TemplateResponse(
         request=request,
-        name="admin/scenario_detail.html",
+        name="bdrrmo/scenario_detail.html",
         context={
             "title": f"{row.name} — Saved Scenario — RisKonek",
             "user": user,
@@ -710,14 +709,14 @@ def saved_scenario_pdf(
 ):
     """Download the stored snapshot as a PDF. Built purely from result_json +
     the saved AI briefing — no recomputation, no Groq call. Audited."""
-    user = require_role(request, ["admin"])
+    user = require_role(request, ["bdrrmo"])
     if isinstance(user, RedirectResponse):
         return user
 
     row = db.query(SavedScenario).filter(SavedScenario.id == scenario_id).first()
     if row is None:
         return RedirectResponse(
-            url="/admin/simulator/setup?"
+            url="/bdrrmo/simulator/setup?"
                 + urlencode({"error": "Saved scenario not found."}),
             status_code=303,
         )
@@ -752,14 +751,14 @@ def saved_scenario_delete(
     request: Request, scenario_id: int, db: Session = Depends(get_db)
 ):
     """Delete a saved scenario (admin only), audited."""
-    user = require_role(request, ["admin"])
+    user = require_role(request, ["bdrrmo"])
     if isinstance(user, RedirectResponse):
         return user
 
     row = db.query(SavedScenario).filter(SavedScenario.id == scenario_id).first()
     if row is None:
         return RedirectResponse(
-            url="/admin/simulator/setup?"
+            url="/bdrrmo/simulator/setup?"
                 + urlencode({"error": "Saved scenario not found."}),
             status_code=303,
         )
@@ -774,7 +773,7 @@ def saved_scenario_delete(
     )
 
     return RedirectResponse(
-        url="/admin/simulator/setup?"
+        url="/bdrrmo/simulator/setup?"
             + urlencode({"success": "Saved scenario deleted."}),
         status_code=303,
     )
@@ -816,14 +815,14 @@ def simulator_settings(
     success: Optional[str] = None,
     error: Optional[str] = None,
 ):
-    user = require_role(request, ["admin"])
+    user = require_role(request, ["bdrrmo"])
     if isinstance(user, RedirectResponse):
         return user
 
     thresholds_svc.ensure_seeded(db)
     return templates.TemplateResponse(
         request=request,
-        name="admin/simulator_settings.html",
+        name="bdrrmo/simulator_settings.html",
         context={
             "title": "Planning Thresholds — RisKonek",
             "user": user,
@@ -847,7 +846,7 @@ def simulator_settings_save(
     MEDICINE_KITS_PER_AFFECTED: Optional[str] = Form(None),
     VEHICLES_PER_AFFECTED: Optional[str] = Form(None),
 ):
-    user = require_role(request, ["admin"])
+    user = require_role(request, ["bdrrmo"])
     if isinstance(user, RedirectResponse):
         return user
 
@@ -855,7 +854,7 @@ def simulator_settings_save(
 
     def _redirect(**params):
         return RedirectResponse(
-            url="/admin/simulator/settings?" + urlencode(params), status_code=303
+            url="/bdrrmo/simulator/settings?" + urlencode(params), status_code=303
         )
 
     def _apply(key, new_value):

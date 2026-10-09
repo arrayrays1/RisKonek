@@ -5,6 +5,8 @@
 
 {% set active_nav = 'resources' %}
 
+{% set resources_route = '/bdrrmo/resources' %}
+
 {% macro alert_pill(a) -%}
     {% if a == 'expired' %}
         <span class="status-pill status-unavailable">Expired</span>
@@ -23,6 +25,9 @@
         <h1>Resource Goods Inventory</h1>
         <p>Consumable disaster-response resources (food packs, water, medicine, hygiene kits, blankets, tarpaulins, sleeping kits).</p>
     </div>
+    <a href="/bdrrmo/resources/new" class="btn btn-rk">
+        <i class="bi bi-plus-lg"></i> Add Resource
+    </a>
 </div>
 
 {% if request.query_params.get('success') %}
@@ -102,21 +107,11 @@
 
 <!-- ── Filters ────────────────────────────────────────────────── -->
 <div class="dash-card mb-3">
-    <form method="GET" action="/admin/resources" class="row g-2 align-items-end js-live-filter">
-        <div class="col-md-2">
+    <form method="GET" action={{resources_route}} class="row g-2 align-items-end js-live-filter">
+        <div class="col-md-3">
             <label class="form-label small fw-semibold mb-1">Search</label>
             <input type="text" name="q" value="{{ f_q }}" class="form-control form-control-sm"
                    placeholder="Search name or location…" autocomplete="off">
-        </div>
-        <div class="col-md-2">
-            <label class="form-label small fw-semibold mb-1">Barangay</label>
-            <select name="barangay_id" class="form-select form-select-sm">
-                
-                <option value=0>All Barangay</option>
-                {% for b in barangays %}
-                <option value="{{ b.id }}" {% if f_barangay_id == b.id %}selected{% endif %}>{{ b.name }}</option>
-                {% endfor %}
-            </select>
         </div>
         <div class="col-md-2">
             <label class="form-label small fw-semibold mb-1">Category</label>
@@ -145,7 +140,7 @@
                 <option value="expired"     {% if f_alert == 'expired'     %}selected{% endif %}>Expired</option>
             </select>
         </div>
-        <div class="col-md-1">
+        <div class="col-md-2">
             <label class="form-label small fw-semibold mb-1">View</label>
             <select name="archived" class="form-select form-select-sm">
                 <option value=""  {% if not show_archived %}selected{% endif %}>Active</option>
@@ -153,7 +148,7 @@
             </select>
         </div>
         <div class="col-md-1 d-grid">
-            <a href="/admin/resources" class="btn btn-outline-secondary btn-sm" title="Reset filters">
+            <a href={{resources_route}} class="btn btn-outline-secondary btn-sm" title="Reset filters">
                 <i class="bi bi-x-circle"></i>
             </a>
         </div>
@@ -166,7 +161,6 @@
         <table class="table table-hover align-middle mb-0">
             <thead class="rk-bg-soft">
                 <tr class="rk-th-soft">
-                    <th class="px-3 py-3">Barangay</th>
                     <th class="px-3 py-3">Item</th>
                     <th class="py-3">Category</th>
                     <th class="py-3 text-end">Qty</th>
@@ -175,12 +169,12 @@
                     <th class="py-3 text-end">Threshold</th>
                     <th class="py-3">Expiry</th>
                     <th class="py-3">Alert</th>
+                    <th class="py-3 text-end px-3">Actions</th>
                 </tr>
             </thead>
             <tbody>
                 {% for r in rows %}
                 <tr class="rk-fs-13">
-                    <td class="px-3 fw-semibold">{{ r.barangay }}</td>
                     <td class="px-3">
                         <div class="fw-semibold">{{ r.name }}</div>
                         <div class="text-muted small">
@@ -197,13 +191,39 @@
                     <td class="text-end text-muted">{{ r.restock_threshold }}</td>
                     <td>{{ r.expiry_date.strftime('%Y-%m-%d') if r.expiry_date else '—' }}</td>
                     <td>{{ alert_pill(r.alert) }}</td>
+                    <td class="text-end px-3">
+                        {% if not r.is_archived %}
+                        <button type="button" class="btn-soft rk-text-ok"
+                                data-bs-toggle="modal" data-bs-target="#stockModal-{{ r.id }}">
+                            <i class="bi bi-plus-slash-minus"></i> Stock
+                        </button>
+                        <a href="/bdrrmo/resources/{{ r.id }}/edit"
+                           class="btn-soft" title="Edit">
+                            <i class="bi bi-pencil"></i>
+                        </a>
+                        <form method="POST" action="/bdrrmo/resources/{{ r.id }}/archive" class="d-inline"
+                              data-confirm='Archive {{ r.name }}?'>
+                            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+                            <button type="submit" class="btn-soft rk-text-amber" title="Archive">
+                                <i class="bi bi-archive"></i>
+                            </button>
+                        </form>
+                        {% else %}
+                        <form method="POST" action="/bdrrmo/resources/{{ r.id }}/archive" class="d-inline">
+                            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+                            <button type="submit" class="btn-soft rk-text-ok">
+                                <i class="bi bi-arrow-counterclockwise"></i> Restore
+                            </button>
+                        </form>
+                        {% endif %}
+                    </td>
                 </tr>
                 {% else %}
                 <tr>
                     <td colspan="9" class="text-center text-muted py-4">
                         No resources match your filters.
                         {% if f_q or f_category or f_alert or f_archived %}
-                        <a href="/admin/resources" class="ms-2">Clear filters</a>
+                        <a href={{resources_route}} class="ms-2">Clear filters</a>
                         {% endif %}
                     </td>
                 </tr>
@@ -213,14 +233,14 @@
     </div>
 </div>
 
-{{ pager(page_obj, "/admin/resources", base_query) }}
+{{ pager(page_obj, resources_route, base_query) }}
 
 <!-- ── Stock modals (one per active row) ──────────────────────── -->
 {% for r in rows %}
 {% if not r.is_archived %}
 <div class="modal fade" id="stockModal-{{ r.id }}" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog">
-    <form method="POST" action="/admin/resources/{{ r.id }}/stock" class="modal-content" data-validate>
+    <form method="POST" action="/bdrrmo/resources/{{ r.id }}/stock" class="modal-content" data-validate>
             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
       <div class="modal-header">
         <h6 class="modal-title">Stock change — {{ r.name }}</h6>

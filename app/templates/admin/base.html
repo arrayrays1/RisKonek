@@ -80,16 +80,8 @@
                 {'href': '/admin/map', 'icon': 'bi-map-fill', 'text': 'Facility Map', 'key': 'map'}
             ]},
             {'label': 'Resource Management', 'items': [
-                {'href': '/admin/resources', 'icon': 'bi-box-seam-fill', 'text': 'Resources', 'key': 'resources', 'title': 'Stockpile / resource goods owned by CDRRMO Logistics Staff (food packs, water, medicine, hygiene kits, blankets, and other relief goods)'},
-                {'href': '/admin/equipment', 'icon': 'bi-wrench-adjustable', 'text': 'Vehicle & Equipment', 'key': 'equipment', 'title': 'Shared module — accessible to CDRRMO Logistics Staff and CFAU / Operations Personnel (vehicles, generators, chainsaws, flashlights, rescue tools, boats, ambulances, and other operational equipment)'},
-                {'href': '/admin/serviceability', 'icon': 'bi-clipboard2-check', 'text': 'Serviceability', 'key': 'serviceability_review', 'title': 'Review and resolve CFAU equipment serviceability reports'}
-            ]},
-            {'label': 'Planning & Simulation', 'items': [
-                {'href': '/admin/simulator/setup', 'icon': 'bi-lightning-fill', 'text': 'Resource Simulator', 'key': 'simulator'}
-            ]},
-            {'label': 'Incident Management', 'items': [
-                {'href': '/admin/uploads', 'icon': 'bi-cloud-upload-fill', 'text': 'Incident Uploads', 'key': 'uploads', 'title': 'Upload and convert disaster reports into incident records.'},
-                {'href': '/admin/incident-reports', 'icon': 'bi-journal-text', 'text': 'Post-Incident Reports', 'key': 'incident_reports_review', 'title': 'Document response actions and operational outcomes for incidents.'}
+                {'href': '/admin/resources', 'icon': 'bi-box-seam-fill', 'text': 'Resources', 'key': 'resources', 'title': 'Stockpile / resource goods owned by BDRRMO Logistics Staff (food packs, water, medicine, hygiene kits, blankets, and other relief goods)'},
+                {'href': '/admin/equipment', 'icon': 'bi-wrench-adjustable', 'text': 'Vehicle & Equipment', 'key': 'equipment', 'title': 'Shared module — accessible to BDRRMO Logistics Staff and CFAU / Operations Personnel (vehicles, generators, chainsaws, flashlights, rescue tools, boats, ambulances, and other operational equipment)'},
             ]},
             {'label': 'Administration', 'items': [
                 {'href': '/admin/users', 'icon': 'bi-people-fill', 'text': 'User Management', 'key': 'users'},
@@ -133,41 +125,57 @@
         {% endif %}
 
         {% if is_bdrrmo %}
-        <a href="/bdrrmo/profile"
-           class="nav-item-link nav-accent-green {{ 'active' if active == 'bdrrmo_profile' else '' }}"
-           title="Disaster profile and planning priority for your barangay">
-            <i class="bi bi-geo-alt-fill nav-icon"></i><span class="nav-label">Barangay Profile</span>
-        </a>
-        <a href="/bdrrmo/incidents"
-           class="nav-item-link nav-accent-orange {{ 'active' if active == 'bdrrmo_incidents' else '' }}"
-           title="Historical disaster incidents in your barangay">
-            <i class="bi bi-clock-history nav-icon"></i><span class="nav-label">Incident History</span>
-        </a>
-        <a href="/bdrrmo/incident-reports"
-           class="nav-item-link nav-accent-purple {{ 'active' if active == 'bdrrmo_incident_reports' else '' }}"
-           title="Document response actions and operational outcomes after an incident in your barangay">
-            <i class="bi bi-journal-text nav-icon"></i><span class="nav-label">Post-Incident Reports</span>
-        </a>
-        <a href="/bdrrmo/facilities"
-           class="nav-item-link nav-accent-blue {{ 'active' if active == 'bdrrmo_facilities' else '' }}"
-           title="Critical facilities in your barangay">
-            <i class="bi bi-building nav-icon"></i><span class="nav-label">Critical Facilities</span>
-        </a>
-        <a href="/bdrrmo/population"
-           class="nav-item-link nav-accent-purple {{ 'active' if active == 'bdrrmo_population' else '' }}"
-           title="Record and view population data for your barangay">
-            <i class="bi bi-people-fill nav-icon"></i><span class="nav-label">Population Records</span>
-        </a>
-        <a href="/bdrrmo/contacts"
-           class="nav-item-link nav-accent-pink {{ 'active' if active == 'bdrrmo_contacts' else '' }}"
-           title="Manage officials and emergency responder contacts">
-            <i class="bi bi-person-vcard nav-icon"></i><span class="nav-label">Contact Details</span>
-        </a>
-        <a href="/bdrrmo/directory"
-           class="nav-item-link nav-accent-pink {{ 'active' if active == 'bdrrmo_directory' else '' }}"
-           title="Barangay officials and emergency responder contacts across San Pedro (read-only)">
-            <i class="bi bi-journal-bookmark-fill nav-icon"></i><span class="nav-label">Contact Directory</span>
-        </a>
+            <a href="/bdrrmo/profile"
+            class="nav-item-link {{ 'active' if active == 'bdrrmo_profile' else '' }}"
+            title="Disaster profile and planning priority for your barangay">
+                <i class="bi bi-geo-alt-fill nav-icon"></i><span class="nav-label">Barangay Profile</span>
+            </a>
+            <a href="/bdrrmo/facilities"
+            class="nav-item-link {{ 'active' if active == 'bdrrmo_facilities' else '' }}"
+            title="Critical facilities in your barangay">
+                <i class="bi bi-building nav-icon"></i><span class="nav-label">Critical Facilities</span>
+            </a>
+            <a href="/bdrrmo/population"
+            class="nav-item-link {{ 'active' if active == 'bdrrmo_population' else '' }}"
+            title="Record and view population data for your barangay">
+                <i class="bi bi-people-fill nav-icon"></i><span class="nav-label">Population Records</span>
+            </a>
+            <a href="/bdrrmo/contacts"
+            class="nav-item-link {{ 'active' if active == 'bdrrmo_contacts' else '' }}"
+            title="Manage officials and emergency responder contacts">
+                <i class="bi bi-person-vcard nav-icon"></i><span class="nav-label">Contact Details</span>
+            </a>
+            <a href="/bdrrmo/directory"
+            class="nav-item-link {{ 'active' if active == 'bdrrmo_directory' else '' }}"
+            title="Barangay officials and emergency responder contacts across San Pedro (read-only)">
+                <i class="bi bi-journal-bookmark-fill nav-icon"></i><span class="nav-label">Contact Directory</span>
+            </a>
+
+            {% set navigation_groups = [
+                {'label': 'Resource Management', 'items': [
+                    {'href': '/bdrrmo/resources', 'icon': 'bi-box-seam-fill', 'text': 'Resources', 'key': 'resources', 'title': 'Stockpile / resource goods owned by BDRRMO Logistics Staff (food packs, water, medicine, hygiene kits, blankets, and other relief goods)'},
+                    {'href': '/bdrrmo/equipment_bdrrmo', 'icon': 'bi-wrench-adjustable', 'text': 'Vehicle & Equipment', 'key': 'equipment', 'title': 'Shared module — accessible to BDRRMO Logistics Staff and CFAU / Operations Personnel (vehicles, generators, chainsaws, flashlights, rescue tools, boats, ambulances, and other operational equipment)'},
+                ]},
+                {'label': 'Planning & Simulation', 'items': [
+                    {'href': '/bdrrmo/simulator/setup', 'icon': 'bi-lightning-fill', 'text': 'Resource Simulator', 'key': 'simulator'}
+                ]},
+                {'label': 'Incident Management', 'items': [
+                    {'href': '/bdrrmo/incidents/upload', 'icon': 'bi-cloud-upload-fill', 'text': 'Incident Uploads', 'key': 'bdrrmo_incident_upload', 'title': 'Upload and convert disaster reports into incident records.'},
+                    {'href': '/bdrrmo/incident-reports', 'icon': 'bi-journal-text', 'text': 'Post-Incident Reports', 'key': 'bdrrmo_incident_reports', 'title': 'Document response actions and operational outcomes for incidents.'},
+                    {'href': '/bdrrmo/incidents', 'icon': 'bi-clock-history', 'text': 'Incident History', 'key': 'bdrrmo_incidents', 'title': 'Document response actions and operational outcomes for incidents.'}
+                ]},
+            ] %}
+            
+            {% for group in navigation_groups %}
+            <div class="nav-section">{{ group.label }}</div>
+                {% for item in group['items'] %}
+                <a href="{{ item.href }}"
+                class="nav-item-link {{ 'active' if active == item.key else '' }}"
+                {%- if item.title %} title="{{ item.title }}"{% endif %}>
+                    <i class="bi {{ item.icon }} nav-icon"></i><span class="nav-label">{{ item.text }}</span>
+                </a>
+                {% endfor %}
+            {% endfor %}
         {% endif %}
 
         {% if is_staff %}

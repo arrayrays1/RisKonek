@@ -5,6 +5,8 @@
 
 {% set active_nav = 'equipment' %}
 
+{% set equipment_route = '/bdrrmo/equipment_bdrrmo' %}
+
 {% macro status_pill(v, label) -%}
     {% if v in ('available', 'serviceable') %}
         <span class="status-pill status-operational">{{ label }}</span>
@@ -25,6 +27,9 @@
         <h1>Vehicle &amp; Equipment Monitoring</h1>
         <p>Operational disaster-response equipment (vehicles, generators, chainsaws, rescue boats, radios, flashlights, life vests).</p>
     </div>
+    <a href="/bdrrmo/equipment_bdrrmo/new" class="btn btn-rk">
+        <i class="bi bi-plus-lg"></i> Add Equipment
+    </a>
 </div>
 
 {% if request.query_params.get('success') %}
@@ -92,23 +97,13 @@
 
 <!-- ── Filters ────────────────────────────────────────────────── -->
 <div class="dash-card mb-3">
-    <form method="GET" action="/admin/equipment" class="row g-2 align-items-end js-live-filter">
-        <div class="col-md-3">
+    <form method="GET" action={{equipment_route}} class="row g-2 align-items-end js-live-filter">
+        <div class="col-md-4">
             <label class="form-label small fw-semibold mb-1">Search</label>
             <input type="text" name="q" value="{{ f_q }}" class="form-control form-control-sm"
                    placeholder="Search name or plate/serial…" autocomplete="off">
         </div>
-        <div class="col-md-2">
-            <label class="form-label small fw-semibold mb-1">Barangay</label>
-            <select name="barangay_id" class="form-select form-select-sm">
-                
-                <option value=0>All Barangay</option>
-                {% for b in barangays %}
-                <option value="{{ b.id }}" {% if f_barangay_id == b.id %}selected{% endif %}>{{ b.name }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="col-md-2">
+        <div class="col-md-3">
             <label class="form-label small fw-semibold mb-1">Type</label>
             <select name="equipment_type" class="form-select form-select-sm">
                 <option value="">All types</option>
@@ -134,7 +129,7 @@
             </select>
         </div>
         <div class="col-md-1 d-grid">
-            <a href="/admin/equipment" class="btn btn-outline-secondary btn-sm" title="Reset filters">
+            <a href={{equipment_route}} class="btn btn-outline-secondary btn-sm" title="Reset filters">
                 <i class="bi bi-x-circle"></i>
             </a>
         </div>
@@ -147,32 +142,65 @@
         <table class="table table-hover align-middle mb-0">
             <thead class="rk-bg-soft">
                 <tr class="rk-th-soft">
-                    <th class="px-3 py-3">Barangay</th>
                     <th class="px-3 py-3">Equipment</th>
                     <th class="py-3">Type</th>
                     <th class="py-3">Status</th>
                     <th class="py-3">Assigned</th>
                     <th class="py-3">Plate / Serial</th>
                     <th class="py-3">Last Inspected</th>
+                    <th class="py-3 text-end px-3">Actions</th>
                 </tr>
             </thead>
             <tbody>
                 {% for e in rows %}
                 <tr class="rk-fs-13">
-                    <td class="px-3 fw-semibold">{{ e.barangay }}</td>
                     <td class="px-3 fw-semibold">{{ e.name }}</td>
                     <td>{{ e.type_label }}</td>
                     <td>{{ status_pill(e.status_value, e.status_label) }}</td>
                     <td class="text-muted">{{ e.assigned }}</td>
                     <td class="text-muted">{{ e.plate_or_serial }}</td>
                     <td class="text-muted">{{ e.last_inspected.strftime('%Y-%m-%d') if e.last_inspected else '—' }}</td>
+                    <td class="text-end px-3">
+                        {# History stays available for archived units too. #}
+                        {% if user.role in ('cfau_oic', 'admin') %}
+                        <a href="/cfau/equipment-audit?equipment_id={{ e.id }}"
+                           class="btn btn-outline-secondary btn-sm"
+                           title="View this unit's audit log">
+                            <i class="bi bi-clock-history"></i>
+                        </a>
+                        {% endif %}
+                        {% if not e.is_archived %}
+                        <button type="button" class="btn btn-outline-primary btn-sm"
+                                data-bs-toggle="modal" data-bs-target="#statusModal-{{ e.id }}">
+                            <i class="bi bi-arrow-repeat"></i> Status
+                        </button>
+                        <a href="/bdrrmo/equipment_bdrrmo/{{ e.id }}/edit"
+                           class="btn btn-outline-secondary btn-sm">
+                            <i class="bi bi-pencil"></i>
+                        </a>
+                        <form method="POST" action="/bdrrmo/equipment_bdrrmo/{{ e.id }}/archive" class="d-inline"
+                              data-confirm='Archive {{ e.name }}?'>
+                            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+                            <button type="submit" class="btn btn-outline-warning btn-sm">
+                                <i class="bi bi-archive"></i>
+                            </button>
+                        </form>
+                        {% else %}
+                        <form method="POST" action="/bdrrmo/equipment_bdrrmo/{{ e.id }}/archive" class="d-inline">
+                            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+                            <button type="submit" class="btn btn-outline-success btn-sm">
+                                <i class="bi bi-arrow-counterclockwise"></i> Restore
+                            </button>
+                        </form>
+                        {% endif %}
+                    </td>
                 </tr>
                 {% else %}
                 <tr>
                     <td colspan="7" class="text-center text-muted py-4">
                         No equipment matches your filters.
                         {% if f_q or f_type or f_status or f_archived %}
-                        <a href="/admin/equipment" class="ms-2">Clear filters</a>
+                        <a href={{equipment_route}} class="ms-2">Clear filters</a>
                         {% endif %}
                     </td>
                 </tr>
@@ -182,14 +210,14 @@
     </div>
 </div>
 
-{{ pager(page_obj, "/admin/equipment", base_query) }}
+{{ pager(page_obj, equipment_route, base_query) }}
 
 <!-- ── Status change modals ───────────────────────────────────── -->
 {% for e in rows %}
 {% if not e.is_archived %}
 <div class="modal fade" id="statusModal-{{ e.id }}" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog">
-    <form method="POST" action="/admin/equipment/{{ e.id }}/status" class="modal-content" data-validate>
+    <form method="POST" action="/bdrrmo/equipment_bdrrmo/{{ e.id }}/status" class="modal-content" data-validate>
             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
       <div class="modal-header">
         <h6 class="modal-title">Change status — {{ e.name }}</h6>
