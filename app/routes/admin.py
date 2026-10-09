@@ -2213,34 +2213,6 @@ def equipment_status_change(
         status_code=302,
     )
 
-
-@router.post("/equipment/{equipment_id}/archive")
-def equipment_archive_toggle(
-    equipment_id: int,
-    request: Request,
-    db: Session = Depends(get_db),
-):
-    user = require_role(request, EQUIPMENT_ROLES)
-    if isinstance(user, RedirectResponse):
-        return user
-    e = db.query(Equipment).filter(Equipment.id == equipment_id).first()
-    if not e:
-        return RedirectResponse(url="/admin/equipment", status_code=302)
-
-    e.is_archived = not bool(e.is_archived)
-    db.commit()
-
-    verb = "archived" if e.is_archived else "restored"
-    log_action(
-        db, user["id"], verb, "equipment", e.id,
-        f"Equipment '{e.name}' {verb}.",
-    )
-
-    url = "/admin/equipment?archived=1&success=" + verb.title() if e.is_archived \
-        else "/admin/equipment?success=" + verb.title()
-    return RedirectResponse(url=url, status_code=302)
-
-
 # ─────────────────────────────────────────────────────────────────────
 # WEEK 8 — EQUIPMENT SERVICEABILITY REVIEW (admin side of Module B)
 # Roles: admin only. CFAU files reports under /cfau/serviceability;
