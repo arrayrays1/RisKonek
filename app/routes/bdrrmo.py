@@ -12,7 +12,7 @@ from app.models import (
     DisasterType, Severity, FacilityType, FacilityStatus,
     UploadedReport, ReportStatus, FileType, LifecycleStatus, UploadEvent,
     add_upload_history, BarangayEquipment, EquipmentType,
-    IncidentReport, ServiceabilityStatus, Resource, ResourceCategory, Equipment, EquipmentReport, EquipmentStatus
+    IncidentReport, ServiceabilityStatus, Resource, ResourceCategory, Equipment, EquipmentReport, EquipmentStatus, Planning, PlanningStatus
 )
 from app.auth import require_role, require_barangay_access
 from app.utils.pagination import (
@@ -3327,3 +3327,143 @@ def equipment_repair_reminders(db, today=None):
         eid: {"state": ("overdue" if rank == 2 else "due_today"), "report": rep}
         for eid, (rank, _d, rep) in best.items()
     }
+
+PLANNING_STATUS_LABELS = {
+    "pending": "Pending",
+    "approved": "Approved",
+    "rejected": "Rejected",
+}
+
+PLANNING_STATUS_CHOICES = ["pending", "approved", "rejected"]
+
+@router.get("/planning", response_class=HTMLResponse)
+def equipment_edit_form(
+    request: Request,              
+    db: Session = Depends(get_db),
+    q: Optional[str] = None,
+    status: Optional[str] = None,
+    page: Optional[str] = None,
+    per_page: Optional[str] = None,):
+    user, barangay = _resolve_scope(request, db)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    query = db.query(Planning).filter(
+        Planning.barangay_id == user["barangay_id"]
+    )
+
+    if q:
+        like = f"%{q.strip()}%"
+        query = query.filter(Planning.file_name.ilike(like))
+    if status in {s.value for s in PlanningStatus}:
+        query = query.filter(Planning.status == PlanningStatus(status))
+
+    rows = []
+    for r in query.order_by(Planning.created_at.desc()).all():
+        rows.append({
+            "id": r.id,
+            "file_name": r.file_name,
+            "file_path": r.file_path,
+            "status_value": r.status.value if r.status else "",
+            "status_label": PLANNING_STATUS_LABELS.get(
+                r.status.value if r.status else "", "—"
+            ),
+            "created_at": r.created_at,
+        })
+
+    page_obj = paginate(rows, parse_page(page), parse_per_page(per_page))
+    base_query = build_base_query({"q": q or "", "status": status or ""})
+
+    return templates.TemplateResponse(
+        request=request,
+        name="bdrrmo/planning.html",
+        context={
+            "user": user,
+            "active_nav": "planning",
+            "barangay": barangay,
+            "edit_mode": True,
+            "plannings": page_obj.items,
+            "page_obj": page_obj,
+            "base_query": base_query,
+            "status_choices": [(v, PLANNING_STATUS_LABELS[v]) for v in PLANNING_STATUS_CHOICES],
+            "f_q": q or "",
+            "f_status": status,
+            "error": None,
+        },
+    )
+    
+
+@router.post("/planning")
+async def planning_upload_submit(
+    request: Request,
+    db: Session = Depends(get_db),
+    file: UploadFile = File(...),
+):
+    user, barangay = _resolve_scope(request, db)
+    if isinstance(user, RedirectResponse):
+        return user
+    if not barangay:
+        return RedirectResponse(
+            url="/bdrrmo/planning?error=No+barangay+is+assigned+to+your+account",
+            status_code=302,
+        )
+
+    original_name = file.filename or "planning"
+    ext = _ext_of(original_name)
+    if ext != ".pdf":
+        return RedirectResponse(
+            url="/bdrrmo/planning?error=Unsupported+file+type.+Allowed:+PDF",
+            status_code=302,
+        )
+
+    PLANNING_UPLOAD_SUBDIR = os.path.join("uploads", "planning")
+
+    os.makedirs(PLANNING_UPLOAD_SUBDIR, exist_ok=True)
+    stored_name = _safe_filename(original_name)
+    stored_path = os.path.join(PLANNING_UPLOAD_SUBDIR, stored_name)
+
+    ok, err = await save_validated_upload(file, ext, stored_path)
+    if not ok:
+        return RedirectResponse(
+            url="/bdrrmo/planning?error=" + quote_plus(err),
+            status_code=302,
+        )
+
+    planning = Planning(
+        uploaded_by=user["id"],
+        file_name=original_name,
+        file_path=stored_path.replace("\\", "/"),
+        status=PlanningStatus.pending,
+        barangay_id=barangay.id,
+    )
+    db.add(planning)
+    db.commit()
+    db.refresh(planning)
+
+    return RedirectResponse(
+        url=f"/bdrrmo/planning?success=Planning+created+successfully", status_code=302
+    )
+
+@router.get("/planning/{document_id}/view")
+async def view_document( 
+    document_id: int,
+    request: Request,
+    db: Session = Depends(get_db), 
+):
+    user, _ = _resolve_scope(request, db)
+    if isinstance(user, RedirectResponse):
+        return user
+    
+    # Retrieve the document from your database
+    document = db.query(Planning).filter(Planning.id == document_id).first()
+
+    if not document:
+        return RedirectResponse(url="/bdrrmo/planning", status_code=302)
+
+    return FileResponse(
+        path=document.file_path,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": "inline"
+        }
+    )
