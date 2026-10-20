@@ -1,0 +1,162 @@
+{% extends "admin/base.html" %}
+{% from "shared/_pagination.html" import pager %}
+
+{% block title %}Planning — RisKonek{% endblock %}
+
+{% set active_nav = 'planning' %}
+
+{% macro status_pill(v, label) -%}
+    {% if v == 'approved' %}
+        <span class="status-pill status-operational">{{ label }}</span>
+    {% elif v == 'pending' %}
+        <span class="status-pill status-maintenance">{{ label }}</span>
+    {% elif v in 'rejected' %}
+        <span class="status-pill status-unavailable">{{ label }}</span>
+    {% else %}
+        <span class="badge bg-light text-dark border">{{ label }}</span>
+    {% endif %}
+{%- endmacro %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start page-header">
+    <div>
+        <h1>Planning</h1>
+        <p>Historical submitted planning for
+           {% if barangay %}Barangay {{ barangay.name }}{% else %}your barangay{% endif %}.</p>
+    </div>
+</div>
+
+{% if request.query_params.get('success') %}
+<div class="alert alert-success alert-dismissible fade show">
+    <i class="bi bi-check-circle-fill me-1"></i>
+    {{ request.query_params.get('success') }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+{% if request.query_params.get('error') %}
+<div class="alert alert-danger alert-dismissible fade show">
+    <i class="bi bi-exclamation-triangle-fill me-1"></i>
+    {{ request.query_params.get('error') }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+{% if not barangay %}
+<div class="alert alert-warning">
+    <i class="bi bi-exclamation-triangle-fill me-1"></i>
+    No barangay is currently assigned to your account. Please contact the CDRRMO Admin.
+</div>
+{% else %}
+
+<!-- ── Submit a disaster / risk report (TR-BDR-01/02) ──────────── -->
+<div class="dash-card mb-4">
+    <div class="card-title-row">
+        <i class="bi bi-plus-circle rk-text-green"></i>
+        <h6>Submit Planning</h6>
+    </div>
+    <form method="POST" action="/bdrrmo/planning" class="row g-3" data-validate
+          data-confirm='Submit this planning for your barangay?' enctype="multipart/form-data">
+            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+        <div class="col-12">
+            <label class="form-label small fw-semibold mb-1">Planning File</label>
+            <input type="file" name="file" class="form-control"
+                   accept=".pdf" required>
+            <div class="form-text">Supported: PDF only</div>
+        </div>
+        <div class="col-12">
+            <button type="submit" class="btn btn-rk btn-sm">
+                <i class="bi bi-send"></i> Submit Planning
+            </button>
+            <span class="text-muted small ms-2">
+                Saved against your barangay and your account; appears in the history below.
+            </span>
+        </div>
+    </form>
+</div>
+
+<!-- ── Filters (auto-apply) ───────────────────────────────────── -->
+<div class="dash-card mb-3">
+    <form method="GET" action="/bdrrmo/planning" class="row g-2 align-items-end js-live-filter">
+        <div class="col-md-8">
+            <label class="form-label small fw-semibold mb-1">Search</label>
+            <input type="text" name="q" value="{{ f_q }}" class="form-control form-control-sm"
+                   placeholder="Search file name…" autocomplete="off">
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small fw-semibold mb-1">Status</label>
+            <select name="status" class="form-select form-select-sm">
+                <option value="">All status</option>
+                {% for s, label in status_choices %}
+                <option value="{{ s }}" {% if f_status == s %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-1 d-grid">
+            <a href="/bdrrmo/planning" class="btn btn-outline-secondary btn-sm" title="Reset filters">
+                <i class="bi bi-x-circle"></i>
+            </a>
+        </div>
+    </form>
+</div>
+
+<div class="dash-card p-0">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="rk-bg-soft">
+                <tr class="rk-th-soft">
+                    <th class="px-3 py-3">File name</th>
+                    <th class="py-3">Status</th>
+                    <th class="py-3 text-end px-3">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for planning in plannings %}
+                <tr class="rk-fs-13">
+                    <td class="px-3">{{ planning.file_name }}</td>
+                    <td>{{ status_pill(planning.status_value, planning.status_label) }}</td>
+                    <td class="text-end px-3">
+                        <a
+                            href="planning/{{ planning.id }}/view"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="btn btn-outline-primary btn-sm"
+                        >
+                            <i class="bi bi-eye"></i>
+                            View
+                        </a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6" class="text-center text-muted py-4">
+                    {% if f_q or f_disaster_type or f_severity %}
+                    No plannings match your filters.
+                    <a href="/bdrrmo/planning" class="ms-2">Clear filters</a>
+                    {% else %}
+                    No submitted plannings for this barangay yet.
+                    {% endif %}
+                </td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{{ pager(page_obj, "/bdrrmo/planning", base_query) }}
+{% endif %}
+{% endblock %}
+
+<script nonce="{{ request.state.csp_nonce }}">
+    document.addEventListener("DOMContentLoaded", () => {
+        document.querySelectorAll(".view-btn").forEach((button) => {
+            button.addEventListener("click", () => {
+                const file = button.dataset.file;
+
+                viewFile(file)
+            });
+        });
+    });
+
+    function viewFile(fileName) {
+        window.open(fileName)
+    }
+</script>
