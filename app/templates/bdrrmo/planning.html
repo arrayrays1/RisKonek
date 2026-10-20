@@ -160,19 +160,3 @@
 {{ pager(page_obj, "/bdrrmo/planning", base_query) }}
 {% endif %}
 {% endblock %}
-
-<script nonce="{{ request.state.csp_nonce }}">
-    document.addEventListener("DOMContentLoaded", () => {
-        document.querySelectorAll(".view-btn").forEach((button) => {
-            button.addEventListener("click", () => {
-                const file = button.dataset.file;
-
-                viewFile(file)
-            });
-        });
-    });
-
-    function viewFile(fileName) {
-        window.open(fileName)
-    }
-</script>
