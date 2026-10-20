@@ -3342,13 +3342,17 @@ def equipment_edit_form(
     db: Session = Depends(get_db),
     q: Optional[str] = None,
     status: Optional[str] = None,
+    archived: Optional[str] = None,
     page: Optional[str] = None,
     per_page: Optional[str] = None,):
     user, barangay = _resolve_scope(request, db)
     if isinstance(user, RedirectResponse):
         return user
 
+    show_archived = (archived == "1")
+
     query = db.query(Planning).filter(
+        Planning.is_archived == show_archived,
         Planning.barangay_id == user["barangay_id"]
     )
 
@@ -3388,6 +3392,7 @@ def equipment_edit_form(
             "status_choices": [(v, PLANNING_STATUS_LABELS[v]) for v in PLANNING_STATUS_CHOICES],
             "f_q": q or "",
             "f_status": status,
+            "show_archived": show_archived,
             "error": None,
         },
     )
@@ -3487,7 +3492,7 @@ def planning_archive_toggle(
     verb = "archived" if p.is_archived else "restored"
     log_action(
         db, user["id"], verb, "equipment", p.id,
-        f"Equipment '{p.name}' {verb}.",
+        f"Equipment '{p.file_name}' {verb}.",
     )
 
     url = "/bdrrmo/planning?archived=1&success=" + verb.title() if p.is_archived \
