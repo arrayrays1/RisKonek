@@ -3467,3 +3467,29 @@ async def view_document(
             "Content-Disposition": "inline"
         }
     )
+
+@router.post("/planning/{planning_id}/archive")
+def planning_archive_toggle(
+    planning_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    user, _ = _resolve_scope(request, db)
+    if isinstance(user, RedirectResponse):
+        return user
+    p = db.query(Planning).filter(Planning.id == planning_id).first()
+    if not p:
+        return RedirectResponse(url="/bdrrmo/planning", status_code=302)
+
+    p.is_archived = not bool(p.is_archived)
+    db.commit()
+
+    verb = "archived" if p.is_archived else "restored"
+    log_action(
+        db, user["id"], verb, "equipment", p.id,
+        f"Equipment '{p.name}' {verb}.",
+    )
+
+    url = "/bdrrmo/planning?archived=1&success=" + verb.title() if p.is_archived \
+        else "/bdrrmo/planning?success=" + verb.title()
+    return RedirectResponse(url=url, status_code=302)
