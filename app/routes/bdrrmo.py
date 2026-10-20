@@ -3337,7 +3337,7 @@ PLANNING_STATUS_LABELS = {
 PLANNING_STATUS_CHOICES = ["pending", "approved", "rejected"]
 
 @router.get("/planning", response_class=HTMLResponse)
-def equipment_edit_form(
+def planning(
     request: Request,              
     db: Session = Depends(get_db),
     q: Optional[str] = None,
@@ -3372,6 +3372,7 @@ def equipment_edit_form(
             "status_label": PLANNING_STATUS_LABELS.get(
                 r.status.value if r.status else "", "—"
             ),
+            "is_archived": r.is_archived,
             "created_at": r.created_at,
         })
 
