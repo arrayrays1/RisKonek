@@ -3447,7 +3447,7 @@ async def planning_upload_submit(
     db.refresh(planning)
 
     return RedirectResponse(
-        url=f"/bdrrmo/planning?success=Planning+created+successfully", status_code=302
+        url=f"/bdrrmo/planning?success=Plan+created+successfully", status_code=302
     )
 
 @router.get("/planning/{document_id}/view")
