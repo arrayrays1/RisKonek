@@ -132,6 +132,12 @@
                             <i class="bi bi-eye"></i>
                             View
                         </a>
+                        {% if planning.status_value == "rejected" %}
+                        <button type="button" class="btn btn-outline-primary btn-sm"
+                            data-bs-toggle="modal" data-bs-target="#reasonModal-{{ planning.id }}">
+                            <i class="bi bi-eye"></i> View Reason
+                        </button>
+                        {% endif %}
                         <form method="POST" action="/bdrrmo/planning/{{ planning.id }}/archive" class="d-inline"
                               data-confirm='Archive {{ planning.name }}?'>
                             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
@@ -140,6 +146,12 @@
                             </button>
                         </form>
                     {% else %}
+                        {% if planning.status_value == "rejected" %}
+                        <button type="button" class="btn btn-outline-primary btn-sm"
+                            data-bs-toggle="modal" data-bs-target="#reasonModal-{{ planning.id }}">
+                            <i class="bi bi-eye"></i> View Reason
+                        </button>
+                        {% endif %}
                         <form method="POST" action="/bdrrmo/planning/{{ planning.id }}/archive" class="d-inline">
                             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                             <button type="submit" class="btn btn-outline-success btn-sm">
@@ -165,5 +177,26 @@
 </div>
 
 {{ pager(page_obj, "/bdrrmo/planning", base_query) }}
+
 {% endif %}
+
+{% for r in plannings %}
+<div class="modal fade" id="reasonModal-{{ r.id }}" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h6 class="modal-title">Reason</h6>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+            <p class="text-center">{{r.reason}}</p>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+        </div>
+    </div>
+    
+  </div>
+</div>
+{% endfor %}
 {% endblock %}
