@@ -102,7 +102,7 @@
                     {% if not planning.is_archived %}
 
                         <button type="button" class="btn-soft rk-text-ok"
-                                data-bs-toggle="modal" data-bs-target="#stockModal-{{ planning.id }}">
+                                data-bs-toggle="modal" data-bs-target="#changeStatusModal-{{ planning.id }}">
                             <i class="bi bi-plus-slash-minus"></i> Change Status
                         </button>
                         <a
@@ -114,6 +114,12 @@
                             <i class="bi bi-eye"></i>
                             View
                         </a>
+                        {% if planning.status_value == "rejected" %}
+                        <button type="button" class="btn btn-outline-primary btn-sm"
+                            data-bs-toggle="modal" data-bs-target="#reasonModal-{{ planning.id }}">
+                            <i class="bi bi-eye"></i> View Reason
+                        </button>
+                        {% endif %}
                         <form method="POST" action="/admin/planning/{{ planning.id }}/archive" class="d-inline"
                               data-confirm='Archive {{ planning.name }}?'>
                             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
@@ -122,6 +128,12 @@
                             </button>
                         </form>
                     {% else %}
+                        {% if planning.status_value == "rejected" %}
+                        <button type="button" class="btn btn-outline-primary btn-sm"
+                            data-bs-toggle="modal" data-bs-target="#reasonModal-{{ planning.id }}">
+                            <i class="bi bi-eye"></i> View Reason
+                        </button>
+                        {% endif %}
                         <form method="POST" action="/admin/planning/{{ planning.id }}/archive" class="d-inline">
                             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                             <button type="submit" class="btn btn-outline-success btn-sm">
@@ -150,7 +162,7 @@
 
 {% for r in plannings %}
 {% if not r.is_archived %}
-<div class="modal fade" id="stockModal-{{ r.id }}" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="changeStatusModal-{{ r.id }}" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog">
     <form method="POST" action="/admin/planning/{{ r.id }}/status" class="modal-content" data-validate>
         <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
@@ -185,6 +197,24 @@
   </div>
 </div>
 {% endif %}
+
+<div class="modal fade" id="reasonModal-{{ r.id }}" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h6 class="modal-title">Reason</h6>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+            <p class="text-center">{{r.reason}}</p>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+        </div>
+    </div>
+    
+  </div>
+</div>
 {% endfor %}
 
 <script nonce="{{ request.state.csp_nonce }}">
