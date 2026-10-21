@@ -173,7 +173,7 @@
         </div>
         <div class="mt-2 reason-field" data-show-when="rejected" hidden>
           <label class="form-label small">Reason <span class="text-danger">*</span></label>
-          <input type="text" name="reason" class="form-control form-control-sm"
+          <input type="text" name="reason" class="form-control form-control-sm reason-input"
                  placeholder="e.g. incomplete">
         </div>
       </div>
@@ -197,6 +197,16 @@ document.querySelectorAll(".status-select").forEach((select) => {
             const shouldShow = select.value === field.dataset.showWhen;
 
             field.hidden = !shouldShow;
+
+            const input = field.querySelector(".reason-input");
+
+            if (input) {
+                input.required = shouldShow;
+
+                if (!shouldShow) {
+                    input.value = "";
+                }
+            }
         });
     }
 
