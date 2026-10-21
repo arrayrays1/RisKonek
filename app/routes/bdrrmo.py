@@ -3368,6 +3368,7 @@ def planning(
             "id": r.id,
             "file_name": r.file_name,
             "file_path": r.file_path,
+            "reason": r.reason,
             "status_value": r.status.value if r.status else "",
             "status_label": PLANNING_STATUS_LABELS.get(
                 r.status.value if r.status else "", "—"
