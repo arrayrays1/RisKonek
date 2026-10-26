@@ -675,6 +675,8 @@ class Planning(Base):
     summary = Column(Text)
     extracted_data = Column(JSON)
     is_archived = Column(Boolean, default=False)
+    is_hardcopy_received = Column(Boolean, default=False)
+    hardcopy_received_date = Column(DateTime, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
 
     uploaded_by_user = relationship(
