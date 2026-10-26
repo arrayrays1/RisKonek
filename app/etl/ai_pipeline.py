@@ -55,3 +55,39 @@ def summarize(text: str, max_chars: int = 6000) -> Optional[str]:
         return (out or "").strip() or None
     except Exception:
         return None
+
+def summarize_planning(text: str, max_chars: int = 6000) -> Optional[str]:
+    """Return a short plain-English summary, or None if AI is unavailable
+    or the call fails. Never raises — extraction must continue regardless.
+    """
+    key = _api_key()
+    if not key or not text or not text.strip():
+        return None
+
+    snippet = text.strip()[:max_chars]
+
+    try:
+        from groq import Groq
+        client = Groq(api_key=key)
+        resp = client.chat.completions.create(
+            model="openai/gpt-oss-20b",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You summarize this planning text for the Barangay"
+                        "Disaster Risk Reduction and Management Office. Be "
+                        "concise, factual, and neutral. 3-5 sentences."
+                    ),
+                },
+                {"role": "user", "content": snippet},
+            ],
+            temperature=0.2,
+            max_tokens=400,
+        )
+        out = resp.choices[0].message.content if resp.choices else None
+        print(out)
+        return (out or "").strip() or None
+    except Exception as e:
+        print(e)
+        return None
