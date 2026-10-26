@@ -12,6 +12,8 @@ from app.models import (
     ResourceCategory, EquipmentType, log_action,
     EquipmentReport, IncidentReport, ServiceabilityStatus, Urgency, Planning, PlanningStatus
 )
+from app.etl.extract_pdf import extract_pdf
+from app.etl.ai_pipeline import summarize_planning as ai_summarize
 from app.auth import require_role, hash_password
 from app.analytics.simulator import compute_risk_score
 from app.utils.geo import BARANGAY_COORDS
@@ -2724,9 +2726,37 @@ def planning_archive_toggle(
 
     p.status = status
     p.reason = reason
+
+    if(status == "approved"):
+        ai_text, extracted = planning_ai_summary(p.file_path, p.file_name)
+        
+        p.summary = ai_text
+        p.extracted_data = extracted
+
     db.commit()
 
     return RedirectResponse(
         url=f"/admin/planning?success={p.file_name}+marked+{status}",
         status_code=302,
     )
+
+def planning_ai_summary(stored_path, file_name):
+    extracted = {
+        "raw_text": "", "error": None,
+    }
+
+    try:
+        out = extract_pdf(stored_path)
+        extracted["raw_text"] = out.get("text", "")
+    except Exception as e:
+        print(f"Extraction failed for plan '{file_name}': {e}")
+        extracted["error"] = "Extraction failed. The file could not be read or was malformed."
+
+
+    # Optional AI summary — never blocks the flow.
+    ai_text = None
+    if extracted.get("raw_text"):
+        ai_text = ai_summarize(extracted["raw_text"])
+
+
+    return ai_text, extracted
