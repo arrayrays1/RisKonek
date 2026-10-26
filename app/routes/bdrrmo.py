@@ -35,7 +35,7 @@ from app.etl.structure import (
     structure_incident_report_rows, structure_incident_report_text,
     empty_incident_report_fields,
 )
-from app.etl.ai_pipeline import summarize as ai_summarize, is_available as ai_available
+from app.etl.ai_pipeline import summarize as ai_summarize, is_available as ai_available, summarize_planning as ai_planning_summarize
 from app.services.geocoding import (
     search_locations, reverse_geocode_san_pedro, nearby_landmarks,
     is_within_san_pedro, get_san_pedro_bounds, get_san_pedro_boundary,
@@ -3536,3 +3536,59 @@ def planning_review(planning_id: int, request: Request, db: Session = Depends(ge
             "error": request.query_params.get("error"),
         },
     )
+
+@router.post("/planning/{planning_id}/retry")
+def planning_review(
+    planning_id: int, 
+    request: Request, 
+    extract_retry: Optional[bool] = False,
+    summary_retry: Optional[bool] = False,
+    db: Session = Depends(get_db)):
+
+    user, _ = _resolve_scope(request, db)
+    if isinstance(user, RedirectResponse):
+        return user
+    p = db.query(Planning).filter(Planning.id == planning_id).first()
+    if not p:
+        return RedirectResponse(url="/admin/planning", status_code=302)
+
+    if(extract_retry):
+    
+        ai_text, extracted = planning_ai_summary(p.file_path, p.file_name)
+
+        p.summary = ai_text
+        p.extracted_data = extracted
+
+    if(summary_retry):
+
+        ai_text = ai_planning_summarize(p.extracted_data["raw_text"])
+        
+        print(ai_text)
+        p.summary = ai_text
+
+    db.commit()
+
+    return RedirectResponse(
+        url=f"/bdrrmo/planning/{planning_id}/review", status_code=302
+    )
+
+def planning_ai_summary(stored_path, file_name):
+    extracted = {
+        "raw_text": "", "error": None,
+    }
+
+    try:
+        out = extract_pdf(stored_path)
+        extracted["raw_text"] = out.get("text", "")
+    except Exception as e:
+        print(f"Extraction failed for plan '{file_name}': {e}")
+        extracted["error"] = "Extraction failed. The file could not be read or was malformed."
+
+
+    # Optional AI summary — never blocks the flow.
+    ai_text = None
+    if extracted.get("raw_text"):
+        ai_text = ai_planning_summarize(extracted["raw_text"])
+
+
+    return ai_text, extracted
