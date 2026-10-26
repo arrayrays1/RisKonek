@@ -132,6 +132,7 @@
                             <i class="bi bi-eye"></i>
                             View
                         </a>
+                        {% if planning.status_value == "approved" %}
                         <a
                             href="planning/{{ planning.id }}/review"
                             class="btn btn-outline-primary btn-sm"
@@ -139,6 +140,7 @@
                             <i class="bi bi-eye"></i>
                             View Summary
                         </a>
+                        {% endif %}
                         {% if planning.status_value == "rejected" %}
                         <button type="button" class="btn btn-outline-primary btn-sm"
                             data-bs-toggle="modal" data-bs-target="#reasonModal-{{ planning.id }}">
