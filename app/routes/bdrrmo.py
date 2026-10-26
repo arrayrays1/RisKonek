@@ -3500,3 +3500,39 @@ def planning_archive_toggle(
     url = "/bdrrmo/planning?archived=1&success=" + verb.title() if p.is_archived \
         else "/bdrrmo/planning?success=" + verb.title()
     return RedirectResponse(url=url, status_code=302)
+
+def _get_planning_owned_upload(db, planning_id, user):
+    """A BDRRMO incident upload the current user may act on (own only)."""
+    r = db.query(Planning).filter(Planning.id == planning_id).first()
+    if not r:
+        return None
+    if r.uploaded_by != user["id"]:
+        return None
+    return r
+
+@router.get("/planning/{planning_id}/review", response_class=HTMLResponse)
+def planning_review(planning_id: int, request: Request, db: Session = Depends(get_db)):
+    user, barangay = _resolve_scope(request, db)
+    if isinstance(user, RedirectResponse):
+        return user
+    plan = _get_planning_owned_upload(db, planning_id, user)
+    if not plan:
+        return RedirectResponse(url="/bdrrmo/planning", status_code=302)
+
+    data = plan.extracted_data or {}
+
+    return templates.TemplateResponse(
+        request=request,
+        name="bdrrmo/planning_review.html",
+        context={
+            "user": user,
+            "active_nav": "planning",
+            "barangay": barangay,
+            "plan": plan,
+            "ai_summary": plan.summary,
+            "ai_available": ai_available(),
+            "raw_text_preview": (data.get("raw_text") or "")[:4000],
+            "extraction_error": data.get("error"),
+            "error": request.query_params.get("error"),
+        },
+    )
