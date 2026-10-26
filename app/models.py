@@ -672,6 +672,8 @@ class Planning(Base):
     file_path = Column(String(500), nullable=False)
     status = Column(Enum(PlanningStatus), default=PlanningStatus.pending)
     reason = Column(Text, nullable=True)
+    summary = Column(Text)
+    extracted_data = Column(JSON)
     is_archived = Column(Boolean, default=False)
     created_at = Column(DateTime, server_default=func.now())
 
