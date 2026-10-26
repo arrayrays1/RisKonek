@@ -40,11 +40,11 @@
         </div>
         <div class="col-md-3">
             <div class="text-muted small">Uploaded</div>
-            <div>{{ plan.uploaded_at | pht }}</div>
+            <div>{{ plan.created_at | pht }}</div>
             <div class="small text-muted">for {{ barangay.name if barangay else '—' }}</div>
         </div>
         <div class="col-md-3 d-flex flex-column gap-2">
-            <a  href="planning/{{ planning.id }}/view"
+            <a  href="/bdrrmo/planning/{{ plan.id }}/view"
                 target="_blank"
                 rel="noopener noreferrer" 
                 class="btn btn-outline-secondary btn-sm">
