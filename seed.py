@@ -228,6 +228,7 @@ for r in resources_data:
 
         resource = Resource(
             name=r["name"],
+            barangay_id=random.randint(1, 27),
             category=r["category"],
             is_perishable=r["perishable"],
             quantity=r["qty"],
@@ -273,6 +274,7 @@ for e in equipment_data:
     if not existing:
         equip = Equipment(
             name=e["name"],
+            barangay_id=random.randint(1, 27),
             equipment_type=e["type"],
             status=e["status"],
             plate_or_serial=e["serial"],

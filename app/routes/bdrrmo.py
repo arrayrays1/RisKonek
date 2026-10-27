@@ -12,7 +12,7 @@ from app.models import (
     DisasterType, Severity, FacilityType, FacilityStatus,
     UploadedReport, ReportStatus, FileType, LifecycleStatus, UploadEvent,
     add_upload_history, BarangayEquipment, EquipmentType,
-    IncidentReport, ServiceabilityStatus,
+    IncidentReport, ServiceabilityStatus, Resource, ResourceCategory, Equipment, EquipmentReport, EquipmentStatus
 )
 from app.auth import require_role, require_barangay_access
 from app.utils.pagination import (
@@ -2376,3 +2376,954 @@ def contacts_update(
     return RedirectResponse(
         url="/bdrrmo/contacts?success=Contact+details+updated", status_code=302
     )
+
+FOOD_TYPE_LABELS = {
+    "rice": "Rice",
+    "canned_goods": "Canned Goods",
+    "drinking_water": "Drinking Water",
+    "rte_meals": "Ready-to-Eat Meals",
+    "baby_food": "Baby Food",
+    "medical_nutrition": "Medical Nutrition",
+}
+FOOD_TYPE_CHOICES = list(FOOD_TYPE_LABELS.keys())
+
+_NEAR_EXPIRY_DAYS = 30
+
+def _resource_alert(r: Resource) -> str:
+    """Rule-based alert tier for a resource. Order matters: expired
+    beats near-expiry, and stock alerts are reported alongside expiry.
+    Returns one of: 'expired', 'near_expiry', 'low_stock', 'ok'.
+    """
+    today = date.today()
+    if r.is_perishable and r.expiry_date:
+        if r.expiry_date < today:
+            return "expired"
+        if r.expiry_date <= today + timedelta(days=_NEAR_EXPIRY_DAYS):
+            return "near_expiry"
+    if (r.quantity or 0) <= (r.restock_threshold or 0):
+        return "low_stock"
+    return "ok"
+
+def _resource_summary(resources):
+    """Counts for the dashboard cards at the top of the list page."""
+    total = len(resources)
+    low = sum(1 for r in resources if _resource_alert(r) == "low_stock")
+    near = sum(1 for r in resources if _resource_alert(r) == "near_expiry")
+    exp = sum(1 for r in resources if _resource_alert(r) == "expired")
+    return {"total": total, "low_stock": low, "near_expiry": near, "expired": exp}
+
+@router.get("/resources", response_class=HTMLResponse)
+def resources_list(
+    request: Request,
+    db: Session = Depends(get_db),
+    q: Optional[str] = None,
+    category: Optional[str] = None,
+    food_type: Optional[str] = None,
+    alert: Optional[str] = None,
+    archived: Optional[str] = None,
+    page: Optional[str] = None,
+    per_page: Optional[str] = None,
+):
+    user, _ = _resolve_scope(request, db)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    query = db.query(Resource)
+    show_archived = (archived == "1")
+    query = query.filter(Resource.is_archived == show_archived, Resource.barangay_id == user['barangay_id'])
+
+    if q:
+        like = f"%{q.strip()}%"
+        query = query.filter(
+            (Resource.name.ilike(like)) | (Resource.storage_location.ilike(like))
+        )
+    if category and category in {c.value for c in ResourceCategory}:
+        query = query.filter(Resource.category == ResourceCategory(category))
+    if food_type and food_type in FOOD_TYPE_CHOICES:
+        query = query.filter(Resource.food_type == food_type)
+
+    rows = query.order_by(Resource.name).all()
+
+    # Alert filter is derived, so apply after SQL filtering.
+    if alert in ("low_stock", "near_expiry", "expired"):
+        rows = [r for r in rows if _resource_alert(r) == alert]
+
+    # Summary cards always reflect the full *active* inventory, not the
+    # filtered view — so users see the real backlog of issues.
+    active_inventory = db.query(Resource).filter(Resource.is_archived == False, Resource.barangay_id == user['barangay_id']).all()
+    summary = _resource_summary(active_inventory)
+
+    view_rows = []
+    for r in rows:
+        view_rows.append({
+            "id": r.id,
+            "name": r.name,
+            "barangay_id": r.barangay_id,
+            "category": r.category.value if r.category else "",
+            "category_label": r.category.value.title() if r.category else "—",
+            "food_type": r.food_type or "",
+            "food_type_label": FOOD_TYPE_LABELS.get(r.food_type or "", ""),
+            "is_perishable": r.is_perishable,
+            "quantity": r.quantity or 0,
+            "unit": r.unit or "",
+            "storage_location": r.storage_location or "—",
+            "restock_threshold": r.restock_threshold or 0,
+            "expiry_date": r.expiry_date,
+            "is_archived": r.is_archived,
+            "alert": _resource_alert(r),
+            "last_updated": r.last_updated,
+        })
+
+    page_obj = paginate(view_rows, parse_page(page), parse_per_page(per_page))
+    base_query = build_base_query({
+        "q": q or "", "category": category or "", "food_type": food_type or "",
+        "alert": alert or "", "archived": "1" if show_archived else "",
+    })
+
+    return templates.TemplateResponse(
+        request=request,
+        name="bdrrmo/resources_list.html",
+        context={
+            "user": user,
+            "active_nav": "resources",
+            "rows": page_obj.items,
+            "page_obj": page_obj,
+            "base_query": base_query,
+            "summary": summary,
+            "categories": [c.value for c in ResourceCategory],
+            "food_types": [(v, FOOD_TYPE_LABELS[v]) for v in FOOD_TYPE_CHOICES],
+            "f_q": q or "",
+            "f_category": category or "",
+            "f_food_type": food_type or "",
+            "f_alert": alert or "",
+            "f_archived": "1" if show_archived else "",
+            "show_archived": show_archived,
+            # Default + max for the stock modal's date-time field (PHT).
+            "now_local": datetime.now(_PHT).strftime("%Y-%m-%dT%H:%M"),
+        },
+    )
+
+@router.get("/resources/new", response_class=HTMLResponse)
+def resource_new_form(request: Request, db: Session = Depends(get_db)):
+    user, _ = _resolve_scope(request, db)
+    if isinstance(user, RedirectResponse):
+        return user
+    return templates.TemplateResponse(
+        request=request,
+        name="bdrrmo/resource_form.html",
+        context={
+            "user": user,
+            "active_nav": "resources",
+            "edit_mode": False,
+            "target": None,
+            "categories": [c.value for c in ResourceCategory],
+            "food_types": [(v, FOOD_TYPE_LABELS[v]) for v in FOOD_TYPE_CHOICES],
+            "error": None,
+        },
+    )
+
+def _parse_date_or_none(s: Optional[str]):
+    if not s:
+        return None
+    try:
+        return datetime.strptime(s.strip(), "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+@router.post("/resources/new")
+def resource_create(
+    request: Request,
+    db: Session = Depends(get_db),
+    name: str = Form(...),
+    category: str = Form(...),
+    food_type: str = Form(""),
+    is_perishable: Optional[str] = Form(None),
+    quantity: int = Form(0),
+    unit: str = Form(""),
+    storage_location: str = Form(""),
+    restock_threshold: int = Form(0),
+    expiry_date: str = Form(""),
+):
+    user, _ = _resolve_scope(request, db)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    def render_error(msg):
+        return templates.TemplateResponse(
+            request=request,
+            name="bdrrmo/resource_form.html",
+            context={
+                "user": user,
+                "active_nav": "resources",
+                "edit_mode": False,
+                "target": None,
+                "categories": [c.value for c in ResourceCategory],
+                "food_types": [(v, FOOD_TYPE_LABELS[v]) for v in FOOD_TYPE_CHOICES],
+                "error": msg,
+            },
+        )
+
+    name = name.strip()
+    if not name:
+        return render_error("Resource name is required.")
+    if category not in {c.value for c in ResourceCategory}:
+        return render_error("Invalid category.")
+
+    perish = bool(is_perishable)
+    exp = _parse_date_or_none(expiry_date) if perish else None
+    # Food sub-classification applies only to the food category.
+    food_type_value = (
+        food_type if (category == ResourceCategory.food.value
+                      and food_type in FOOD_TYPE_CHOICES)
+        else None
+    )
+
+    r = Resource(
+        name=name,
+        barangay_id=user['barangay_id'],
+        category=ResourceCategory(category),
+        food_type=food_type_value,
+        is_perishable=perish,
+        quantity=max(0, quantity or 0),
+        unit=unit.strip() or None,
+        storage_location=storage_location.strip() or None,
+        restock_threshold=max(0, restock_threshold or 0),
+        expiry_date=exp,
+        is_archived=False,
+        updated_by=user["id"],
+    )
+    db.add(r)
+    db.commit()
+    db.refresh(r)
+
+    log_action(
+        db, user["id"], "created", "resources", r.id,
+        f"Created resource '{r.name}' ({r.category.value}, qty={r.quantity} {r.unit or ''})".strip(),
+    )
+
+    return RedirectResponse(
+        url="/bdrrmo/resources?success=Resource+created+successfully",
+        status_code=302,
+    )
+
+@router.get("/resources/{resource_id}/edit", response_class=HTMLResponse)
+def resource_edit_form(resource_id: int, request: Request, db: Session = Depends(get_db)):
+    user, _ = _resolve_scope(request, db)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    r = db.query(Resource).filter(Resource.id == resource_id).first()
+    if not r:
+        return RedirectResponse(url="/admin/resources", status_code=302)
+
+    return templates.TemplateResponse(
+        request=request,
+        name="bdrrmo/resource_form.html",
+        context={
+            "user": user,
+            "active_nav": "resources",
+            "edit_mode": True,
+            "target": r,
+            "categories": [c.value for c in ResourceCategory],
+            "food_types": [(v, FOOD_TYPE_LABELS[v]) for v in FOOD_TYPE_CHOICES],
+            "error": None,
+        },
+    )
+
+
+@router.post("/resources/{resource_id}/edit")
+def resource_edit(
+    resource_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    name: str = Form(...),
+    category: str = Form(...),
+    food_type: str = Form(""),
+    is_perishable: Optional[str] = Form(None),
+    unit: str = Form(""),
+    storage_location: str = Form(""),
+    restock_threshold: int = Form(0),
+    expiry_date: str = Form(""),
+):
+    user, _ = _resolve_scope(request, db)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    r = db.query(Resource).filter(Resource.id == resource_id).first()
+    if not r:
+        return RedirectResponse(url="/bdrrmo/resources", status_code=302)
+
+    # Quantity is intentionally not editable here — use Add/Deduct Stock so
+    # every quantity change is auditable with before/after numbers.
+    changes = []
+    new_name = name.strip()
+    if new_name and new_name != r.name:
+        changes.append(f"name: '{r.name}' → '{new_name}'")
+        r.name = new_name
+
+    if category in {c.value for c in ResourceCategory} and r.category.value != category:
+        changes.append(f"category: {r.category.value} → {category}")
+        r.category = ResourceCategory(category)
+
+    # Food sub-classification: kept only while the item is in the food
+    # category, otherwise cleared so a re-categorised item doesn't keep a
+    # stale food_type. r.category reflects any change applied just above.
+    new_food_type = (
+        food_type if (r.category == ResourceCategory.food
+                      and food_type in FOOD_TYPE_CHOICES)
+        else None
+    )
+    if new_food_type != r.food_type:
+        changes.append(f"food_type: {r.food_type or '—'} → {new_food_type or '—'}")
+        r.food_type = new_food_type
+
+    perish = bool(is_perishable)
+    if perish != bool(r.is_perishable):
+        changes.append(f"is_perishable: {bool(r.is_perishable)} → {perish}")
+        r.is_perishable = perish
+
+    new_unit = unit.strip() or None
+    if new_unit != r.unit:
+        changes.append(f"unit: '{r.unit or ''}' → '{new_unit or ''}'")
+        r.unit = new_unit
+
+    new_loc = storage_location.strip() or None
+    if new_loc != r.storage_location:
+        changes.append(f"storage_location: '{r.storage_location or ''}' → '{new_loc or ''}'")
+        r.storage_location = new_loc
+
+    new_thr = max(0, restock_threshold or 0)
+    if new_thr != (r.restock_threshold or 0):
+        changes.append(f"restock_threshold: {r.restock_threshold or 0} → {new_thr}")
+        r.restock_threshold = new_thr
+
+    new_exp = _parse_date_or_none(expiry_date) if perish else None
+    if new_exp != r.expiry_date:
+        changes.append(f"expiry_date: {r.expiry_date} → {new_exp}")
+        r.expiry_date = new_exp
+
+    r.updated_by = user["id"]
+    db.commit()
+
+    if changes:
+        log_action(
+            db, user["id"], "updated", "resources", r.id,
+            f"Updated resource '{r.name}': " + "; ".join(changes),
+        )
+
+    return RedirectResponse(
+        url="/bdrrmo/resources?success=Resource+updated+successfully",
+        status_code=302,
+    )
+
+def _movement_fields(reason, deployed_to, occurred_at, location_required):
+    """Validate and normalise the accountability fields. Returns
+    (values, error): `error` is a user-facing message when validation
+    fails, otherwise None. Mirrors the client-side rules in rk-forms.js —
+    JS is convenience, this is the enforcement."""
+    r = (reason or "").strip()
+    if len(r) < 3:
+        return None, "Reason is required (at least 3 characters)."
+
+    loc = (deployed_to or "").strip() or None
+    if location_required and not loc:
+        return None, "Deployment location is required for this change."
+
+    raw = (occurred_at or "").strip()
+    if not raw:
+        return None, "Date and time is required."
+    try:
+        # <input type="datetime-local"> submits "YYYY-MM-DDTHH:MM" (PHT,
+        # as typed by the user); seconds may be appended by some browsers.
+        local = datetime.strptime(raw[:16], "%Y-%m-%dT%H:%M")
+    except ValueError:
+        return None, "Invalid date and time."
+
+    # Stored UTC-naive, like every other timestamp in the system.
+    dt_utc = local.replace(tzinfo=_PHT).astimezone(timezone.utc).replace(tzinfo=None)
+    if dt_utc > datetime.utcnow() + timedelta(minutes=5):
+        return None, "Date and time cannot be in the future."
+
+    return {"reason": r, "deployed_to": loc, "occurred_at": dt_utc}, None
+
+@router.post("/resources/{resource_id}/stock")
+def resource_stock_change(
+    resource_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    action: str = Form(...),       # "add" or "deduct"
+    amount: int = Form(...),
+    reason: str = Form(""),
+    deployed_to: str = Form(""),
+    occurred_at: str = Form(""),
+):
+    user, _ = _resolve_scope(request, db)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    r = db.query(Resource).filter(Resource.id == resource_id).first()
+    if not r:
+        return RedirectResponse(url="/bdrrmo/resources", status_code=302)
+
+    if action not in ("add", "deduct"):
+        return RedirectResponse(
+            url="/bdrrmo/resources?error=Invalid+stock+action", status_code=302
+        )
+    if not amount or amount <= 0:
+        return RedirectResponse(
+            url=f"/bdrrmo/resources/{resource_id}/edit?error=Amount+must+be+positive",
+            status_code=302,
+        )
+
+    # Deducting stock moves goods somewhere, so a destination is required;
+    # adding stock (supplier delivery, returned goods) does not need one.
+    movement, err = _movement_fields(
+        reason, deployed_to, occurred_at, location_required=(action == "deduct")
+    )
+    if err:
+        return RedirectResponse(
+            url=f"/bdrrmo/resources?error={quote_plus(err)}", status_code=302
+        )
+
+    before = r.quantity or 0
+    if action == "add":
+        after = before + amount
+        verb = "stock_added"
+    else:
+        if amount > before:
+            return RedirectResponse(
+                url=f"/bdrrmo/resources/{resource_id}/edit?error=Cannot+deduct+more+than+current+stock",
+                status_code=302,
+            )
+        after = before - amount
+        verb = "stock_deducted"
+
+    r.quantity = after
+    r.updated_by = user["id"]
+    db.commit()
+
+    note = f" — reason: {movement['reason']}"
+    if movement["deployed_to"]:
+        note += f"; deployed to: {movement['deployed_to']}"
+    log_action(
+        db, user["id"], verb, "resources", r.id,
+        f"Resource '{r.name}' quantity {before} → {after} ({'+' if action == 'add' else '-'}{amount} {r.unit or ''}){note}",
+        reason=movement["reason"],
+        deployed_to=movement["deployed_to"],
+        occurred_at=movement["occurred_at"],
+    )
+
+    return RedirectResponse(
+        url=f"/bdrrmo/resources?success=Stock+{'added' if action == 'add' else 'deducted'}+successfully",
+        status_code=302,
+    )
+
+@router.post("/resources/{resource_id}/archive")
+def resource_archive_toggle(
+    resource_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    user, _ = _resolve_scope(request, db)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    r = db.query(Resource).filter(Resource.id == resource_id).first()
+    if not r:
+        return RedirectResponse(url="/bdrrmo/resources", status_code=302)
+
+    r.is_archived = not bool(r.is_archived)
+    r.updated_by = user["id"]
+    db.commit()
+
+    verb = "archived" if r.is_archived else "restored"
+    log_action(
+        db, user["id"], verb, "resources", r.id,
+        f"Resource '{r.name}' {verb}.",
+    )
+
+    url = (
+        f"/bdrrmo/resources?archived=1&success=Resource+{verb}"
+        if r.is_archived
+        else f"/bdrrmo/resources?success=Resource+{verb}"
+    )
+    return RedirectResponse(url=url, status_code=302)
+
+# Client-aligned status labels for the UI (maps enum value → display).
+EQUIPMENT_STATUS_LABELS = {
+    "available": "Available",
+    "deployed": "Deployed",
+    "under_repair": "Under Repair",
+    "unserviceable": "Unserviceable",
+    # Legacy values — mapped to the closest client term so old rows still
+    # display sensibly without us mutating data.
+    "serviceable": "Available (legacy)",
+    "not_serviceable": "Unserviceable (legacy)",
+}
+
+# Statuses exposed in the *change-status* dropdown. Legacy values are
+# intentionally omitted to steer users onto client-aligned terms.
+EQUIPMENT_STATUS_CHOICES = ["available", "deployed", "under_repair", "unserviceable"]
+
+EQUIPMENT_TYPE_LABELS = {
+    "fire_truck": "Fire Truck",
+    "ambulance": "Ambulance",
+    "rescue_vehicle": "Rescue Vehicle",
+    "generator": "Generator",
+    "chainsaw": "Chainsaw",
+    "rescue_boat": "Rescue Boat",
+    "radio": "Radio",
+    "flashlight": "Flashlight",
+    "life_vest": "Life Vest",
+    "other": "Other",
+}
+
+# Legacy statuses fold into their client-aligned bucket so a fleet snapshot
+# reads in the four terms the client uses, without mutating stored rows.
+_EQUIPMENT_STATUS_BUCKET = {
+    "available": "available",
+    "serviceable": "available",
+    "deployed": "deployed",
+    "under_repair": "under_repair",
+    "unserviceable": "unserviceable",
+    "not_serviceable": "unserviceable",
+}
+
+
+def equipment_status_breakdown(db):
+    """Fleet snapshot over active (non-archived) equipment:
+    {"counts": {status_value: n}, "total": n}. Shared by the Logistics and
+    CFAU dashboards. A unit with an unrecognised status is counted in the
+    total but in no bucket, so the buckets never overstate the fleet."""
+    counts = {v: 0 for v in EQUIPMENT_STATUS_CHOICES}
+    units = db.query(Equipment).filter(Equipment.is_archived == False).all()
+    for e in units:
+        bucket = _EQUIPMENT_STATUS_BUCKET.get(e.status.value if e.status else "")
+        if bucket:
+            counts[bucket] += 1
+    return {"counts": counts, "total": len(units)}
+
+
+@router.get("/equipment_bdrrmo", response_class=HTMLResponse)
+def equipment_list(
+    request: Request,
+    db: Session = Depends(get_db),
+    q: Optional[str] = None,
+    equipment_type: Optional[str] = None,
+    status: Optional[str] = None,
+    archived: Optional[str] = None,
+    page: Optional[str] = None,
+    per_page: Optional[str] = None,
+):
+    user, _ = _resolve_scope(request, db)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    query = db.query(Equipment)
+    show_archived = (archived == "1")
+    query = query.filter(Equipment.is_archived == show_archived, Equipment.barangay_id == user['barangay_id'])
+
+    if q:
+        like = f"%{q.strip()}%"
+        query = query.filter(
+            (Equipment.name.ilike(like)) | (Equipment.plate_or_serial.ilike(like))
+        )
+    if equipment_type and equipment_type in {t.value for t in EquipmentType}:
+        query = query.filter(Equipment.equipment_type == EquipmentType(equipment_type))
+    if status and status in {s.value for s in EquipmentStatus}:
+        query = query.filter(Equipment.status == EquipmentStatus(status))
+
+    rows = query.order_by(Equipment.name).all()
+
+    # Repair-follow-up reminders, keyed by equipment id (archived excluded
+    # by the helper). Reused as-is for both the badges and the count.
+    reminders = equipment_repair_reminders(db)
+
+    view_rows = []
+    for e in rows:
+        reminder = reminders.get(e.id)
+        view_rows.append({
+            "id": e.id,
+            "name": e.name,
+            "type_value": e.equipment_type.value if e.equipment_type else "",
+            "type_label": EQUIPMENT_TYPE_LABELS.get(
+                e.equipment_type.value if e.equipment_type else "", "—"
+            ),
+            "status_value": e.status.value if e.status else "",
+            "status_label": EQUIPMENT_STATUS_LABELS.get(
+                e.status.value if e.status else "", "—"
+            ),
+            "plate_or_serial": e.plate_or_serial or "—",
+            "assigned": e.assigned_to_user.username if e.assigned_to_user else "—",
+            "last_inspected": e.last_inspected,
+            "is_archived": e.is_archived,
+            "repair_reminder": reminder["state"] if reminder else None,
+        })
+
+    # Summary cards for at-a-glance fleet readiness.
+    active = db.query(Equipment).filter(Equipment.is_archived == False, Equipment.barangay_id == user['barangay_id']).all()
+    summary = {
+        "total": len(active),
+        "available": sum(
+            1 for x in active
+            if x.status and x.status.value in ("available", "serviceable")
+        ),
+        "deployed": sum(1 for x in active if x.status and x.status.value == "deployed"),
+        "under_repair": sum(1 for x in active if x.status and x.status.value == "under_repair"),
+        "unserviceable": sum(
+            1 for x in active
+            if x.status and x.status.value in ("unserviceable", "not_serviceable")
+        ),
+        # Distinct non-archived assets with an active repair reminder.
+        "repair_attention": len(reminders),
+    }
+
+    page_obj = paginate(view_rows, parse_page(page), parse_per_page(per_page))
+    base_query = build_base_query({
+        "q": q or "", "equipment_type": equipment_type or "",
+        "status": status or "", "archived": "1" if show_archived else "",
+    })
+
+    return templates.TemplateResponse(
+        request=request,
+        name="bdrrmo/equipment_list.html",
+        context={
+            "user": user,
+            "active_nav": "equipment",
+            "rows": page_obj.items,
+            "page_obj": page_obj,
+            "base_query": base_query,
+            "summary": summary,
+            "types": [(t.value, EQUIPMENT_TYPE_LABELS.get(t.value, t.value.title()))
+                      for t in EquipmentType],
+            "statuses": [(s.value, EQUIPMENT_STATUS_LABELS.get(s.value, s.value.title()))
+                         for s in EquipmentStatus],
+            "status_choices": [(v, EQUIPMENT_STATUS_LABELS[v]) for v in EQUIPMENT_STATUS_CHOICES],
+            "f_q": q or "",
+            "f_type": equipment_type or "",
+            "f_status": status or "",
+            "f_archived": "1" if show_archived else "",
+            "show_archived": show_archived,
+            # Default + max for the status modal's date-time field (PHT).
+            "now_local": datetime.now(_PHT).strftime("%Y-%m-%dT%H:%M"),
+        },
+    )
+
+@router.get("/equipment_bdrrmo/new", response_class=HTMLResponse)
+def equipment_new_form(request: Request, db: Session = Depends(get_db)):
+    user, _ = _resolve_scope(request, db)
+    if isinstance(user, RedirectResponse):
+        return user
+    return templates.TemplateResponse(
+        request=request,
+        name="bdrrmo/equipment_form.html",
+        context={
+            "user": user,
+            "active_nav": "equipment",
+            "edit_mode": False,
+            "target": None,
+            "types": [(t.value, EQUIPMENT_TYPE_LABELS.get(t.value, t.value.title()))
+                      for t in EquipmentType],
+            "status_choices": [(v, EQUIPMENT_STATUS_LABELS[v]) for v in EQUIPMENT_STATUS_CHOICES],
+            "error": None,
+        },
+    )
+
+
+@router.post("/equipment_bdrrmo/new")
+def equipment_create(
+    request: Request,
+    db: Session = Depends(get_db),
+    name: str = Form(...),
+    equipment_type: str = Form(...),
+    status: str = Form("available"),
+    plate_or_serial: str = Form(""),
+    last_inspected: str = Form(""),
+):
+    user, _ = _resolve_scope(request, db)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    def render_error(msg):
+        return templates.TemplateResponse(
+            request=request,
+            name="bdrrmo/equipment_form.html",
+            context={
+                "user": user,
+                "active_nav": "equipment",
+                "edit_mode": False,
+                "target": None,
+                "types": [(t.value, EQUIPMENT_TYPE_LABELS.get(t.value, t.value.title()))
+                          for t in EquipmentType],
+                "status_choices": [(v, EQUIPMENT_STATUS_LABELS[v]) for v in EQUIPMENT_STATUS_CHOICES],
+                "error": msg,
+            },
+        )
+
+    name = name.strip()
+    if not name:
+        return render_error("Equipment name is required.")
+    if equipment_type not in {t.value for t in EquipmentType}:
+        return render_error("Invalid equipment type.")
+    if status not in {s.value for s in EquipmentStatus}:
+        status = "available"
+
+    e = Equipment(
+        name=name,
+        barangay_id=user['barangay_id'],
+        equipment_type=EquipmentType(equipment_type),
+        status=EquipmentStatus(status),
+        plate_or_serial=plate_or_serial.strip() or None,
+        last_inspected=_parse_date_or_none(last_inspected),
+        is_archived=False,
+    )
+    db.add(e)
+    db.commit()
+    db.refresh(e)
+
+    log_action(
+        db, user["id"], "created", "equipment", e.id,
+        f"Created equipment '{e.name}' ({e.equipment_type.value}, status={e.status.value})",
+    )
+
+    return RedirectResponse(
+        url="/bdrrmo/equipment_bdrrmo?success=Equipment+created+successfully",
+        status_code=302,
+    )
+
+@router.get("/equipment_bdrrmo/{equipment_id}/edit", response_class=HTMLResponse)
+def equipment_edit_form(equipment_id: int, request: Request, db: Session = Depends(get_db)):
+    user, _ = _resolve_scope(request, db)
+    if isinstance(user, RedirectResponse):
+        return user
+    e = db.query(Equipment).filter(Equipment.id == equipment_id).first()
+    if not e:
+        return RedirectResponse(url="/bdrrmo/equipment_bdrrmo", status_code=302)
+
+    # Repair follow-up for this unit (most-relevant report, if any).
+    reminder = equipment_repair_reminders(db).get(e.id)
+    return templates.TemplateResponse(
+        request=request,
+        name="bdrrmo/equipment_form.html",
+        context={
+            "user": user,
+            "active_nav": "equipment",
+            "edit_mode": True,
+            "target": e,
+            "types": [(t.value, EQUIPMENT_TYPE_LABELS.get(t.value, t.value.title()))
+                      for t in EquipmentType],
+            "status_choices": [(v, EQUIPMENT_STATUS_LABELS[v]) for v in EQUIPMENT_STATUS_CHOICES],
+            "error": None,
+            "repair_reminder": reminder["state"] if reminder else None,
+            "repair_report": reminder["report"] if reminder else None,
+            "live_status_label": EQUIPMENT_STATUS_LABELS.get(
+                e.status.value if e.status else "", "—"
+            ),
+        },
+    )
+
+
+@router.post("/equipment_bdrrmo/{equipment_id}/edit")
+def equipment_edit(
+    equipment_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    name: str = Form(...),
+    equipment_type: str = Form(...),
+    plate_or_serial: str = Form(""),
+    last_inspected: str = Form(""),
+):
+    user, _ = _resolve_scope(request, db)
+    if isinstance(user, RedirectResponse):
+        return user
+    e = db.query(Equipment).filter(Equipment.id == equipment_id).first()
+    if not e:
+        return RedirectResponse(url="/bdrrmo/equipment_bdrrmo", status_code=302)
+
+    # Status is changed via the dedicated status-change action so the
+    # audit log captures it as a status transition, not a generic edit.
+    changes = []
+    new_name = name.strip()
+    if new_name and new_name != e.name:
+        changes.append(f"name: '{e.name}' → '{new_name}'")
+        e.name = new_name
+
+    if equipment_type in {t.value for t in EquipmentType} and e.equipment_type.value != equipment_type:
+        changes.append(f"type: {e.equipment_type.value} → {equipment_type}")
+        e.equipment_type = EquipmentType(equipment_type)
+
+    new_ps = plate_or_serial.strip() or None
+    if new_ps != e.plate_or_serial:
+        changes.append(f"plate_or_serial: '{e.plate_or_serial or ''}' → '{new_ps or ''}'")
+        e.plate_or_serial = new_ps
+
+    new_insp = _parse_date_or_none(last_inspected)
+    if new_insp != e.last_inspected:
+        changes.append(f"last_inspected: {e.last_inspected} → {new_insp}")
+        e.last_inspected = new_insp
+
+    db.commit()
+
+    if changes:
+        log_action(
+            db, user["id"], "updated", "equipment", e.id,
+            f"Updated equipment '{e.name}': " + "; ".join(changes),
+        )
+
+    return RedirectResponse(
+        url="/bdrrmo/equipment_bdrrmo?success=Equipment+updated+successfully",
+        status_code=302,
+    )
+
+@router.post("/equipment_bdrrmo/{equipment_id}/status")
+def equipment_status_change(
+    equipment_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    status: str = Form(...),
+    reason: str = Form(""),
+    deployed_to: str = Form(""),
+    occurred_at: str = Form(""),
+):
+    user, _ = _resolve_scope(request, db)
+    if isinstance(user, RedirectResponse):
+        return user
+    e = db.query(Equipment).filter(Equipment.id == equipment_id).first()
+    if not e:
+        return RedirectResponse(url="/bdrrmo/equipment_bdrrmo", status_code=302)
+
+    if status not in EQUIPMENT_STATUS_CHOICES:
+        return RedirectResponse(
+            url="/bdrrmo/equipment_bdrrmo?error=Invalid+status", status_code=302
+        )
+
+    old = e.status.value if e.status else "—"
+    if status == old:
+        return RedirectResponse(
+            url="/bdrrmo/equipment_bdrrmo?success=Status+unchanged", status_code=302
+        )
+
+    # A unit going to "deployed" must name where; repairs and returns
+    # to the motorpool may leave the location blank.
+    movement, err = _movement_fields(
+        reason, deployed_to, occurred_at, location_required=(status == "deployed")
+    )
+    if err:
+        return RedirectResponse(
+            url=f"/bdrrmo/equipment_bdrrmo?error={quote_plus(err)}", status_code=302
+        )
+
+    e.status = EquipmentStatus(status)
+    db.commit()
+
+    note = f" — reason: {movement['reason']}"
+    if movement["deployed_to"]:
+        note += f"; deployed to: {movement['deployed_to']}"
+    log_action(
+        db, user["id"], "status_changed", "equipment", e.id,
+        f"Equipment '{e.name}' status {old} → {status}{note}",
+        reason=movement["reason"],
+        deployed_to=movement["deployed_to"],
+        occurred_at=movement["occurred_at"],
+    )
+
+    return RedirectResponse(
+        url="/bdrrmo/equipment_bdrrmo?success=Status+updated+successfully",
+        status_code=302,
+    )
+
+@router.post("/equipment_bdrrmo/{equipment_id}/archive")
+def equipment_archive_toggle(
+    equipment_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    user, _ = _resolve_scope(request, db)
+    if isinstance(user, RedirectResponse):
+        return user
+    e = db.query(Equipment).filter(Equipment.id == equipment_id).first()
+    if not e:
+        return RedirectResponse(url="/bdrrmo/equipment_bdrrmo", status_code=302)
+
+    e.is_archived = not bool(e.is_archived)
+    db.commit()
+
+    verb = "archived" if e.is_archived else "restored"
+    log_action(
+        db, user["id"], verb, "equipment", e.id,
+        f"Equipment '{e.name}' {verb}.",
+    )
+
+    url = "/bdrrmo/equipment_bdrrmo?archived=1&success=" + verb.title() if e.is_archived \
+        else "/bdrrmo/equipment_bdrrmo?success=" + verb.title()
+    return RedirectResponse(url=url, status_code=302)
+
+_REPAIR_OPEN_STATUSES = {"under_repair", "unserviceable", "not_serviceable"}
+
+def repair_reminder_state(report, today=None):
+    """Repair-reminder state for an EquipmentReport — one of:
+        "overdue"   — repair_scheduled_date is before today
+        "due_today" — repair_scheduled_date is today
+        None        — no reminder
+
+    A reminder applies only while a scheduled repair date has arrived
+    (today or past) AND the linked equipment is still out of service
+    (under_repair / unserviceable / legacy not_serviceable). It clears by
+    itself once the unit is returned to service — Equipment.status stays
+    the source of truth and is never changed here. Report workflow state
+    is intentionally ignored: a resolved report whose equipment was never
+    returned to service keeps reminding.
+    """
+    if report is None or report.repair_scheduled_date is None:
+        return None
+    equipment = report.equipment
+    if not equipment or not equipment.status:
+        return None
+    if equipment.status.value not in _REPAIR_OPEN_STATUSES:
+        return None
+    today = today or date.today()
+    if report.repair_scheduled_date < today:
+        return "overdue"
+    if report.repair_scheduled_date == today:
+        return "due_today"
+    return None
+
+
+# Reminder severity for picking the "most relevant" report per asset.
+_REPAIR_REMINDER_RANK = {"overdue": 2, "due_today": 1}
+
+
+def equipment_repair_reminders(db, today=None):
+    """Map of {equipment_id: {"state", "report"}} for active, non-archived
+    equipment with at least one due/overdue repair whose unit is still out
+    of service. Deduped per asset: when a unit has several qualifying
+    reports the most relevant one wins — Overdue over Due Today, then the
+    earliest repair date. Reuses repair_reminder_state() for the rule so no
+    business logic is duplicated."""
+    today = today or date.today()
+    reports = (
+        db.query(EquipmentReport)
+        .join(Equipment, EquipmentReport.equipment_id == Equipment.id)
+        .filter(Equipment.is_archived == False)
+        .filter(EquipmentReport.repair_scheduled_date.isnot(None))
+        .filter(EquipmentReport.repair_scheduled_date <= today)
+        .all()
+    )
+    best = {}
+    for r in reports:
+        state = repair_reminder_state(r, today)
+        if state is None:
+            continue
+        current = best.get(r.equipment_id)
+        candidate = (_REPAIR_REMINDER_RANK[state], r.repair_scheduled_date, r)
+        if current is None:
+            best[r.equipment_id] = candidate
+        else:
+            # Higher rank wins; tie broken by the earliest repair date.
+            if (candidate[0] > current[0]
+                    or (candidate[0] == current[0] and candidate[1] < current[1])):
+                best[r.equipment_id] = candidate
+    return {
+        eid: {"state": ("overdue" if rank == 2 else "due_today"), "report": rep}
+        for eid, (rank, _d, rep) in best.items()
+    }

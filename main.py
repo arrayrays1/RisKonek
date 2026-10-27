@@ -153,7 +153,6 @@ templates = Jinja2Templates(directory="app/templates")
 from app.routes.auth import router as auth_router
 from app.routes.admin import router as admin_router
 from app.routes.bdrrmo import router as bdrrmo_router
-from app.routes.cfau import router as cfau_router
 from app.routes.staff import router as staff_router
 from app.routes.uploads import router as uploads_router
 from app.simulation.routes import router as simulator_router
@@ -161,7 +160,6 @@ from app.simulation.routes import router as simulator_router
 app.include_router(auth_router)
 app.include_router(admin_router)
 app.include_router(bdrrmo_router)
-app.include_router(cfau_router)
 app.include_router(staff_router)
 app.include_router(uploads_router)
 app.include_router(simulator_router)
