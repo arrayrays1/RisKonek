@@ -9,8 +9,7 @@
     <div>
         <h1>Review Uploaded Plan</h1>
         <p>Preview from <strong>{{ plan.file_name }}</strong>. Use the extracted content below
-           as reference, then complete and verify the post-incident report form and save as a
-           draft or submit.</p>
+           as reference.</p>
     </div>
     <a href="/bdrrmo/planning" class="btn btn-outline-secondary">
         <i class="bi bi-arrow-left"></i> Back
@@ -91,11 +90,11 @@
             <i class="bi bi-arrow-repeat"></i> Retry Extract
         </button>
     </form>
-    {% elif not ai_summary %}
+    {% elif not ai_summary and not ai_recommendation %}
     <form method="POST" action="/bdrrmo/planning/{{ plan.id }}/retry?summary_retry=true" class="d-inline">
         <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
         <button type="submit" class="btn btn-outline-primary btn-sm">
-            <i class="bi bi-arrow-repeat"></i> Retry Summary
+            <i class="bi bi-arrow-repeat"></i> Retry Summary and Recommendation
         </button>
     </form>
     {% endif %}
