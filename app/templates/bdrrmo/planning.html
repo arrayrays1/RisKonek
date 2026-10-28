@@ -45,9 +45,7 @@
 <div class="alert alert-warning alert-dismissible fade show">
     <i class="bi bi-exclamation-triangle-fill me-1"></i>
     Your bdrrm plan              
-        {% for item in not_submitted  %}
-        <b>{{item.file_name}}</b>
-        {% endfor %}
+        <b>{{not_submitted}}</b>
         is approved, you may now proceed to the cdrrm research and planning office to submit your hardcopy
     
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
