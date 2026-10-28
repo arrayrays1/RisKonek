@@ -114,6 +114,14 @@
                             <i class="bi bi-eye"></i>
                             View
                         </a>
+                        {% if planning.status_value == "approved" %}
+                        {% if not planning.is_hardcopy_received %}
+                        <button type="button" class="btn btn-outline-primary btn-sm"
+                            data-bs-toggle="modal" data-bs-target="#receivedModal-{{ planning.id }}">
+                            <i class="bi bi-file-earmark-check"></i> Received
+                        </button>
+                        {% endif %}
+                        {% endif %}
                         {% if planning.status_value == "rejected" %}
                         <button type="button" class="btn btn-outline-primary btn-sm"
                             data-bs-toggle="modal" data-bs-target="#reasonModal-{{ planning.id }}">
@@ -213,6 +221,28 @@
         </div>
     </div>
     
+  </div>
+</div>
+
+<div class="modal fade" id="receivedModal-{{ r.id }}" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <form method="POST" action="/admin/planning/{{ r.id }}/receive" class="modal-content" data-validate>
+        <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+      <div class="modal-header">
+        <h6 class="modal-title">Received</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mt-2">
+          <label class="form-label small">Date Received<span class="text-danger">*</span></label>
+          <input type="date" name="date" class="form-control form-control-sm" required>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" class="btn btn-rk btn-sm">Submit</button>
+      </div>
+    </form>
   </div>
 </div>
 {% endfor %}
