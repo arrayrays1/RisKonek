@@ -69,6 +69,20 @@
     {% endif %}
 </div>
 
+<div class="dash-card mb-3">
+    <div class="card-title-row">
+        <i class="bi bi-robot"></i>
+        <h6>AI Recommendation</h6>
+    </div>
+    {% if ai_recommendation %}
+        <p class="mb-0 rk-pre-line">{{ ai_recommendation }}</p>
+    {% elif not ai_available %}
+        <p class="text-muted mb-0 small">AI summary unavailable (GROQ_API_KEY not configured).</p>
+    {% else %}
+        <p class="text-muted mb-0 small">No AI summary generated for this file.</p>
+    {% endif %}
+</div>
+
 <div class="d-flex justify-content-end">
     {% if extraction_error %}
     <form method="POST" action="/bdrrmo/planning/{{ plan.id }}/retry?extract_retry=true" class="d-inline">
