@@ -3377,6 +3377,13 @@ def planning(
             "created_at": r.created_at,
         })
 
+    rows_not_submitted = []
+    for r in query.filter(Planning.is_hardcopy_received == False):
+        rows_not_submitted.append({
+            "id": r.id,
+            "file_name": r.file_name,
+        })
+
     page_obj = paginate(rows, parse_page(page), parse_per_page(per_page))
     base_query = build_base_query({"q": q or "", "status": status or ""})
 
@@ -3391,6 +3398,7 @@ def planning(
             "plannings": page_obj.items,
             "page_obj": page_obj,
             "base_query": base_query,
+            "not_submitted": rows_not_submitted,
             "status_choices": [(v, PLANNING_STATUS_LABELS[v]) for v in PLANNING_STATUS_CHOICES],
             "f_q": q or "",
             "f_status": status,
