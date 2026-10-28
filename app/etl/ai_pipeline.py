@@ -6,6 +6,7 @@ from the .env template.
 
 import os
 from typing import Optional
+import json
 
 
 _PLACEHOLDER_KEYS = {"", "groq_api_key_here", "your_groq_api_key", "changeme"}
@@ -74,20 +75,28 @@ def summarize_planning(text: str, max_chars: int = 6000) -> Optional[str]:
             messages=[
                 {
                     "role": "system",
-                    "content": (
-                        "You summarize this planning text for the Barangay"
-                        "Disaster Risk Reduction and Management Office. Be "
-                        "concise, factual, and neutral. 3-5 sentences."
-                    ),
+                    "content": """
+                Analyze the planning text for the Barangay.
+
+                Return a JSON object with exactly these fields:
+                {
+                    "summary": "a concise, factual, and neutral. 3-5 sentences summary of the text",
+                    "recommendation": "Recommendations based on the text, must be also concise, factual, and neutral"
+                }
+
+                The summary must describe the information provided by the planning text.
+                The recommendation must suggest appropriate actions based on the planning text.
+
+                Do not combine the summary and recommendation.
+                """,
                 },
                 {"role": "user", "content": snippet},
             ],
+            response_format={"type": "json_object"},
             temperature=0.2,
-            max_tokens=400,
         )
         out = resp.choices[0].message.content if resp.choices else None
-        print(out)
-        return (out or "").strip() or None
+        return json.loads(out) or None
     except Exception as e:
         print(e)
         return None
