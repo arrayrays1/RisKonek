@@ -2631,6 +2631,7 @@ def planning(
                 r.status.value if r.status else "", "—"
             ),
             "is_archived": r.is_archived,
+            "is_hardcopy_received": r.is_hardcopy_received,
             "created_at": r.created_at,
         })
 
@@ -2737,6 +2738,30 @@ def planning_archive_toggle(
 
     return RedirectResponse(
         url=f"/admin/planning?success={p.file_name}+marked+{status}",
+        status_code=302,
+    )
+
+@router.post("/planning/{planning_id}/receive")
+def planning_receive_toggle(
+    planning_id: int,
+    request: Request,
+    date: datetime = Form(""),
+    db: Session = Depends(get_db),
+):
+    user = require_role(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
+    p = db.query(Planning).filter(Planning.id == planning_id).first()
+    if not p:
+        return RedirectResponse(url="/admin/planning", status_code=302)
+
+    p.is_hardcopy_received = True
+    p.hardcopy_received_date = date
+
+    db.commit()
+
+    return RedirectResponse(
+        url=f"/admin/planning?success={p.file_name}+received",
         status_code=302,
     )
 
