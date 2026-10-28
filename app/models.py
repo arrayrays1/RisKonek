@@ -673,6 +673,7 @@ class Planning(Base):
     status = Column(Enum(PlanningStatus), default=PlanningStatus.pending)
     reason = Column(Text, nullable=True)
     summary = Column(Text)
+    recommendation = Column(Text)
     extracted_data = Column(JSON)
     is_archived = Column(Boolean, default=False)
     is_hardcopy_received = Column(Boolean, default=False)
