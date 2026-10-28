@@ -3398,7 +3398,7 @@ def planning(
             "plannings": page_obj.items,
             "page_obj": page_obj,
             "base_query": base_query,
-            "not_submitted": rows_not_submitted,
+            "not_submitted": filenames_to_paragraph(rows_not_submitted),
             "status_choices": [(v, PLANNING_STATUS_LABELS[v]) for v in PLANNING_STATUS_CHOICES],
             "f_q": q or "",
             "f_status": status,
@@ -3602,3 +3602,17 @@ def planning_ai_summary(stored_path, file_name):
 
 
     return ai_json, extracted
+
+def filenames_to_paragraph(files: list[str]) -> str: 
+    filenames = [file["file_name"] for file in files]
+
+    if not filenames: 
+        return None 
+    
+    if len(filenames) == 1: 
+        return filenames[0] 
+    
+    if len(filenames) == 2: 
+        return " and ".join(filenames) 
+    
+    return ", ".join(filenames[:-1]) + " and " + filenames[-1]
