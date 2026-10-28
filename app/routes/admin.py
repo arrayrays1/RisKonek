@@ -2729,9 +2729,10 @@ def planning_archive_toggle(
     p.reason = reason
 
     if(status == "approved"):
-        ai_text, extracted = planning_ai_summary(p.file_path, p.file_name)
+        ai_json, extracted = planning_ai_summary(p.file_path, p.file_name)
         
-        p.summary = ai_text
+        p.summary = ai_json['summary']
+        p.recommendation = ai_json['recommendation']
         p.extracted_data = extracted
 
     db.commit()
@@ -2779,9 +2780,8 @@ def planning_ai_summary(stored_path, file_name):
 
 
     # Optional AI summary — never blocks the flow.
-    ai_text = None
+    ai_json = None
     if extracted.get("raw_text"):
-        ai_text = ai_summarize(extracted["raw_text"])
+        ai_json = ai_summarize(extracted["raw_text"])
 
-
-    return ai_text, extracted
+    return ai_json, extracted
