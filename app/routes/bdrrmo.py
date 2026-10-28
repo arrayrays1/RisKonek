@@ -3378,7 +3378,7 @@ def planning(
         })
 
     rows_not_submitted = []
-    for r in query.filter(Planning.is_hardcopy_received == False):
+    for r in query.filter(Planning.is_hardcopy_received == False, Planning.status == "approved"):
         rows_not_submitted.append({
             "id": r.id,
             "file_name": r.file_name,
@@ -3538,6 +3538,7 @@ def planning_review(planning_id: int, request: Request, db: Session = Depends(ge
             "barangay": barangay,
             "plan": plan,
             "ai_summary": plan.summary,
+            "ai_recommendation": plan.recommendation,
             "ai_available": ai_available(),
             "raw_text_preview": (data.get("raw_text") or "")[:4000],
             "extraction_error": data.get("error"),
@@ -3562,17 +3563,18 @@ def planning_review(
 
     if(extract_retry):
     
-        ai_text, extracted = planning_ai_summary(p.file_path, p.file_name)
+        ai_json, extracted = planning_ai_summary(p.file_path, p.file_name)
 
-        p.summary = ai_text
+        p.summary = ai_json['summary']
+        p.recommendation = ai_json['recommendation']
         p.extracted_data = extracted
 
     if(summary_retry):
 
-        ai_text = ai_planning_summarize(p.extracted_data["raw_text"])
+        ai_json = ai_planning_summarize(p.extracted_data["raw_text"])
         
-        print(ai_text)
-        p.summary = ai_text
+        p.summary = ai_json['summary']
+        p.recommendation = ai_json['recommendation']
 
     db.commit()
 
@@ -3594,9 +3596,9 @@ def planning_ai_summary(stored_path, file_name):
 
 
     # Optional AI summary — never blocks the flow.
-    ai_text = None
+    ai_json = None
     if extracted.get("raw_text"):
-        ai_text = ai_planning_summarize(extracted["raw_text"])
+        ai_json = ai_summarize(extracted["raw_text"])
 
 
-    return ai_text, extracted
+    return ai_json, extracted
