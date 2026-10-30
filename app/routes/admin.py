@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Request, Depends, Form
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, Response
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, Response, FileResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, select
@@ -10,8 +10,10 @@ from app.models import (
     DisasterType, RiskLevel, Facility, FacilityType, FacilityStatus,
     UploadedReport, UploadHistory, UploadEvent,
     ResourceCategory, EquipmentType, log_action,
-    EquipmentReport, IncidentReport, ServiceabilityStatus, Urgency,
+    EquipmentReport, IncidentReport, ServiceabilityStatus, Urgency, Planning, PlanningStatus
 )
+from app.etl.extract_pdf import extract_pdf
+from app.etl.ai_pipeline import summarize_planning as ai_summarize
 from app.auth import require_role, hash_password
 from app.analytics.simulator import compute_risk_score
 from app.utils.geo import BARANGAY_COORDS
@@ -2570,3 +2572,216 @@ def incident_report_detail(report_id: int, request: Request, db: Session = Depen
             "source_upload": source_upload,
         },
     )
+
+PLANNING_STATUS_LABELS = {
+    "pending": "Pending",
+    "approved": "Approved",
+    "rejected": "Rejected",
+}
+
+PLANNING_STATUS_CHOICES = ["pending", "approved", "rejected"]
+
+@router.get("/planning", response_class=HTMLResponse)
+def planning(
+    request: Request,              
+    db: Session = Depends(get_db),
+    q: Optional[str] = None,
+    status: Optional[str] = None,
+    archived: Optional[str] = None,
+    barangay_id: Optional[int] = None,
+    page: Optional[str] = None,
+    per_page: Optional[str] = None,):
+    user = require_role(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
+
+    stmt = (
+        select(Planning)
+        .options(joinedload(Planning.barangay))
+    )
+    
+    show_archived = (archived == "1")
+    
+    stmt = stmt.where(Planning.is_archived == show_archived)
+    
+    if q:
+        like = f"%{q.strip()}%"
+        stmt = stmt.where(Planning.file_name.ilike(like))
+    if barangay_id:
+        stmt = stmt.where(Planning.barangay_id == barangay_id)
+    if status and status in {s.value for s in PlanningStatus}:
+        stmt = stmt.where(Planning.status == PlanningStatus(status))
+    
+    stmt = stmt.order_by(Planning.file_name)
+    
+    result = db.execute(stmt)
+    
+    rows = result.scalars().all()
+
+    view_rows = []
+    
+    for r in rows:
+        view_rows.append({
+            "id": r.id,
+            "file_name": r.file_name,
+            "file_path": r.file_path,
+            "reason": r.reason,
+            "status_value": r.status.value if r.status else "",
+            "status_label": PLANNING_STATUS_LABELS.get(
+                r.status.value if r.status else "", "—"
+            ),
+            "is_archived": r.is_archived,
+            "is_hardcopy_received": r.is_hardcopy_received,
+            "created_at": r.created_at,
+        })
+
+    page_obj = paginate(view_rows, parse_page(page), parse_per_page(per_page))
+    base_query = build_base_query({"q": q or "", "barangay_id": barangay_id or "", "status": status or ""})
+
+    barangays = db.query(Barangay).order_by(Barangay.name).all()
+
+    return templates.TemplateResponse(
+        request=request,
+        name="admin/planning.html",
+        context={
+            "user": user,
+            "active_nav": "planning",
+            "edit_mode": True,
+            "plannings": page_obj.items,
+            "page_obj": page_obj,
+            "base_query": base_query,
+            "barangays": barangays,
+            "status_choices": [(v, PLANNING_STATUS_LABELS[v]) for v in PLANNING_STATUS_CHOICES],
+            "f_q": q or "",
+            "f_status": status,
+            "f_barangay_id": barangay_id or "",
+            "show_archived": show_archived,
+            "error": None,
+        },
+    )
+
+@router.get("/planning/{document_id}/view")
+async def view_document( 
+    document_id: int,
+    request: Request,
+    db: Session = Depends(get_db), 
+):
+    user = require_role(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
+    
+    # Retrieve the document from your database
+    document = db.query(Planning).filter(Planning.id == document_id).first()
+
+    if not document:
+        return RedirectResponse(url="/admin/planning", status_code=302)
+
+    return FileResponse(
+        path=document.file_path,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": "inline"
+        }
+    )
+
+@router.post("/planning/{planning_id}/archive")
+def planning_archive_toggle(
+    planning_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    user = require_role(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
+    p = db.query(Planning).filter(Planning.id == planning_id).first()
+    if not p:
+        return RedirectResponse(url="/admin/planning", status_code=302)
+
+    p.is_archived = not bool(p.is_archived)
+    db.commit()
+
+    verb = "archived" if p.is_archived else "restored"
+    log_action(
+        db, user["id"], verb, "equipment", p.id,
+        f"Equipment '{p.file_name}' {verb}.",
+    )
+
+    url = "/admin/planning?archived=1&success=" + verb.title() if p.is_archived \
+        else "/admin/planning?success=" + verb.title()
+    return RedirectResponse(url=url, status_code=302)
+
+@router.post("/planning/{planning_id}/status")
+def planning_archive_toggle(
+    planning_id: int,
+    request: Request,
+    status: str = Form(...),
+    reason: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    user = require_role(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
+    p = db.query(Planning).filter(Planning.id == planning_id).first()
+    if not p:
+        return RedirectResponse(url="/admin/planning", status_code=302)
+
+    p.status = status
+    p.reason = reason
+
+    if(status == "approved"):
+        ai_json, extracted = planning_ai_summary(p.file_path, p.file_name)
+        
+        p.summary = ai_json['summary']
+        p.recommendation = ai_json['recommendation']
+        p.extracted_data = extracted
+
+    db.commit()
+
+    return RedirectResponse(
+        url=f"/admin/planning?success={p.file_name}+marked+{status}",
+        status_code=302,
+    )
+
+@router.post("/planning/{planning_id}/receive")
+def planning_receive_toggle(
+    planning_id: int,
+    request: Request,
+    date: datetime = Form(""),
+    db: Session = Depends(get_db),
+):
+    user = require_role(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
+    p = db.query(Planning).filter(Planning.id == planning_id).first()
+    if not p:
+        return RedirectResponse(url="/admin/planning", status_code=302)
+
+    p.is_hardcopy_received = True
+    p.hardcopy_received_date = date
+
+    db.commit()
+
+    return RedirectResponse(
+        url=f"/admin/planning?success={p.file_name}+received",
+        status_code=302,
+    )
+
+def planning_ai_summary(stored_path, file_name):
+    extracted = {
+        "raw_text": "", "error": None,
+    }
+
+    try:
+        out = extract_pdf(stored_path)
+        extracted["raw_text"] = out.get("text", "")
+    except Exception as e:
+        print(f"Extraction failed for plan '{file_name}': {e}")
+        extracted["error"] = "Extraction failed. The file could not be read or was malformed."
+
+
+    # Optional AI summary — never blocks the flow.
+    ai_json = None
+    if extracted.get("raw_text"):
+        ai_json = ai_summarize(extracted["raw_text"])
+
+    return ai_json, extracted

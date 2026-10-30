@@ -6,6 +6,7 @@ from the .env template.
 
 import os
 from typing import Optional
+import json
 
 
 _PLACEHOLDER_KEYS = {"", "groq_api_key_here", "your_groq_api_key", "changeme"}
@@ -54,4 +55,48 @@ def summarize(text: str, max_chars: int = 6000) -> Optional[str]:
         out = resp.choices[0].message.content if resp.choices else None
         return (out or "").strip() or None
     except Exception:
+        return None
+
+def summarize_planning(text: str, max_chars: int = 6000) -> Optional[str]:
+    """Return a short plain-English summary, or None if AI is unavailable
+    or the call fails. Never raises — extraction must continue regardless.
+    """
+    key = _api_key()
+    if not key or not text or not text.strip():
+        return None
+
+    snippet = text.strip()[:max_chars]
+
+    try:
+        from groq import Groq
+        client = Groq(api_key=key)
+        resp = client.chat.completions.create(
+            model="openai/gpt-oss-20b",
+            messages=[
+                {
+                    "role": "system",
+                    "content": """
+                Analyze the planning text for the Barangay.
+
+                Return a JSON object with exactly these fields:
+                {
+                    "summary": "a concise, factual, and neutral. 3-5 sentences summary of the text",
+                    "recommendation": "Recommendations based on the text, must be also concise, factual, and neutral"
+                }
+
+                The summary must describe the information provided by the planning text.
+                The recommendation must suggest appropriate actions based on the planning text.
+
+                Do not combine the summary and recommendation.
+                """,
+                },
+                {"role": "user", "content": snippet},
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.2,
+        )
+        out = resp.choices[0].message.content if resp.choices else None
+        return json.loads(out) or None
+    except Exception as e:
+        print(e)
         return None

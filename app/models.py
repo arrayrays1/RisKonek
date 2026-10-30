@@ -131,6 +131,11 @@ class ResourceCategory(str, enum.Enum):
     clothing = "clothing"
     other = "other"
 
+class PlanningStatus(str, enum.Enum):
+    pending = "pending"
+    approved = "approved"
+    rejected = "rejected"
+
 # ==========================
 # TABLE 1: Barangay
 # ==========================
@@ -162,6 +167,7 @@ class Barangay(Base):
     equipment_items = relationship("BarangayEquipment", back_populates="barangay")
     resources = relationship("Resource", back_populates="barangay")
     equipment = relationship("Equipment", back_populates="barangay")
+    planning = relationship("Planning", back_populates="barangay")
 
 # ==========================
 # TABLE 2: Users (4 roles)
@@ -198,6 +204,11 @@ class User(Base):
         foreign_keys="UploadedReport.uploaded_by",
     )
     updated_resources = relationship("Resource", back_populates="updated_by_user")
+    planning = relationship(
+        "Planning",
+        back_populates="uploaded_by_user",
+        foreign_keys="Planning.uploaded_by",
+    )
 
 # ==========================
 # TABLE 3: Population - census data per brgy
@@ -650,6 +661,29 @@ class SavedScenario(Base):
     # relationships (no cascade — a deleted barangay/user must not destroy history)
     barangay = relationship("Barangay")
     created_by_user = relationship("User")
+
+class Planning(Base):
+    __tablename__ = "planning"
+
+    id = Column(Integer, primary_key=True, index=True)
+    uploaded_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    barangay_id = Column(Integer, ForeignKey("barangays.id"), nullable=True)
+    file_name = Column(String(150), nullable=False)
+    file_path = Column(String(500), nullable=False)
+    status = Column(Enum(PlanningStatus), default=PlanningStatus.pending)
+    reason = Column(Text, nullable=True)
+    summary = Column(Text)
+    recommendation = Column(Text)
+    extracted_data = Column(JSON)
+    is_archived = Column(Boolean, default=False)
+    is_hardcopy_received = Column(Boolean, default=False)
+    hardcopy_received_date = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+
+    uploaded_by_user = relationship(
+        "User", back_populates="planning", foreign_keys=[uploaded_by]
+    )
+    barangay = relationship("Barangay", back_populates="planning")
 
 
 # *******************************
