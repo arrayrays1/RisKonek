@@ -1,0 +1,73 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Activities — RisKonek{% endblock %}
+
+{% set active_nav = 'planning' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start page-header">
+    <div>
+        <h1>Activities</h1>
+        <p>Activities from <strong>{{ plan.file_name }}</strong>.</p>
+    </div>
+    <a href="/admin/planning" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Back
+    </a>
+</div>
+
+{% if error %}
+<div class="alert alert-danger alert-dismissible fade show">
+    <i class="bi bi-exclamation-triangle-fill me-1"></i>{{ error | replace('+', ' ') }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+{% if extraction_error %}
+<div class="alert alert-warning">
+    <strong>Extraction failed:</strong> {{ extraction_error }}<br>
+    The file was stored, but no content could be extracted.
+</div>
+{% endif %}
+
+
+<div id="input-container" class="container">
+    {% for activity in activities %}
+
+    <div class="row mb-2">
+      
+        <div class="form-control col-lg">{{ activity.title }}</div>
+        <div class="form-control col-lg">{{ activity.start_date}}</div>
+
+        <div class="m-1 col-sm-2">
+        {% if activity.is_proof_submitted %}
+            <a
+              href="/admin/activities/{{ activity.id }}/proof"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="btn btn-outline-primary btn-sm"
+            >
+              <i class="bi bi-eye"></i>
+              View Proof
+            </a>
+            <form method="POST" action="/admin/activities/{{ activity.id }}/approve" class="d-inline"
+              data-confirm='Approve {{ activity.title }}?'>
+              <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+              <button type="submit" class="remove-btn btn btn-success btn-sm">
+                Approve
+              </button> 
+            </form>
+        {% else %}
+            <button type="button" disabled class="remove-btn btn btn-outline-secondary btn-sm">
+            Proof not yet submitted
+            </button> 
+        {% endif %}
+        </div>
+
+
+    </div>
+
+    {% endfor %}
+
+</div>
+
+{% endblock %}

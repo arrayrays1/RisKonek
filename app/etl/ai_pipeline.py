@@ -6,9 +6,25 @@ from the .env template.
 
 import os
 from typing import Optional
+from pydantic import BaseModel, ConfigDict
+import json
 
 
 _PLACEHOLDER_KEYS = {"", "groq_api_key_here", "your_groq_api_key", "changeme"}
+
+class ActivitySchema(BaseModel):
+
+    model_config = ConfigDict(extra="forbid")
+
+    title: str
+    start_date: Optional[str]
+
+
+class ActivityExtractionSchema(BaseModel):
+
+    model_config = ConfigDict(extra="forbid")
+
+    activities: list[ActivitySchema]
 
 
 def _api_key() -> Optional[str]:
@@ -54,4 +70,110 @@ def summarize(text: str, max_chars: int = 6000) -> Optional[str]:
         out = resp.choices[0].message.content if resp.choices else None
         return (out or "").strip() or None
     except Exception:
+        return None
+
+def summarize_planning(text: str, max_chars: int = 6000) -> Optional[str]:
+    """Return a short plain-English summary, or None if AI is unavailable
+    or the call fails. Never raises — extraction must continue regardless.
+    """
+    key = _api_key()
+    if not key or not text or not text.strip():
+        return None
+
+    snippet = text.strip()[:max_chars]
+
+    try:
+        from groq import Groq
+        client = Groq(api_key=key)
+        resp = client.chat.completions.create(
+            model="openai/gpt-oss-20b",
+            messages=[
+                {
+                    "role": "system",
+                    "content": """
+                Analyze the planning text for the Barangay.
+
+                Return a JSON object with exactly these fields:
+                {
+                    "summary": "a concise, factual, and neutral. 3-5 sentences summary of the text",
+                    "recommendation": "Recommendations based on the text, must be also concise, factual, and neutral"
+                }
+
+                The summary must describe the information provided by the planning text.
+                The recommendation must suggest appropriate actions based on the planning text.
+
+                Do not combine the summary and recommendation.
+                """,
+                },
+                {"role": "user", "content": snippet},
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.2,
+        )
+        out = resp.choices[0].message.content if resp.choices else None
+        return json.loads(out) or None
+    except Exception as e:
+        print(e)
+        return None
+
+def extract_activities(text: str, max_chars: int = 8000) -> Optional[str]:
+    """Return a list of activitiesy, or None if AI is unavailable
+    or the call fails. Never raises — extraction must continue regardless.
+    """
+    key = _api_key()
+    if not key or not text or not text.strip():
+        return None
+
+    snippet = text.strip()[:max_chars]
+
+    try:
+        from groq import Groq
+        client = Groq(api_key=key)
+        resp = client.chat.completions.create(
+            model="openai/gpt-oss-20b",
+            messages=[
+                {
+                    "role": "system",
+                    "content": """
+                    You are an expert in analyzing Barangay Disaster Risk Reduction and Management (BDRRM) plans.
+
+                    Your task is to extract programs, projects, and activities from the provided document text.
+
+                    IMPORTANT INSTRUCTIONS:
+
+                    -Extract only identifiable programs, projects, and activities.
+                    -Do not consider equipment, materials, personnel, funding sources, documentation requirements, or responsible committees as activities.
+                    -Use the surrounding context to identify which information belongs to an activity.
+                    -Do not invent activities that are not supported by the document.
+                    -If no date is specified, return null for its start_date.
+                    -Preserve the original activity title as much as possible.
+                    -Return an empty activities array if no identifiable activities are found.
+                    """,
+                },
+                {
+                    "role": "user", 
+                    "content": f"""
+                    DOCUMENT TEXT:
+
+                    {snippet}
+
+                    """
+                },
+            ],
+            response_format={
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "activity_extraction",
+                    "strict": True,
+                    "schema": ActivityExtractionSchema.model_json_schema()
+                }
+                },
+            temperature=0.2,
+            max_completion_tokens=8192
+        )
+        
+        out = resp.choices[0].message.content if resp.choices else None
+        return json.loads(out) or None
+    except Exception as e:
+        print(e)
         return None

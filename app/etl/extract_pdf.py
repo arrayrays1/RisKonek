@@ -45,3 +45,92 @@ def extract_pdf(path: str) -> Dict:
             raise RuntimeError(f"PDF extraction failed: {e}")
 
     return {"text": text}
+
+def extract_pdf_content(file_path):
+    import pdfplumber
+    extracted_content = []
+
+    with pdfplumber.open(file_path) as pdf:
+        for page_number, page in enumerate(pdf.pages, start=1):
+
+            # Extract normal text
+            text = page.extract_text(layout=True) or ""
+
+            # Extract tables
+            tables = page.extract_tables()
+
+            extracted_content.append({
+                "page": page_number,
+                "text": text,
+                "tables": tables
+            })
+
+    return extracted_content
+
+def format_tables(tables):
+    formatted_tables = []
+
+    for table_index, table in enumerate(tables, start=1):
+
+        if not table:
+            continue
+
+        rows = []
+
+        for row in table:
+            # Remove None values and normalize whitespace
+            cleaned_row = [
+                str(cell).strip().replace("\n", " ")
+                if cell else ""
+                for cell in row
+            ]
+
+            if any(cleaned_row):
+                rows.append(cleaned_row)
+
+        if not rows:
+            continue
+
+        formatted_tables.append({
+            "table_number": table_index,
+            "content": rows
+        })
+
+    return formatted_tables
+
+def prepare_pdf_text(file_path):
+    pages = extract_pdf_content(file_path)
+
+    document_text = []
+
+    for page in pages:
+
+        document_text.append(
+            f"\n========== PAGE {page['page']} ==========\n"
+        )
+
+        # Normal text
+        if page["text"]:
+            document_text.append(
+                "\n--- PAGE TEXT ---\n"
+            )
+            document_text.append(page["text"])
+
+        # Tables
+        if page["tables"]:
+            document_text.append(
+                "\n--- PAGE TABLES ---\n"
+            )
+
+            formatted_tables = format_tables(page["tables"])
+
+            for table in formatted_tables:
+
+                document_text.append(
+                    f"\nTABLE {table['table_number']}\n"
+                )
+
+                for row in table["content"]:
+                    document_text.append(" | ".join(row))
+
+    return {"text": "\n".join(document_text)}
