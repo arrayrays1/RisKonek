@@ -1,0 +1,103 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Review Uploaded Report — RisKonek{% endblock %}
+
+{% set active_nav = 'planning' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start page-header">
+    <div>
+        <h1>Review Uploaded Plan</h1>
+        <p>Preview from <strong>{{ plan.file_name }}</strong>. Use the extracted content below
+           as reference.</p>
+    </div>
+    <a href="/bdrrmo/planning" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Back
+    </a>
+</div>
+
+{% if error %}
+<div class="alert alert-danger alert-dismissible fade show">
+    <i class="bi bi-exclamation-triangle-fill me-1"></i>{{ error | replace('+', ' ') }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+{% if extraction_error %}
+<div class="alert alert-warning">
+    <strong>Extraction failed:</strong> {{ extraction_error }}<br>
+    The file was stored, but no content could be extracted.
+</div>
+{% endif %}
+
+<!-- ── Upload Metadata ─────────────────────────────────────────────── -->
+<div class="dash-card mb-3">
+    <div class="row g-3">
+        <div class="col-md-3">
+            <div class="text-muted small">File</div>
+            <div class="fw-semibold">{{ plan.file_name }}</div>
+        </div>
+        <div class="col-md-3">
+            <div class="text-muted small">Uploaded</div>
+            <div>{{ plan.created_at | pht }}</div>
+            <div class="small text-muted">for {{ barangay.name if barangay else '—' }}</div>
+        </div>
+        <div class="col-md-3 d-flex flex-column gap-2">
+            <a  href="/bdrrmo/planning/{{ plan.id }}/view"
+                target="_blank"
+                rel="noopener noreferrer" 
+                class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-download"></i> View Original File
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- ── AI summary ──────────────────────────────────────────────────── -->
+<div class="dash-card mb-3">
+    <div class="card-title-row">
+        <i class="bi bi-robot"></i>
+        <h6>AI Summary</h6>
+    </div>
+    {% if ai_summary %}
+        <p class="mb-0 rk-pre-line">{{ ai_summary }}</p>
+    {% elif not ai_available %}
+        <p class="text-muted mb-0 small">AI summary unavailable (GROQ_API_KEY not configured).</p>
+    {% else %}
+        <p class="text-muted mb-0 small">No AI summary generated for this file.</p>
+    {% endif %}
+</div>
+
+<div class="dash-card mb-3">
+    <div class="card-title-row">
+        <i class="bi bi-robot"></i>
+        <h6>AI Recommendation</h6>
+    </div>
+    {% if ai_recommendation %}
+        <p class="mb-0 rk-pre-line">{{ ai_recommendation }}</p>
+    {% elif not ai_available %}
+        <p class="text-muted mb-0 small">AI summary unavailable (GROQ_API_KEY not configured).</p>
+    {% else %}
+        <p class="text-muted mb-0 small">No AI summary generated for this file.</p>
+    {% endif %}
+</div>
+
+<div class="d-flex justify-content-end">
+    {% if extraction_error %}
+    <form method="POST" action="/bdrrmo/planning/{{ plan.id }}/retry?extract_retry=true" class="d-inline">
+        <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+        <button type="submit" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-arrow-repeat"></i> Retry Extract
+        </button>
+    </form>
+    {% elif not ai_summary and not ai_recommendation %}
+    <form method="POST" action="/bdrrmo/planning/{{ plan.id }}/retry?summary_retry=true" class="d-inline">
+        <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+        <button type="submit" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-arrow-repeat"></i> Retry Summary and Recommendation
+        </button>
+    </form>
+    {% endif %}
+</div>
+
+{% endblock %}

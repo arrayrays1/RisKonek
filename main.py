@@ -4,10 +4,14 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, RedirectResponse
 from starlette.middleware.sessions import SessionMiddleware
 from app.database import engine
+from contextlib import asynccontextmanager
 import app.models as models
 import os
 import secrets
 from dotenv import load_dotenv
+from apscheduler.schedulers.background import BackgroundScheduler
+
+from app.routes.bdrrmo import cleanup_expired_drafts
 
 load_dotenv()
 
@@ -39,10 +43,30 @@ async def csrf_protect(request: Request):
                 detail="CSRF token missing or invalid. Please reload the page and try again.",
             )
 
+scheduler = BackgroundScheduler()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+
+    # Run cleanup every hour
+    scheduler.add_job(
+        cleanup_expired_drafts,
+        trigger="interval",
+        hours=1,
+        id="cleanup_drafts",
+        replace_existing=True
+    )
+
+    scheduler.start()
+
+    yield
+
+    scheduler.shutdown()
+
 
 # Applied to every route (including the standalone ones below) via the
 # app-level dependency list.
-app = FastAPI(title="RisKonek", dependencies=[Depends(csrf_protect)])
+app = FastAPI(title="RisKonek", dependencies=[Depends(csrf_protect)], lifespan=lifespan)
 
 # Fail closed: never sign sessions with a hardcoded fallback secret. A missing
 # SECRET_KEY is a configuration error, not something to silently work around.

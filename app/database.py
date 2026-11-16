@@ -6,12 +6,19 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./instance/riskonek.db")
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 # connect_args only needed for SQLite
 engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {}
+    DATABASE_URL.replace(
+        "postgresql://",
+        "postgresql+psycopg://",
+        1
+    ),
+    pool_pre_ping=True,
+    pool_recycle=300,
+    pool_size=5,
+    max_overflow=5
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

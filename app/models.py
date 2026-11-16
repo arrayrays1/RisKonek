@@ -131,6 +131,16 @@ class ResourceCategory(str, enum.Enum):
     clothing = "clothing"
     other = "other"
 
+class PlanningStatus(str, enum.Enum):
+    pending = "pending"
+    approved = "approved"
+    rejected = "rejected"
+
+class ActivityStatus(str, enum.Enum):
+    pending = "pending"
+    approved = "approved"
+    rejected = "rejected"
+
 # ==========================
 # TABLE 1: Barangay
 # ==========================
@@ -162,6 +172,7 @@ class Barangay(Base):
     equipment_items = relationship("BarangayEquipment", back_populates="barangay")
     resources = relationship("Resource", back_populates="barangay")
     equipment = relationship("Equipment", back_populates="barangay")
+    planning = relationship("Planning", back_populates="barangay")
 
 # ==========================
 # TABLE 2: Users (4 roles)
@@ -198,6 +209,11 @@ class User(Base):
         foreign_keys="UploadedReport.uploaded_by",
     )
     updated_resources = relationship("Resource", back_populates="updated_by_user")
+    planning = relationship(
+        "Planning",
+        back_populates="uploaded_by_user",
+        foreign_keys="Planning.uploaded_by",
+    )
 
 # ==========================
 # TABLE 3: Population - census data per brgy
@@ -651,6 +667,77 @@ class SavedScenario(Base):
     barangay = relationship("Barangay")
     created_by_user = relationship("User")
 
+class Planning(Base):
+    __tablename__ = "planning"
+
+    id = Column(Integer, primary_key=True, index=True)
+    uploaded_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    barangay_id = Column(Integer, ForeignKey("barangays.id"), nullable=True)
+    file_name = Column(String(150), nullable=False)
+    file_path = Column(String(500), nullable=False)
+    status = Column(Enum(PlanningStatus), default=PlanningStatus.pending)
+    reason = Column(Text, nullable=True)
+    summary = Column(Text)
+    recommendation = Column(Text)
+    extracted_data = Column(JSON)
+    is_archived = Column(Boolean, default=False)
+    is_hardcopy_received = Column(Boolean, default=False)
+    hardcopy_received_date = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+
+    uploaded_by_user = relationship(
+        "User", back_populates="planning", foreign_keys=[uploaded_by]
+    )
+    barangay = relationship("Barangay", back_populates="planning")
+    activities = relationship(
+        "Activity",
+        back_populates="planning",
+        cascade="all, delete-orphan"
+    )
+
+class Activity(Base):
+    __tablename__ = "activities"
+    id = Column(Integer, primary_key=True, index=True)
+
+    planning_id = Column(
+        Integer,
+        ForeignKey("planning.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+
+    title = Column(String(255), nullable=False)
+    start_date = Column(Date, nullable=False)
+    status = Column(Enum(ActivityStatus), default=ActivityStatus.pending)
+    is_proof_submitted = Column(Boolean, default=False)
+    planning = relationship(
+        "Planning",
+        back_populates="activities"
+    )
+    proof = relationship(
+        "ActivityProof",
+        back_populates="activity",
+        cascade="all, delete-orphan"
+    )
+
+class ActivityProof(Base):
+    __tablename__ = "activity_proof"
+    id = Column(Integer, primary_key=True, index=True)
+
+    activity_id = Column(
+        Integer,
+        ForeignKey("activities.id"),
+        nullable=False,
+        unique=True
+    )
+
+    file_name = Column(String(150), nullable=False)
+    file_path = Column(String(500), nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+    activity = relationship(
+        "Activity",
+        back_populates="proof"
+    )
 
 # *******************************
 # Audit log helper (called from every route that changes data)
