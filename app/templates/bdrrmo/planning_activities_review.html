@@ -7,10 +7,18 @@
 {% block head_extra %}
 <style nonce="{{ request.state.csp_nonce }}">
     /* Review Activities table (shared .rk-table style from rk.css). */
+    /* The toolbar stays pinned to the top of the window while a long list
+       scrolls. Sticky needs no scrolling ancestor in between, so the card
+       itself does not scroll; only .ar-scroll (the table) scrolls sideways. */
+    .rk-table-card.ar-card { overflow: visible; }
+    .ar-scroll { overflow-x: auto; border-radius: 0 0 12px 12px; }
     .ar-toolbar {
         display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
         gap: 8px; padding: 12px 16px; border-bottom: 1px solid #dfeadb;
+        position: sticky; top: 0; z-index: 5;
+        background: #fff; border-radius: 12px 12px 0 0;
     }
+    .ar-toolbar.is-stuck { border-radius: 0; box-shadow: 0 2px 6px rgba(0, 0, 0, .08); }
     .ar-count { font-size: 13px; font-weight: 600; color: var(--rk-muted); }
     .rk-table .ar-col-num { width: 3.5rem; }
     .rk-table .ar-col-date { width: 12rem; }
@@ -59,8 +67,9 @@
         <i class="bi bi-info-circle" aria-hidden="true"></i> Activity date: Optional. You can set it later.
     </div>
 
-    <div class="rk-table-card">
-        <div class="ar-toolbar">
+    <div class="rk-table-card ar-card">
+        <div id="ar-toolbar-sentinel" aria-hidden="true"></div>
+        <div class="ar-toolbar" id="ar-toolbar">
             <span class="ar-count" id="ar-count" aria-live="polite">{{ activities | length }} activit{{ 'y' if activities | length == 1 else 'ies' }}</span>
             <div class="d-flex flex-wrap gap-2">
                 <button type="button" id="add-input" class="btn btn-outline-secondary btn-sm">
@@ -70,6 +79,7 @@
             </div>
         </div>
 
+        <div class="ar-scroll">
         <table class="rk-table">
             <thead>
                 <tr>
@@ -108,6 +118,7 @@
                 </tr>
             </tbody>
         </table>
+        </div>
     </div>
 </form>
 
@@ -198,6 +209,16 @@
     container.addEventListener("keydown", (event) => {
         if (event.key === "Enter" && event.target.classList.contains("ar-title")) event.preventDefault();
     });
+
+    // Shadow under the pinned toolbar only while it is actually stuck: a
+    // zero-height marker just above it leaves the viewport at that moment.
+    const toolbar = document.getElementById("ar-toolbar");
+    const sentinel = document.getElementById("ar-toolbar-sentinel");
+    if (toolbar && sentinel && "IntersectionObserver" in window) {
+        new IntersectionObserver(([entry]) => {
+            toolbar.classList.toggle("is-stuck", !entry.isIntersecting && entry.boundingClientRect.top < 0);
+        }).observe(sentinel);
+    }
 
     const growAll = () => container.querySelectorAll(".ar-title").forEach(autoGrow);
     window.addEventListener("resize", growAll);
