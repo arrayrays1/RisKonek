@@ -1991,3 +1991,98 @@ body.facility-location-picking .map-area .leaflet-container {
   color: #167736;
   font-size: 40px;
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   Shared list-page table style (filter bar · table card · pager)
+   Modelled on the Contact Directory. Markup:
+     <form class="rk-filter-bar js-live-filter"> … </form>
+     <div class="rk-table-card"><table class="rk-table"> … </table></div>
+     {{ rk_pager(page_obj, path, base_query) }}   (shared/_pagination.html)
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ── Filter bar ──────────────────────────────────────────────────── */
+.rk-filter-bar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  margin-bottom: 12px;
+}
+.rk-filter-bar .rk-filter-search { position: relative; flex: 1 1 260px; min-width: 200px; }
+.rk-filter-bar .rk-filter-search > .bi-search {
+  position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+  color: var(--rk-green); pointer-events: none;
+}
+.rk-filter-bar .rk-filter-search .form-control { padding-left: 34px; }
+.rk-filter-bar .rk-filter-select { flex: 0 1 180px; min-width: 140px; }
+.rk-filter-bar .form-control,
+.rk-filter-bar .form-select,
+.rk-filter-bar .rk-clear-filters {
+  height: 36px; border: 1px solid rgba(22, 119, 54, .35); border-radius: 8px;
+  font-size: 13px; background-color: #fff;
+}
+.rk-filter-bar .form-control:focus,
+.rk-filter-bar .form-select:focus {
+  border-color: var(--rk-green); box-shadow: 0 0 0 .2rem rgba(22, 119, 54, .15);
+}
+.rk-filter-bar .rk-clear-filters {
+  display: inline-flex; align-items: center; gap: 6px; padding: 0 12px;
+  color: #9b1c14; font-weight: 600; text-decoration: none; white-space: nowrap;
+}
+.rk-filter-bar .rk-clear-filters:hover,
+.rk-filter-bar .rk-clear-filters:focus { background: #fdf2f1; color: #9b1c14; }
+/* funnel with a small x badge (Bootstrap Icons has no funnel-x) */
+.rk-funnel-x { position: relative; display: inline-block; line-height: 1; }
+.rk-funnel-x .bi-x-circle-fill {
+  position: absolute; right: -4px; bottom: -3px; font-size: .6em;
+  background: #fff; border-radius: 50%;
+}
+@media (max-width: 575.98px) {
+  .rk-filter-bar .rk-filter-search,
+  .rk-filter-bar .rk-filter-select { flex: 1 1 100%; }
+}
+
+/* ── Table card ──────────────────────────────────────────────────── */
+.rk-table-card {
+  background: #fff; border: 1px solid rgba(22, 119, 54, .25); border-radius: 12px;
+  box-shadow: none; overflow-x: auto;
+}
+
+/* ── Table ───────────────────────────────────────────────────────── */
+.rk-table {
+  width: 100%; min-width: 640px; margin: 0; border-collapse: collapse;
+  font-size: 13px; color: var(--rk-text); font-variant-numeric: tabular-nums;
+}
+.rk-table th,
+.rk-table td { text-align: left; vertical-align: middle; border: 0; }
+.rk-table thead th {
+  padding: 14px 16px 12px; background: transparent;
+  color: var(--rk-green); font-size: 12px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .04em; white-space: nowrap;
+  border-bottom: 1px solid #dfeadb;
+}
+.rk-table tbody td { height: 56px; padding: 8px 16px; border-bottom: 1px solid #eef1ee; }
+.rk-table tbody tr:last-child td { border-bottom: 0; }
+.rk-table tbody tr:hover td { background: #f6fbf4; }
+.rk-table tbody tr.rk-table-empty:hover td { background: transparent; }
+.rk-table .rk-table-empty td { color: var(--rk-muted); }
+/* Action buttons/forms in a cell: one wrapping row, left-aligned. */
+.rk-table .rk-table-actions {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+}
+.rk-table .rk-table-actions form { display: inline-flex; margin: 0; }
+
+/* ── Numbered pagination footer ──────────────────────────────────── */
+.rk-pagination {
+  display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center;
+  gap: 8px; margin-top: 12px; padding: 0 4px;
+}
+.rk-pagination .rk-pagination-summary { font-size: 13px; color: var(--rk-muted); }
+.rk-pagination ul { display: flex; align-items: center; gap: 4px; list-style: none; margin: 0; padding: 0; }
+.rk-pagination li > a,
+.rk-pagination li > span {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 30px; height: 30px; padding: 0 6px; border-radius: 999px;
+  font-size: 13px; font-weight: 600; color: #374151; text-decoration: none;
+}
+.rk-pagination li > a:hover,
+.rk-pagination li > a:focus { background: #eefbe8; color: var(--rk-green); }
+.rk-pagination .rk-page-current { background: var(--rk-green); color: #fff; }
+.rk-pagination .rk-page-off { color: #c3c8cf; }

@@ -1,5 +1,5 @@
 {% extends "admin/base.html" %}
-{% from "shared/_pagination.html" import pager %}
+{% from "shared/_pagination.html" import rk_pager %}
 {% from "bdrrmo/_plan_banner.html" import plan_status_banner %}
 
 {% block title %}Planning — RisKonek{% endblock %}
@@ -8,9 +8,6 @@
 
 {% block head_extra %}
 <link rel="stylesheet" href="/static/css/rk-dashboard.css">
-<style nonce="{{ request.state.csp_nonce }}">
-    #header { margin: 0; color: #167736; font-size: 40px;}
-</style>
 {% endblock %}
 
 {% macro status_pill(v, label) -%}
@@ -95,127 +92,115 @@
     </form>
 </div>
 
+{% set filters_active = f_q or f_status or show_archived %}
+
 <!-- ── Filters (auto-apply) ───────────────────────────────────── -->
-<div class="dash-card mb-3">
-    <form method="GET" action="/bdrrmo/planning" class="row g-2 align-items-end js-live-filter">
-        <div class="col-md-7">
-            <label class="form-label small fw-semibold mb-1">Search</label>
-            <input type="text" name="q" value="{{ f_q }}" class="form-control form-control-sm"
-                   placeholder="Search file name…" autocomplete="off">
-        </div>
-        <div class="col-md-2">
-            <label class="form-label small fw-semibold mb-1">Status</label>
-            <select name="status" class="form-select form-select-sm">
-                <option value="">All status</option>
-                {% for s, label in status_choices %}
-                <option value="{{ s }}" {% if f_status == s %}selected{% endif %}>{{ label }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="col-md-2">
-            <label class="form-label small fw-semibold mb-1">View</label>
-            <select name="archived" class="form-select form-select-sm">
-                <option value=""  {% if not show_archived %}selected{% endif %}>Active</option>
-                <option value="1" {% if show_archived %}selected{% endif %}>Archived</option>
-            </select>
-        </div>
-        <div class="col-md-1 d-grid">
-            <a href="/bdrrmo/planning" class="btn btn-outline-secondary btn-sm" title="Reset filters">
-                <i class="bi bi-x-circle"></i>
-            </a>
-        </div>
-    </form>
-</div>
-
-<div class="dash-card overflow-hidden p-0">
-    <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
-            <thead class="rk-bg-soft">
-                <tr class="rk-th-soft">
-                    <th class="px-3 py-3">File name</th>
-                    <th class="py-3">Status</th>
-                    <th class="py-3 text-end px-3">Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for planning in plannings %}
-                <tr class="rk-fs-13">
-                    <td class="px-3">{{ planning.file_name }}</td>
-                    <td>{{ status_pill(planning.status_value, planning.status_label) }}</td>
-                    <td class="text-end px-3">
-                    {% if not planning.is_archived %}
-                        <a
-                            href="/bdrrmo/planning/{{ planning.id }}/details"
-                            class="btn btn-outline-primary btn-sm"
-                        >
-                            <i class="bi bi-eye"></i>
-                            View
-                        </a>
-                        <a
-                            href="planning/activities/{{ planning.id }}"
-                            class="btn btn-outline-primary btn-sm"
-                        >
-                            <i class="bi bi-eye"></i>
-                            View Activities
-                        </a>
-                        {% if planning.status_value == "approved" %}
-                        <a
-                            href="planning/{{ planning.id }}/review"
-                            class="btn btn-outline-primary btn-sm"
-                        >
-                            <i class="bi bi-eye"></i>
-                            View Summary
-                        </a>
-                        {% endif %}
-                        {% if planning.status_value == "rejected" %}
-                        <button type="button" class="btn btn-outline-primary btn-sm"
-                            data-bs-toggle="modal" data-bs-target="#reasonModal-{{ planning.id }}">
-                            <i class="bi bi-eye"></i> View Reason
-                        </button>
-                        {% endif %}
-                        {# Only returned plans can be archived (enforced server-side). #}
-                        {% if planning.status_value == "rejected" %}
-                        <form method="POST" action="/bdrrmo/planning/{{ planning.id }}/archive" class="d-inline"
-                              data-confirm='Archive {{ planning.file_name }}?'>
-                            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
-                            <button type="submit" class="btn btn-outline-warning btn-sm"
-                                    aria-label="Archive {{ planning.file_name }}">
-                                <i class="bi bi-archive" aria-hidden="true"></i>
-                            </button>
-                        </form>
-                        {% endif %}
-                    {% else %}
-                        {% if planning.status_value == "rejected" %}
-                        <button type="button" class="btn btn-outline-primary btn-sm"
-                            data-bs-toggle="modal" data-bs-target="#reasonModal-{{ planning.id }}">
-                            <i class="bi bi-eye"></i> View Reason
-                        </button>
-                        {% endif %}
-                        <form method="POST" action="/bdrrmo/planning/{{ planning.id }}/archive" class="d-inline">
-                            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
-                            <button type="submit" class="btn btn-outline-success btn-sm">
-                                <i class="bi bi-arrow-counterclockwise"></i> Restore
-                            </button>
-                        </form>
-                    {% endif %}
-                    </td>
-                </tr>
-                {% else %}
-                <tr><td colspan="6" class="text-center text-muted py-4">
-                    {% if f_q or f_disaster_type or f_severity %}
-                    No plannings match your filters.
-                    <a href="/bdrrmo/planning" class="ms-2">Clear filters</a>
-                    {% else %}
-                    No submitted plannings for this barangay yet.
-                    {% endif %}
-                </td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
+<form method="GET" action="/bdrrmo/planning" class="rk-filter-bar js-live-filter" role="search">
+    <div class="rk-filter-search">
+        <label for="pl-q" class="visually-hidden">Search file name</label>
+        <i class="bi bi-search" aria-hidden="true"></i>
+        <input type="text" id="pl-q" name="q" value="{{ f_q }}" class="form-control"
+               placeholder="Search file name…" autocomplete="off">
     </div>
+    <div class="rk-filter-select">
+        <label for="pl-status" class="visually-hidden">Status</label>
+        <select id="pl-status" name="status" class="form-select">
+            <option value="">All status</option>
+            {% for s, label in status_choices %}
+            <option value="{{ s }}" {% if f_status == s %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="rk-filter-select">
+        <label for="pl-view" class="visually-hidden">View</label>
+        <select id="pl-view" name="archived" class="form-select">
+            <option value=""  {% if not show_archived %}selected{% endif %}>Active</option>
+            <option value="1" {% if show_archived %}selected{% endif %}>Archived</option>
+        </select>
+    </div>
+    <a href="/bdrrmo/planning" class="rk-clear-filters">
+        <span class="rk-funnel-x" aria-hidden="true"><i class="bi bi-funnel-fill"></i><i class="bi bi-x-circle-fill"></i></span>
+        Clear filters
+    </a>
+</form>
+
+<div class="rk-table-card">
+    <table class="rk-table">
+        <thead>
+            <tr>
+                <th scope="col">File name</th>
+                <th scope="col">Status</th>
+                <th scope="col">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for planning in plannings %}
+            <tr>
+                <td>{{ planning.file_name }}</td>
+                <td>{{ status_pill(planning.status_value, planning.status_label) }}</td>
+                <td>
+                <div class="rk-table-actions">
+                {% if not planning.is_archived %}
+                    <a href="/bdrrmo/planning/{{ planning.id }}/details" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-eye"></i> View
+                    </a>
+                    <a href="planning/activities/{{ planning.id }}" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-eye"></i> View Activities
+                    </a>
+                    {% if planning.status_value == "approved" %}
+                    <a href="planning/{{ planning.id }}/review" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-eye"></i> View Summary
+                    </a>
+                    {% endif %}
+                    {% if planning.status_value == "rejected" %}
+                    <button type="button" class="btn btn-outline-primary btn-sm"
+                        data-bs-toggle="modal" data-bs-target="#reasonModal-{{ planning.id }}">
+                        <i class="bi bi-eye"></i> View Reason
+                    </button>
+                    {% endif %}
+                    {# Only returned plans can be archived (enforced server-side). #}
+                    {% if planning.status_value == "rejected" %}
+                    <form method="POST" action="/bdrrmo/planning/{{ planning.id }}/archive"
+                          data-confirm='Archive {{ planning.file_name }}?'>
+                        <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+                        <button type="submit" class="btn btn-outline-warning btn-sm"
+                                aria-label="Archive {{ planning.file_name }}">
+                            <i class="bi bi-archive" aria-hidden="true"></i>
+                        </button>
+                    </form>
+                    {% endif %}
+                {% else %}
+                    {% if planning.status_value == "rejected" %}
+                    <button type="button" class="btn btn-outline-primary btn-sm"
+                        data-bs-toggle="modal" data-bs-target="#reasonModal-{{ planning.id }}">
+                        <i class="bi bi-eye"></i> View Reason
+                    </button>
+                    {% endif %}
+                    <form method="POST" action="/bdrrmo/planning/{{ planning.id }}/archive">
+                        <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+                        <button type="submit" class="btn btn-outline-success btn-sm">
+                            <i class="bi bi-arrow-counterclockwise"></i> Restore
+                        </button>
+                    </form>
+                {% endif %}
+                </div>
+                </td>
+            </tr>
+            {% else %}
+            <tr class="rk-table-empty"><td colspan="3">
+                {% if filters_active %}
+                No records found.
+                <a href="/bdrrmo/planning" class="ms-1">Clear filters</a>
+                {% else %}
+                No submitted plannings for this barangay yet.
+                {% endif %}
+            </td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
 </div>
 
-{{ pager(page_obj, "/bdrrmo/planning", base_query) }}
+{{ rk_pager(page_obj, "/bdrrmo/planning", base_query, "Planning pages") }}
 
 {% endif %}
 

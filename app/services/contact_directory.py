@@ -12,7 +12,7 @@ import re
 
 from app.models import Barangay
 from app.utils.pagination import (
-    paginate, parse_per_page, parse_page, build_base_query,
+    paginate, parse_per_page, parse_page, build_base_query, page_window,
 )
 
 # A run of digits (with the separators PH numbers commonly use) long enough
@@ -75,28 +75,6 @@ def _barangay_entries(b):
 # The directory table shows 15 contact rows per page (roughly the height of the
 # hotline panel beside it) unless ?per_page= says otherwise.
 DIRECTORY_PER_PAGE = 15
-
-
-def page_window(current, total_pages, radius=1):
-    """Page numbers for a numbered pager: the first and last page, the current
-    page and its neighbours, with None where a run of pages is skipped (an
-    ellipsis). e.g. page 5 of 10 -> [1, None, 4, 5, 6, None, 10]."""
-    if total_pages <= 1:
-        return [1] if total_pages == 1 else []
-    keep = {1, total_pages}
-    keep.update(range(max(1, current - radius), min(total_pages, current + radius) + 1))
-    # Near either end show a few more pages instead of a lone ellipsis gap.
-    if current <= 2 + radius:
-        keep.update(range(1, min(total_pages, 3 + radius) + 1))
-    if current >= total_pages - 1 - radius:
-        keep.update(range(max(1, total_pages - 2 - radius), total_pages + 1))
-    out, prev = [], 0
-    for n in sorted(keep):
-        if n - prev > 1:
-            out.append(None)
-        out.append(n)
-        prev = n
-    return out
 
 
 def build_directory_context(db, *, q, brgy, page, per_page,

@@ -53,3 +53,51 @@
 </nav>
 {% endif %}
 {% endmacro %}
+
+{# ── Numbered pager (shared table style) ────────────────────────────────
+   "Showing X–Y of Z" on the left; prev/next chevrons and page numbers on
+   the right (current page = filled green circle, … for skipped ranges).
+   Same arguments as pager(); the page size in use is kept on every link.
+
+     {% from "shared/_pagination.html" import rk_pager %}
+     {{ rk_pager(page_obj, "/admin/planning", base_query) }}
+#}
+{% macro rk_pager(page_obj, path, base_query, label="Table pages") %}
+{% if page_obj.total %}
+<nav class="rk-pagination" aria-label="{{ label }}">
+    <span class="rk-pagination-summary">
+        Showing {{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ page_obj.total }}
+    </span>
+    {% if page_obj.total_pages > 1 %}
+    {% set size = 'per_page=' ~ page_obj.size_value ~ '&page=' %}
+    <ul>
+        <li>
+            {% if page_obj.has_prev %}
+            <a href="{{ _url(path, base_query, size ~ (page_obj.page - 1)) }}" aria-label="Previous page"><i class="bi bi-chevron-left" aria-hidden="true"></i></a>
+            {% else %}
+            <span class="rk-page-off" aria-disabled="true"><i class="bi bi-chevron-left" aria-hidden="true"></i></span>
+            {% endif %}
+        </li>
+        {% for n in page_obj.window %}
+        <li>
+            {% if n is none %}
+            <span aria-hidden="true">…</span>
+            {% elif n == page_obj.page %}
+            <span class="rk-page-current" aria-current="page">{{ n }}</span>
+            {% else %}
+            <a href="{{ _url(path, base_query, size ~ n) }}" aria-label="Page {{ n }}">{{ n }}</a>
+            {% endif %}
+        </li>
+        {% endfor %}
+        <li>
+            {% if page_obj.has_next %}
+            <a href="{{ _url(path, base_query, size ~ (page_obj.page + 1)) }}" aria-label="Next page"><i class="bi bi-chevron-right" aria-hidden="true"></i></a>
+            {% else %}
+            <span class="rk-page-off" aria-disabled="true"><i class="bi bi-chevron-right" aria-hidden="true"></i></span>
+            {% endif %}
+        </li>
+    </ul>
+    {% endif %}
+</nav>
+{% endif %}
+{% endmacro %}
