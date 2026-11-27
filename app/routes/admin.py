@@ -11,7 +11,7 @@ from app.models import (
     UploadedReport, UploadHistory, UploadEvent,
     ResourceCategory, EquipmentType, log_action,
     EquipmentReport, IncidentReport, ServiceabilityStatus, Urgency, Planning, PlanningStatus,
-    Activity, ActivityProof
+    Activity, ActivityProof, ActivityStatus
 )
 from app.etl.extract_pdf import extract_pdf
 from app.services import plan_dashboard as pdash
@@ -2900,10 +2900,25 @@ async def change_status_activity(
     if not activity:
         return RedirectResponse(url="/admin/planning", status_code=302)
 
-    activity.status = status
-    activity.reason = reason
+    back = f"/admin/planning/activities/{activity.planning_id}"
+    # Only a proof awaiting review can be approved or returned.
+    if not activity.is_proof_submitted or activity.status == ActivityStatus.approved:
+        return RedirectResponse(
+            url=f"{back}?error=There+is+no+proof+to+review+for+this+activity.",
+            status_code=302,
+        )
+    try:
+        new_status = ActivityStatus(status)
+    except ValueError:
+        return RedirectResponse(url=f"{back}?error=Invalid+status", status_code=302)
+    if new_status == ActivityStatus.rejected and not reason.strip():
+        return RedirectResponse(url=f"{back}?error=Please+give+a+reason", status_code=302)
 
-    if status == "rejected":
+    status = new_status.value
+    activity.status = new_status
+    activity.reason = reason.strip()
+
+    if new_status == ActivityStatus.rejected:
         activity.is_proof_submitted = False
 
     verb = status
