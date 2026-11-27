@@ -6,7 +6,20 @@
 
 {% block head_extra %}
 <style nonce="{{ request.state.csp_nonce }}">
-    #header { margin: 0; color: #167736; font-size: 40px;}
+    /* Review Activities table (shared .rk-table style from rk.css). */
+    .ar-toolbar {
+        display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+        gap: 8px; padding: 12px 16px; border-bottom: 1px solid #dfeadb;
+    }
+    .ar-count { font-size: 13px; font-weight: 600; color: var(--rk-muted); }
+    .rk-table .ar-col-num { width: 3.5rem; }
+    .rk-table .ar-col-date { width: 12rem; }
+    .rk-table .ar-col-actions { width: 6rem; }
+    .rk-table td.ar-num { color: var(--rk-muted); font-weight: 600; }
+    /* Auto-growing title box: always shows the whole PPA title. */
+    .ar-title {
+        resize: none; overflow: hidden; min-height: 34px; line-height: 1.4;
+    }
 </style>
 {% endblock %}
 
@@ -39,100 +52,162 @@
 </div>
 {% endif %}
 
-<form method="POST" action={{"/bdrrmo/activities/save/" ~  draft_id}}>
+<form method="POST" action="/bdrrmo/activities/save/{{ draft_id }}" id="activitiesForm">
+    <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+
     <div class="form-text mb-2">
-        <i class="bi bi-info-circle"></i> Activity date: Optional. You can set it later.
+        <i class="bi bi-info-circle" aria-hidden="true"></i> Activity date: Optional. You can set it later.
     </div>
-    <div id="input-container">
-        {% for activity in activities %}
 
-        <div class="input-group mb-2">
-
-            <input
-                type="text"
-                class="form-control form-control-sm"
-                name="activities[{{ loop.index0 }}][title]"
-                value="{{ activity.title }}"
-                required
-            >
-
-
-            <input
-                type="date"
-                class="form-control form-control-sm"
-                name="activities[{{ loop.index0 }}][start_date]"
-                value="{{ activity.start_date or '' }}"
-                title="Optional. You can set it later."
-            >
-
-            <button type="button" class="remove-btn btn btn-danger">
-                Remove
-            </button>
-
+    <div class="rk-table-card">
+        <div class="ar-toolbar">
+            <span class="ar-count" id="ar-count" aria-live="polite">{{ activities | length }} activit{{ 'y' if activities | length == 1 else 'ies' }}</span>
+            <div class="d-flex flex-wrap gap-2">
+                <button type="button" id="add-input" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-plus-lg" aria-hidden="true"></i> Add activity
+                </button>
+                <button type="submit" class="btn-rk btn-sm">Save Activities</button>
+            </div>
         </div>
 
-        {% endfor %}
-
+        <table class="rk-table">
+            <thead>
+                <tr>
+                    <th scope="col" class="ar-col-num">#</th>
+                    <th scope="col">Activity (PPA)</th>
+                    <th scope="col" class="ar-col-date">Date (optional)</th>
+                    <th scope="col" class="ar-col-actions">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="input-container">
+                {% for activity in activities %}
+                {# Names keep the activities[i][field] shape the save handler reads. #}
+                <tr class="ar-row">
+                    <td class="ar-num">{{ loop.index }}</td>
+                    <td>
+                        <textarea class="form-control form-control-sm ar-title" rows="1"
+                                  name="activities[{{ loop.index0 }}][title]"
+                                  aria-label="Activity {{ loop.index }} title" required>{{ activity.title }}</textarea>
+                    </td>
+                    <td>
+                        <input type="date" class="form-control form-control-sm ar-date"
+                               name="activities[{{ loop.index0 }}][start_date]"
+                               value="{{ activity.start_date or '' }}"
+                               aria-label="Activity {{ loop.index }} date (optional)">
+                    </td>
+                    <td>
+                        <button type="button" class="remove-btn btn btn-outline-danger btn-sm"
+                                aria-label="Remove activity {{ loop.index }}" title="Remove">
+                            <i class="bi bi-trash" aria-hidden="true"></i>
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+                <tr class="rk-table-empty" id="ar-empty" {% if activities %}hidden{% endif %}>
+                    <td colspan="4">No activities were extracted. Add them manually with 'Add activity'.</td>
+                </tr>
+            </tbody>
+        </table>
     </div>
-
-    <div class="d-flex justify-content-center mt-4">
-        <button type="button" id="add-input" class="btn btn-primary">
-            + Add Activity
-        </button>
-    </div>
-
 
     <div class="d-flex justify-content-end mt-4">
-       <button type="submit" class="btn-rk">Save Activities</button> 
-    </div> 
+       <button type="submit" class="btn-rk">Save Activities</button>
+    </div>
 </form>
 
+{# Blank row cloned by "Add activity"; __i__ becomes the next free index. #}
+<template id="ar-row-template">
+    <tr class="ar-row">
+        <td class="ar-num"></td>
+        <td>
+            <textarea class="form-control form-control-sm ar-title" rows="1"
+                      name="activities[__i__][title]" placeholder="Enter activity" required></textarea>
+        </td>
+        <td>
+            <input type="date" class="form-control form-control-sm ar-date" name="activities[__i__][start_date]" value="">
+        </td>
+        <td>
+            <button type="button" class="remove-btn btn btn-outline-danger btn-sm" title="Remove">
+                <i class="bi bi-trash" aria-hidden="true"></i>
+            </button>
+        </td>
+    </tr>
+</template>
+
 <script nonce="{{ request.state.csp_nonce }}">
+(function () {
     const container = document.getElementById("input-container");
     const addButton = document.getElementById("add-input");
+    const emptyRow = document.getElementById("ar-empty");
+    const countEl = document.getElementById("ar-count");
+    const rowTemplate = document.getElementById("ar-row-template");
 
-    let activityIndex = container.querySelectorAll(".input-group").length;
+    // Next free index: indexes may have gaps after removals (the save
+    // handler accepts that); a new row never reuses one.
+    let activityIndex = {{ activities | length }};
+
+    const rows = () => Array.from(container.querySelectorAll("tr.ar-row"));
+
+    // Grow the title box to fit its text (no scrollbar).
+    function autoGrow(textarea) {
+        textarea.style.height = "auto";
+        textarea.style.height = textarea.scrollHeight + 2 + "px";
+    }
+
+    // Row numbers, accessible names, the count and the empty state.
+    function renumber() {
+        const all = rows();
+        all.forEach((tr, i) => {
+            const n = i + 1;
+            tr.querySelector(".ar-num").textContent = n;
+            tr.querySelector(".ar-title").setAttribute("aria-label", "Activity " + n + " title");
+            tr.querySelector(".ar-date").setAttribute("aria-label", "Activity " + n + " date (optional)");
+            tr.querySelector(".remove-btn").setAttribute("aria-label", "Remove activity " + n);
+        });
+        countEl.textContent = all.length + (all.length === 1 ? " activity" : " activities");
+        emptyRow.hidden = all.length > 0;
+    }
 
     addButton.addEventListener("click", () => {
         const index = activityIndex++;
-
-        const div = document.createElement("div");
-
-        div.classList.add("input-group", "mb-2");
-
-        div.innerHTML = `
-            <input
-                type="text"
-                name="activities[${index}][title]"
-                class="form-control form-control-sm"
-                placeholder="Enter activity"
-                required
-            >
-
-            <input
-                type="date"
-                class="form-control form-control-sm"
-                name="activities[${index}][start_date]"
-                value=""
-                title="Optional. You can set it later."
-            >
-
-            <button type="button" class="remove-btn btn btn-danger">
-                Remove
-            </button>
-        `;
-
-        container.appendChild(div);
+        const tr = rowTemplate.content.firstElementChild.cloneNode(true);
+        tr.querySelectorAll("[name]").forEach((el) => {
+            el.name = el.name.replace("__i__", index);
+        });
+        container.insertBefore(tr, emptyRow);
+        renumber();
+        const title = tr.querySelector(".ar-title");
+        autoGrow(title);
+        title.focus();
     });
 
     container.addEventListener("click", (event) => {
-
-        if (event.target.classList.contains("remove-btn")) {
-            event.target.closest(".input-group").remove();
-        }
-
+        // closest(): a click on the trash icon inside the button counts too.
+        const btn = event.target.closest("button.remove-btn");
+        if (!btn) return;
+        const tr = btn.closest("tr.ar-row");
+        const next = tr.nextElementSibling && tr.nextElementSibling.classList.contains("ar-row")
+            ? tr.nextElementSibling : tr.previousElementSibling;
+        tr.remove();
+        renumber();
+        // Keep keyboard focus nearby instead of losing it.
+        const target = next && next.querySelector(".remove-btn");
+        (target || addButton).focus();
     });
 
+    container.addEventListener("input", (event) => {
+        if (event.target.classList.contains("ar-title")) autoGrow(event.target);
+    });
+    // A title is one line of text: Enter does not add a line break.
+    container.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" && event.target.classList.contains("ar-title")) event.preventDefault();
+    });
+
+    const growAll = () => container.querySelectorAll(".ar-title").forEach(autoGrow);
+    window.addEventListener("resize", growAll);
+    growAll();
+    renumber();
+})();
 </script>
 
 {% endblock %}
