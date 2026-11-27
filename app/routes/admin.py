@@ -17,7 +17,6 @@ from app.etl.extract_pdf import extract_pdf
 from app.services import plan_dashboard as pdash
 from app.etl.ai_pipeline import summarize_planning as ai_summarize
 from app.auth import require_role, hash_password
-from app.analytics.simulator import compute_risk_score
 from app.utils.geo import BARANGAY_COORDS
 from app.services.geocoding import (
     nearby_landmarks, search_locations, reverse_geocode_san_pedro,
@@ -1016,12 +1015,9 @@ def barangay_list(
 
 
 def barangay_profile_context(db, brgy: Barangay) -> dict:
-    """Build the full barangay-profile context for `brgy`.
-
-    Shared by the admin barangay profile (TR-ADM-23) and the
-    barangay-scoped BDRRMO profile (Week 9) so both render identical
-    population / incident / facility / planning-priority data without
-    duplicating the logic. Does NOT include `user` — the caller adds it.
+    """Build the Admin barangay-profile context for `brgy`: headline cards,
+    the current BDRRM Plan with its activities, key infrastructure and
+    vulnerable groups. Does NOT include `user` — the caller adds it.
     """
     population = db.query(Population).filter(
         Population.barangay_id == brgy.id
@@ -1035,16 +1031,6 @@ def barangay_profile_context(db, brgy: Barangay) -> dict:
         Facility.barangay_id == brgy.id,
         Facility.is_archived == False,
     ).order_by(Facility.facility_type, Facility.name).all()
-
-    # ── Risk score (reuse existing formula) ──────────────────────────
-    risk_result = compute_risk_score(brgy, incidents, population)
-
-    # ── Historical disaster counts (last 5 years) ────────────────────
-    five_years_ago = date.today() - timedelta(days=365 * 5)
-    recent_incidents = [i for i in incidents if i.date_occurred >= five_years_ago]
-    incident_counts_by_type = {dt.value: 0 for dt in DisasterType}
-    for inc in recent_incidents:
-        incident_counts_by_type[inc.disaster_type.value] += 1
 
     # ── Vulnerable group breakdown ───────────────────────────────────
     total_pop = population.total_population if population else 0
@@ -1071,11 +1057,20 @@ def barangay_profile_context(db, brgy: Barangay) -> dict:
             "status_class": status_class,
         })
 
+    # ── Current BDRRM Plan (latest non-archived, as on the dashboards) ─
+    plan = pdash.latest_plan_for_barangay(db, brgy.id)
+    activities = pdash.activities_for_plans(db, [plan.id]) if plan else []
+    activity_rows = pdash.admin_activity_rows(activities)
+    rescheduled = pdash.rescheduled_counts(db, [a.id for a in activities])
+    for row in activity_rows:
+        row["rescheduled"] = rescheduled.get(row["activity"].id, 0)
+
     return {
         "barangay": brgy,
-        "risk_level": brgy.risk_level.value if brgy.risk_level else "low",
-        "risk_score": risk_result["score"],
-        "risk_breakdown": risk_result["breakdown"],
+        "plan": plan,
+        "plan_status": pdash.plan_status(plan) if plan else None,
+        "activity_rows": activity_rows,
+        "activity_cards": pdash.activity_cards(activities),
         "total_population": total_pop,
         "households": households,
         "vulnerable_pct": _vulnerable_percent(population),
@@ -1088,9 +1083,6 @@ def barangay_profile_context(db, brgy: Barangay) -> dict:
         "flood_trend": _risk_trend(incidents, DisasterType.flood),
         "fire_trend": _risk_trend(incidents, DisasterType.fire),
         "facility_rows": facility_rows,
-        "incident_counts": incident_counts_by_type,
-        "recent_incidents": recent_incidents[:10],
-        "hazard_types": [h.strip() for h in (brgy.hazard_types or "").split(",") if h.strip()],
     }
 
 
