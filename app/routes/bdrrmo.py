@@ -2608,24 +2608,58 @@ def resources_list(
         },
     )
 
-@router.get("/resources/new", response_class=HTMLResponse)
-def resource_new_form(request: Request, db: Session = Depends(get_db)):
-    user, _ = _resolve_scope(request, db)
-    if isinstance(user, RedirectResponse):
-        return user
+def _no_barangay_redirect():
+    return RedirectResponse(
+        url="/bdrrmo/resources?error=No+barangay+is+assigned+to+your+account",
+        status_code=302,
+    )
+
+
+def _resource_not_found():
+    return RedirectResponse(
+        url="/bdrrmo/resources?error=Resource+not+found", status_code=302
+    )
+
+
+def _own_resource(db, barangay, resource_id):
+    """A resource of the current BDRRMO's OWN barangay, or None. Every
+    edit / stock / archive route loads through this, so changing the id in
+    the URL can never reach another barangay's resource."""
+    if not barangay:
+        return None
+    return db.query(Resource).filter(
+        Resource.id == resource_id,
+        Resource.barangay_id == barangay.id,
+    ).first()
+
+
+def _render_resource_form(request, user, barangay, target, error=None):
+    """The Add / Edit resource form. `barangay` is required by the BDRRMO
+    header in admin/base.html."""
     return templates.TemplateResponse(
         request=request,
         name="bdrrmo/resource_form.html",
         context={
             "user": user,
+            "barangay": barangay,
             "active_nav": "resources",
-            "edit_mode": False,
-            "target": None,
+            "edit_mode": target is not None,
+            "target": target,
             "categories": [c.value for c in ResourceCategory],
             "food_types": [(v, FOOD_TYPE_LABELS[v]) for v in FOOD_TYPE_CHOICES],
-            "error": None,
+            "error": error,
         },
     )
+
+
+@router.get("/resources/new", response_class=HTMLResponse)
+def resource_new_form(request: Request, db: Session = Depends(get_db)):
+    user, barangay = _resolve_scope(request, db)
+    if isinstance(user, RedirectResponse):
+        return user
+    if not barangay:
+        return _no_barangay_redirect()
+    return _render_resource_form(request, user, barangay, None)
 
 def _parse_date_or_none(s: Optional[str]):
     if not s:
@@ -2649,24 +2683,14 @@ def resource_create(
     restock_threshold: int = Form(0),
     expiry_date: str = Form(""),
 ):
-    user, _ = _resolve_scope(request, db)
+    user, barangay = _resolve_scope(request, db)
     if isinstance(user, RedirectResponse):
         return user
+    if not barangay:
+        return _no_barangay_redirect()
 
     def render_error(msg):
-        return templates.TemplateResponse(
-            request=request,
-            name="bdrrmo/resource_form.html",
-            context={
-                "user": user,
-                "active_nav": "resources",
-                "edit_mode": False,
-                "target": None,
-                "categories": [c.value for c in ResourceCategory],
-                "food_types": [(v, FOOD_TYPE_LABELS[v]) for v in FOOD_TYPE_CHOICES],
-                "error": msg,
-            },
-        )
+        return _render_resource_form(request, user, barangay, None, msg)
 
     name = name.strip()
     if not name:
@@ -2685,7 +2709,7 @@ def resource_create(
 
     r = Resource(
         name=name,
-        barangay_id=user['barangay_id'],
+        barangay_id=barangay.id,
         category=ResourceCategory(category),
         food_type=food_type_value,
         is_perishable=perish,
@@ -2713,26 +2737,17 @@ def resource_create(
 
 @router.get("/resources/{resource_id}/edit", response_class=HTMLResponse)
 def resource_edit_form(resource_id: int, request: Request, db: Session = Depends(get_db)):
-    user, _ = _resolve_scope(request, db)
+    user, barangay = _resolve_scope(request, db)
     if isinstance(user, RedirectResponse):
         return user
 
-    r = db.query(Resource).filter(Resource.id == resource_id).first()
+    r = _own_resource(db, barangay, resource_id)
     if not r:
-        return RedirectResponse(url="/admin/resources", status_code=302)
+        return _resource_not_found()
 
-    return templates.TemplateResponse(
-        request=request,
-        name="bdrrmo/resource_form.html",
-        context={
-            "user": user,
-            "active_nav": "resources",
-            "edit_mode": True,
-            "target": r,
-            "categories": [c.value for c in ResourceCategory],
-            "food_types": [(v, FOOD_TYPE_LABELS[v]) for v in FOOD_TYPE_CHOICES],
-            "error": None,
-        },
+    # The stock route sends its errors here as ?error=…
+    return _render_resource_form(
+        request, user, barangay, r, request.query_params.get("error")
     )
 
 
@@ -2750,13 +2765,19 @@ def resource_edit(
     restock_threshold: int = Form(0),
     expiry_date: str = Form(""),
 ):
-    user, _ = _resolve_scope(request, db)
+    user, barangay = _resolve_scope(request, db)
     if isinstance(user, RedirectResponse):
         return user
 
-    r = db.query(Resource).filter(Resource.id == resource_id).first()
+    r = _own_resource(db, barangay, resource_id)
     if not r:
-        return RedirectResponse(url="/bdrrmo/resources", status_code=302)
+        return _resource_not_found()
+
+    # Same required-field checks as Add; shown on the form, nothing saved.
+    if not name.strip():
+        return _render_resource_form(request, user, barangay, r, "Resource name is required.")
+    if category not in {c.value for c in ResourceCategory}:
+        return _render_resource_form(request, user, barangay, r, "Invalid category.")
 
     # Quantity is intentionally not editable here — use Add/Deduct Stock so
     # every quantity change is auditable with before/after numbers.
@@ -2862,13 +2883,13 @@ def resource_stock_change(
     deployed_to: str = Form(""),
     occurred_at: str = Form(""),
 ):
-    user, _ = _resolve_scope(request, db)
+    user, barangay = _resolve_scope(request, db)
     if isinstance(user, RedirectResponse):
         return user
 
-    r = db.query(Resource).filter(Resource.id == resource_id).first()
+    r = _own_resource(db, barangay, resource_id)
     if not r:
-        return RedirectResponse(url="/bdrrmo/resources", status_code=302)
+        return _resource_not_found()
 
     if action not in ("add", "deduct"):
         return RedirectResponse(
@@ -2929,13 +2950,13 @@ def resource_archive_toggle(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    user, _ = _resolve_scope(request, db)
+    user, barangay = _resolve_scope(request, db)
     if isinstance(user, RedirectResponse):
         return user
 
-    r = db.query(Resource).filter(Resource.id == resource_id).first()
+    r = _own_resource(db, barangay, resource_id)
     if not r:
-        return RedirectResponse(url="/bdrrmo/resources", status_code=302)
+        return _resource_not_found()
 
     r.is_archived = not bool(r.is_archived)
     r.updated_by = user["id"]

@@ -225,7 +225,8 @@
                     <p class="m-0 header-text">Magandang San Pedro Po, {{ user.username.upper() }}!</p>
                 </div>
             </div>
-            {% if is_bdrrmo %}
+            {# Only when the route passed `barangay`; a missing value must never crash a page. #}
+            {% if is_bdrrmo and barangay %}
             <div class="barangay-text-container">
                 <div class="d-flex align-items-center p-1">
                     <i class="bi bi-geo-alt-fill nav-icon text-color"></i>
