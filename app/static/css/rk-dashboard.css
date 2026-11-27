@@ -4,12 +4,12 @@
    attributes. */
 
 /* ── Header ─────────────────────────────────────────────────────── */
-.rkd-eyebrow { font-size: 12px; color: var(--rk-muted); margin-bottom: 2px; }
+.rkd-eyebrow { font-size: var(--rk-fs-small); color: var(--rk-muted); margin-bottom: 2px; }
 .rkd-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .rkd-chip {
-    font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px;
+    font-size: var(--rk-fs-small); font-weight: 600; padding: 4px 10px; border-radius: 999px;
     background: #fff; border: 1px solid #e4e7ec; color: var(--rk-text);
-    max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    max-width: 100%; overflow-wrap: anywhere;
 }
 
 /* ── Cards ──────────────────────────────────────────────────────── */
@@ -17,10 +17,10 @@
     background: #fff; border: 1px solid #e6e9ee; border-radius: 14px;
     padding: 18px 20px; height: 100%;
 }
-.rkd-card-title { font-size: 15px; font-weight: 700; color: var(--rk-text); margin: 0; }
-.rkd-card-note { font-size: 12px; color: var(--rk-muted); margin: 2px 0 14px; }
+.rkd-card-title { font-size: 0.9375rem; font-weight: 700; color: var(--rk-text); margin: 0; }
+.rkd-card-note { font-size: var(--rk-fs-small); color: var(--rk-muted); margin: 2px 0 14px; }
 .rkd-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
-.rkd-link { font-size: 13px; font-weight: 600; color: #167736; text-decoration: underline; }
+.rkd-link { font-size: var(--rk-fs-small); font-weight: 600; color: #167736; text-decoration: underline; }
 .rkd-link:hover { color: #0f5a28; }
 
 /* Summary cards (both dashboards). Tone sets background, number and icon
@@ -32,12 +32,12 @@
     padding: 16px 72px 16px 18px;
 }
 .rk-stat-card .rk-stat-text { position: relative; z-index: 1; }
-.rk-stat-card .rk-stat-label { font-size: 15px; font-weight: 600; color: #2f6b3a; line-height: 1.25; }
-.rk-stat-card .rk-stat-value { font-size: 34px; font-weight: 800; line-height: 1.15; margin-top: 6px; color: var(--rk-text); }
-.rk-stat-card .rk-stat-sub { font-size: 14px; color: #4f7a5a; margin-top: 2px; }
+.rk-stat-card .rk-stat-label { font-size: 0.9375rem; font-weight: 600; color: #2f6b3a; line-height: 1.25; }
+.rk-stat-card .rk-stat-value { font-size: var(--rk-fs-kpi); font-weight: 800; line-height: 1.15; margin-top: 6px; color: var(--rk-text); }
+.rk-stat-card .rk-stat-sub { font-size: 0.875rem; color: #4f7a5a; margin-top: 2px; }
 .rk-stat-card .rk-stat-icon {
     position: absolute; z-index: 0; right: -30px; top: 50%; transform: translateY(-50%);
-    font-size: 90px; line-height: 1; color: #8fbf9a; pointer-events: none;
+    font-size: 5.625rem; line-height: 1; color: #8fbf9a; pointer-events: none;
 }
 .rk-stat-green { background: #eefbe8; }
 .rk-stat-green .rk-stat-value { color: #167736; }
@@ -49,8 +49,8 @@
 .rk-stat-amber .rk-stat-icon { color: #f9dca0; }
 @media (max-width: 575.98px) {
     .rk-stat-card { min-height: 104px; padding-right: 52px; }
-    .rk-stat-card .rk-stat-icon { font-size: 64px; right: -21px; }
-    .rk-stat-card .rk-stat-value { font-size: 30px; }
+    .rk-stat-card .rk-stat-icon { font-size: 4rem; right: -21px; }
+    .rk-stat-card .rk-stat-value { font-size: 1.875rem; }
 }
 
 .rkd-val-green { color: #167736 !important; }
@@ -59,14 +59,14 @@
 
 /* ── Status pills ───────────────────────────────────────────────── */
 .rkd-pill {
-    display: inline-block; font-size: 11px; font-weight: 700; padding: 3px 10px;
+    display: inline-block; font-size: var(--rk-fs-small); font-weight: 700; padding: 3px 10px;
     border-radius: 999px; white-space: nowrap;
 }
-.rkd-pill-approved { background: #e6f4ea; color: #0f5a28; }
-.rkd-pill-pending  { background: #fff4d6; color: #7a4f00; }
-.rkd-pill-returned { background: #fde8e6; color: #9b1c14; }
-.rkd-pill-awaiting { background: #e8eefc; color: #1f3f8f; }
-.rkd-pill-none     { background: #eef0f3; color: #4b5563; }
+.rkd-pill-approved { background: var(--rk-success-bg); color: var(--rk-success-fg); }
+.rkd-pill-pending { background: var(--rk-warning-bg); color: var(--rk-warning-fg); }
+.rkd-pill-returned { background: var(--rk-danger-bg); color: var(--rk-danger-fg); }
+.rkd-pill-awaiting { background: var(--rk-info-bg); color: var(--rk-info-fg); }
+.rkd-pill-none { background: var(--rk-neutral-bg); color: var(--rk-neutral-fg); }
 .rkd-pill-muted    { background: #eef0f3; color: #4b5563; font-weight: 600; }
 
 /* ── Pie + legend ───────────────────────────────────────────────── */
@@ -81,19 +81,19 @@
 .rkd-swatch { width: 14px; height: 14px; border-radius: 4px; flex: 0 0 14px; margin-top: 3px; }
 .rkd-swatch-green { background: #167736; }
 .rkd-swatch-yellow { background: #f5b800; }
-.rkd-legend-label { font-size: 14px; font-weight: 600; color: var(--rk-text); }
-.rkd-legend-sub { font-size: 12px; color: var(--rk-muted); }
+.rkd-legend-label { font-size: 0.875rem; font-weight: 600; color: var(--rk-text); }
+.rkd-legend-sub { font-size: var(--rk-fs-small); color: var(--rk-muted); }
 
 /* ── Simple rows under a chart / in a list ──────────────────────── */
 .rkd-rows { border-top: 1px solid #eef0f3; margin-top: 14px; }
 .rkd-row {
     display: flex; justify-content: space-between; align-items: center; gap: 12px;
-    padding: 9px 0; border-bottom: 1px solid #f2f4f7; font-size: 13px;
+    padding: 9px 0; border-bottom: 1px solid #f2f4f7; font-size: var(--rk-fs-small);
 }
 .rkd-row:last-child { border-bottom: none; }
-.rkd-row-head { font-size: 12px; color: var(--rk-muted); font-weight: 600; }
+.rkd-row-head { font-size: var(--rk-fs-small); color: var(--rk-muted); font-weight: 600; }
 .rkd-count {
-    min-width: 26px; text-align: center; font-size: 12px; font-weight: 700;
+    min-width: 26px; text-align: center; font-size: var(--rk-fs-badge); font-weight: 700;
     padding: 2px 8px; border-radius: 999px;
 }
 .rkd-count-green { background: #e6f4ea; color: #0f5a28; }
@@ -101,7 +101,7 @@
 .rkd-count-red { background: #fde8e6; color: #9b1c14; }
 .rkd-count-blue { background: #e8eefc; color: #1f3f8f; }
 .rkd-count-grey { background: #eef0f3; color: #4b5563; }
-.rkd-icon-link { color: #167736; font-size: 16px; line-height: 1; padding: 2px 4px; }
+.rkd-icon-link { color: #167736; font-size: 1rem; line-height: 1; padding: 2px 4px; }
 .rkd-icon-link:hover { color: #0f5a28; }
 
 /* ── Date badge + upcoming list ─────────────────────────────────── */
@@ -111,10 +111,10 @@
     flex: 0 0 46px; text-align: center; background: #e6f4ea; color: #0f5a28;
     border-radius: 8px; padding: 4px 0; line-height: 1.1;
 }
-.rkd-date-mon { font-size: 10px; font-weight: 700; letter-spacing: .5px; }
-.rkd-date-day { font-size: 20px; font-weight: 800; }
-.rkd-upcoming-title { font-size: 14px; font-weight: 500; color: var(--rk-text); }
-.rkd-upcoming-sub { font-size: 12px; color: var(--rk-muted); }
+.rkd-date-mon { font-size: var(--rk-fs-badge); font-weight: 700; letter-spacing: .5px; }
+.rkd-date-day { font-size: 1.25rem; font-weight: 800; }
+.rkd-upcoming-title { font-size: 0.875rem; font-weight: 500; color: var(--rk-text); }
+.rkd-upcoming-sub { font-size: var(--rk-fs-small); color: var(--rk-muted); }
 
 /* ── Stacked bar (SVG rects, widths are attributes) ─────────────── */
 .rkd-bar { height: 10px; border-radius: 5px; overflow: hidden; background: #dde1e7; }
@@ -123,20 +123,20 @@
 .rkd-fill-submitted { fill: #e0a100; }
 .rkd-fill-scheduled { fill: #7cc596; }
 .rkd-fill-unscheduled { fill: #dde1e7; }
-.rkd-bar-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 12px; color: var(--rk-text); margin-top: 6px; }
+.rkd-bar-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: var(--rk-fs-small); color: var(--rk-text); margin-top: 6px; }
 .rkd-key { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
 .rkd-key-approved { background: #167736; }
 .rkd-key-submitted { background: #e0a100; }
 .rkd-key-scheduled { background: #7cc596; }
 .rkd-key-unscheduled { background: #dde1e7; }
 
-.rkd-progress-row { display: grid; grid-template-columns: 140px 1fr 64px; gap: 12px; align-items: center; padding: 6px 0; font-size: 13px; }
-.rkd-progress-row .rkd-progress-n { text-align: right; color: var(--rk-muted); font-size: 12px; }
-.rkd-progress-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rkd-progress-row { display: grid; grid-template-columns: 140px 1fr 64px; gap: 12px; align-items: center; padding: 6px 0; font-size: var(--rk-fs-small); }
+.rkd-progress-row .rkd-progress-n { text-align: right; color: var(--rk-muted); font-size: var(--rk-fs-small); }
+.rkd-progress-name { overflow-wrap: anywhere; }
 
 /* ── Tables ─────────────────────────────────────────────────────── */
-.rkd-table { width: 100%; font-size: 13px; }
-.rkd-table th { font-size: 12px; color: var(--rk-muted); font-weight: 600; padding: 8px 6px; border-bottom: 1px solid #eef0f3; }
+.rkd-table { width: 100%; font-size: var(--rk-fs-small); }
+.rkd-table th { font-size: var(--rk-fs-small); color: var(--rk-muted); font-weight: 600; padding: 8px 6px; border-bottom: 1px solid #eef0f3; }
 .rkd-table td { padding: 10px 6px; border-bottom: 1px solid #f2f4f7; vertical-align: middle; }
 .rkd-table tr:last-child td { border-bottom: none; }
 .rkd-actions { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
@@ -145,9 +145,9 @@
 /* ── Attention card ─────────────────────────────────────────────── */
 .rkd-attention { background: #fff8e1; border-color: #f3e2a6; }
 .rkd-attention .rkd-row { border-bottom-color: #f1e3b5; align-items: center; }
-.rkd-attention-title { font-weight: 700; color: var(--rk-text); font-size: 14px; }
-.rkd-attention-sub { font-size: 12px; color: #7a4f00; }
+.rkd-attention-title { font-weight: 700; color: var(--rk-text); font-size: 0.875rem; }
+.rkd-attention-sub { font-size: var(--rk-fs-small); color: #7a4f00; }
 
 /* ── Empty state ────────────────────────────────────────────────── */
-.rkd-empty { text-align: center; color: var(--rk-muted); font-size: 13px; padding: 22px 8px; }
-.rkd-empty i { display: block; font-size: 22px; margin-bottom: 4px; color: #b6bcc6; }
+.rkd-empty { text-align: center; color: var(--rk-muted); font-size: var(--rk-fs-small); padding: 22px 8px; }
+.rkd-empty i { display: block; font-size: 1.375rem; margin-bottom: 4px; color: #b6bcc6; }

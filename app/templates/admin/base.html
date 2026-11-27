@@ -15,12 +15,16 @@
         var html = document.documentElement;
         html.classList.add('rk-no-anim');
         try {
-            if (localStorage.getItem('rk_sidebar_collapsed') === '1') {
+            // The collapsed rail is a desktop feature; below 992px the
+            // sidebar is off-canvas instead.
+            if (localStorage.getItem('rk_sidebar_collapsed') === '1' &&
+                window.matchMedia('(min-width: 992px)').matches) {
                 html.classList.add('rk-sidebar-collapsed');
             }
         } catch (e) { /* localStorage unavailable — ignore */ }
     })();
     </script>
+    <link rel="preload" href="/static/fonts/InterVariable-latin.woff2" as="font" type="font/woff2" crossorigin>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"
           integrity="sha384-9ndCyUaIbzAi2FUVXJi0CjmCapSmO7SnpJef0486qhLnuZ2cdeRhO02iuK6FUUVM" crossorigin="anonymous">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css"
@@ -40,21 +44,26 @@
 {% set role_label = 'CDRRMO Admin' if is_admin else ('CDRRMO Logistics Staff' if is_staff else ('CFAU / Operations' if is_cfau else ('BDRRMO / Barangay Focal' if is_bdrrmo else ''))) %}
 
 <!-- ── SIDEBAR ────────────────────────────────────────────────────── -->
-<div class="sidebar {{ 'sidebar-personnel' if not is_admin else '' }}" id="sidebar">
+<aside class="sidebar {{ 'sidebar-personnel' if not is_admin else '' }}" id="sidebar" aria-label="Sidebar">
     <div class="sidebar-brand">
         <div class="brand-icon"><img src="/static/img/Riskonek-Logo-v2.png" alt="RisKonek logo"></div>
         <div class="brand-text">
             <div class="brand-name">Riskonek</div>
             <div class="brand-sub">{{ portal_label }}</div>
         </div>
+        {# Desktop: collapse / expand the rail. Hidden below 992px. #}
         <button class="sidebar-toggle" id="sidebarToggle" type="button"
-                aria-label="Toggle sidebar" title="Toggle sidebar">
-            <i class="bi bi-list" id="sidebarToggleIcon"></i>
+                aria-label="Toggle sidebar" aria-controls="sidebar" aria-expanded="true" title="Toggle sidebar">
+            <i class="bi bi-list" id="sidebarToggleIcon" aria-hidden="true"></i>
+        </button>
+        {# Mobile: close the off-canvas menu. Hidden at 992px and up. #}
+        <button class="sidebar-close" id="sidebarClose" type="button" aria-label="Close menu">
+            <i class="bi bi-x-lg" aria-hidden="true"></i>
         </button>
     </div>
 
     {% set active = active_nav | default('') %}
-    <nav>
+    <nav aria-label="Main">
         {# ── Admin: grouped, data-driven navigation ──────────────────────
            Each section renders in order; every item keeps its active-route
            key and tooltip. To change the admin sidebar, edit this list — the
@@ -88,7 +97,7 @@
         <a href="{{ item.href }}"
            class="nav-item-link {{ 'active' if active == item.key else '' }}"
            {%- if item.title %} title="{{ item.title }}"{% endif %}>
-            <i class="bi {{ item.icon }} nav-icon"></i><span class="nav-label">{{ item.text }}</span>
+            <i class="bi {{ item.icon }} nav-icon" aria-hidden="true"></i><span class="nav-label">{{ item.text }}</span>
         </a>
         {% endfor %}
         {% endfor %}
@@ -97,23 +106,23 @@
         {% if is_staff %}
         <a href="/staff/dashboard"
            class="nav-item-link nav-accent-green {{ 'active' if active == 'staff_dashboard' else '' }}">
-            <i class="bi bi-grid-1x2-fill nav-icon"></i><span class="nav-label">Dashboard</span>
+            <i class="bi bi-grid-1x2-fill nav-icon" aria-hidden="true"></i><span class="nav-label">Dashboard</span>
         </a>
         <a href="/staff/contacts"
            class="nav-item-link nav-accent-pink {{ 'active' if active == 'contacts' else '' }}"
            title="Barangay officials and emergency responder contacts (read-only)">
-            <i class="bi bi-person-vcard nav-icon"></i><span class="nav-label">Contact Directory</span>
+            <i class="bi bi-person-vcard nav-icon" aria-hidden="true"></i><span class="nav-label">Contact Directory</span>
         </a>
         {% endif %}
         {% if is_cfau %}
         <a href="/cfau/dashboard"
            class="nav-item-link nav-accent-green {{ 'active' if active == 'cfau_dashboard' else '' }}">
-            <i class="bi bi-grid-1x2-fill nav-icon"></i><span class="nav-label">Dashboard</span>
+            <i class="bi bi-grid-1x2-fill nav-icon" aria-hidden="true"></i><span class="nav-label">Dashboard</span>
         </a>
         <a href="/cfau/contacts"
            class="nav-item-link nav-accent-pink {{ 'active' if active == 'contacts' else '' }}"
            title="Barangay officials and emergency responder contacts (read-only)">
-            <i class="bi bi-person-vcard nav-icon"></i><span class="nav-label">Contact Directory</span>
+            <i class="bi bi-person-vcard nav-icon" aria-hidden="true"></i><span class="nav-label">Contact Directory</span>
         </a>
         {% endif %}
 
@@ -121,22 +130,22 @@
             <a href="/bdrrmo/profile"
             class="nav-item-link {{ 'active' if active == 'bdrrmo_profile' else '' }}"
             title="Your barangay's plan, activities and reminders">
-                <i class="bi bi-geo-alt-fill nav-icon"></i><span class="nav-label">Dashboard</span>
+                <i class="bi bi-geo-alt-fill nav-icon" aria-hidden="true"></i><span class="nav-label">Dashboard</span>
             </a>
             <a href="/bdrrmo/facilities"
             class="nav-item-link {{ 'active' if active == 'bdrrmo_facilities' else '' }}"
             title="Critical facilities in your barangay">
-                <i class="bi bi-building nav-icon"></i><span class="nav-label">Critical Facilities</span>
+                <i class="bi bi-building nav-icon" aria-hidden="true"></i><span class="nav-label">Critical Facilities</span>
             </a>
             <a href="/bdrrmo/population"
             class="nav-item-link {{ 'active' if active == 'bdrrmo_population' else '' }}"
             title="Record and view population data for your barangay">
-                <i class="bi bi-people-fill nav-icon"></i><span class="nav-label">Population Records</span>
+                <i class="bi bi-people-fill nav-icon" aria-hidden="true"></i><span class="nav-label">Population Records</span>
             </a>
             <a href="/bdrrmo/directory"
             class="nav-item-link {{ 'active' if active == 'bdrrmo_directory' else '' }}"
             title="Barangay officials and emergency responder contacts across San Pedro (read-only)">
-                <i class="bi bi-journal-bookmark-fill nav-icon"></i><span class="nav-label">Contact Directory</span>
+                <i class="bi bi-journal-bookmark-fill nav-icon" aria-hidden="true"></i><span class="nav-label">Contact Directory</span>
             </a>
 
             {% set navigation_groups = [
@@ -155,7 +164,7 @@
                 <a href="{{ item.href }}"
                 class="nav-item-link {{ 'active' if active == item.key else '' }}"
                 {%- if item.title %} title="{{ item.title }}"{% endif %}>
-                    <i class="bi {{ item.icon }} nav-icon"></i><span class="nav-label">{{ item.text }}</span>
+                    <i class="bi {{ item.icon }} nav-icon" aria-hidden="true"></i><span class="nav-label">{{ item.text }}</span>
                 </a>
                 {% endfor %}
             {% endfor %}
@@ -165,7 +174,7 @@
         <a href="/admin/resources"
            class="nav-item-link nav-accent-pink {{ 'active' if active == 'resources' else '' }}"
            title="Stockpile / resource goods owned by CDRRMO Logistics Staff (food packs, water, medicine, hygiene kits, blankets, and other relief goods)">
-            <i class="bi bi-box-seam-fill nav-icon"></i><span class="nav-label">Resources Module</span>
+            <i class="bi bi-box-seam-fill nav-icon" aria-hidden="true"></i><span class="nav-label">Resources Module</span>
         </a>
         {% endif %}
 
@@ -173,7 +182,7 @@
         <a href="/admin/equipment"
            class="nav-item-link {{ 'active' if active == 'equipment' else '' }}"
            title="Shared module — accessible to CDRRMO Logistics Staff and CFAU / Operations Personnel (vehicles, generators, chainsaws, flashlights, rescue tools, boats, ambulances, and other operational equipment)">
-            <i class="bi bi-wrench-adjustable nav-icon"></i><span class="nav-label">Vehicle &amp; Equipment</span>
+            <i class="bi bi-wrench-adjustable nav-icon" aria-hidden="true"></i><span class="nav-label">Vehicle &amp; Equipment</span>
         </a>
         {% endif %}
 
@@ -181,7 +190,7 @@
         <a href="/staff/audit"
            class="nav-item-link nav-accent-orange {{ 'active' if active == 'staff_audit' else '' }}"
            title="Recorded changes to stockpile resources and to vehicles &amp; equipment">
-            <i class="bi bi-file-earmark-text-fill nav-icon"></i><span class="nav-label">Audit Trail</span>
+            <i class="bi bi-file-earmark-text-fill nav-icon" aria-hidden="true"></i><span class="nav-label">Audit Trail</span>
         </a>
         {% endif %}
 
@@ -189,17 +198,17 @@
         <a href="/cfau/serviceability"
            class="nav-item-link nav-accent-blue {{ 'active' if active == 'serviceability' else '' }}"
            title="Equipment inspection, maintenance, and serviceability reports">
-            <i class="bi bi-clipboard2-check nav-icon"></i><span class="nav-label">Serviceability Reports</span>
+            <i class="bi bi-clipboard2-check nav-icon" aria-hidden="true"></i><span class="nav-label">Serviceability Reports</span>
         </a>
         <a href="/cfau/incident-reports"
            class="nav-item-link nav-accent-purple {{ 'active' if active == 'incident_reports' else '' }}"
            title="Document response actions and operational outcomes for incidents.">
-            <i class="bi bi-journal-text nav-icon"></i><span class="nav-label">Post-Incident Reports</span>
+            <i class="bi bi-journal-text nav-icon" aria-hidden="true"></i><span class="nav-label">Post-Incident Reports</span>
         </a>
         <a href="/cfau/equipment-audit"
            class="nav-item-link nav-accent-blue {{ 'active' if active == 'equipment_audit' else '' }}"
            title="Read-only trail of every change made to a vehicle or equipment unit — additions, edits, status movements, archiving, and serviceability reports.">
-            <i class="bi bi-clock-history nav-icon"></i><span class="nav-label">Equipment Audit Log</span>
+            <i class="bi bi-clock-history nav-icon" aria-hidden="true"></i><span class="nav-label">Equipment Audit Log</span>
         </a>
         {% endif %}
 
@@ -207,15 +216,22 @@
 
     <div class="sidebar-footer">
         <a href="/logout">
-            <i class="bi bi-box-arrow-right nav-icon"></i><span class="nav-label">Logout</span>
+            <i class="bi bi-box-arrow-right nav-icon" aria-hidden="true"></i><span class="nav-label">Logout</span>
         </a>
     </div>
-</div>
+</aside>
+{# Mobile only: dims the page while the menu is open; a click closes it.
+   Keyboard users close with Esc or the Close menu button. #}
+<div class="rk-sidebar-backdrop" id="sidebarBackdrop"></div>
 
 <!-- ── MAIN CONTENT ───────────────────────────────────────────────── -->
-<div class="main-content">
+<div class="main-content" id="mainContent">
     <div class="main-container">
         <div class="main-header">
+            <button class="rk-menu-btn" id="sidebarOpen" type="button"
+                    aria-label="Open menu" aria-controls="sidebar" aria-expanded="false">
+                <i class="bi bi-list" aria-hidden="true"></i>
+            </button>
             <div class="logo-text-container">
                 <div>
                     <img id="cdrrmo-logo" src="/static/img/cdrrmo-logo-transparent.png" alt="CDRRMO logo">
@@ -228,17 +244,17 @@
             {% if is_bdrrmo %}
             <div class="barangay-text-container">
                 <div class="d-flex align-items-center p-1">
-                    <i class="bi bi-geo-alt-fill nav-icon text-color"></i>
+                    <i class="bi bi-geo-alt-fill nav-icon text-color" aria-hidden="true"></i>
                 </div>
                 <div class="d-flex align-items-center">
-                    <p class="m-0"> <b class="text-color">Barangay</b> </br> <span class="barangay-text">{{barangay.name}}</span></p>
+                    <p class="m-0"> <b class="text-color">Barangay</b> <br> <span class="barangay-text">{{barangay.name}}</span></p>
                 </div>
             </div>
             {% endif %}
         </div>
-        <div class="main-body">
-           {% block content %}{% endblock %}    
-        </div> 
+        <main class="main-body" id="main">
+           {% block content %}{% endblock %}
+        </main>
     </div>
 </div>
 
@@ -269,27 +285,79 @@
 })();
 </script>
 <script nonce="{{ request.state.csp_nonce }}">
-// ── Collapsible sidebar (state persisted in localStorage) ──────────
+// ── Sidebar ─────────────────────────────────────────────────────────
+// Desktop (>= 992px): collapsible rail, state persisted in localStorage.
+// Mobile (< 992px): off-canvas menu. The menu button opens it and moves
+// focus to Close; Esc, Close or the backdrop closes it and returns focus to
+// the menu button. While it is open the page behind is inert, so keyboard
+// focus stays inside the menu.
 (function () {
-    const html   = document.documentElement;
-    const toggle = document.getElementById('sidebarToggle');
-    const icon   = document.getElementById('sidebarToggleIcon');
-    const KEY    = 'rk_sidebar_collapsed';
-    const CLS    = 'rk-sidebar-collapsed';
+    const html     = document.documentElement;
+    const toggle   = document.getElementById('sidebarToggle');
+    const icon     = document.getElementById('sidebarToggleIcon');
+    const openBtn  = document.getElementById('sidebarOpen');
+    const closeBtn = document.getElementById('sidebarClose');
+    const backdrop = document.getElementById('sidebarBackdrop');
+    const page     = document.getElementById('mainContent');
+    const mobile   = window.matchMedia('(max-width: 991.98px)');
+    const KEY      = 'rk_sidebar_collapsed';
+    const CLS      = 'rk-sidebar-collapsed';
+    const OPEN     = 'rk-nav-open';
 
-    function syncIcon() {
-        icon.className = html.classList.contains(CLS)
-            ? 'bi bi-list'
-            : 'bi bi-chevron-double-left';
+    function savedCollapsed() {
+        try { return localStorage.getItem(KEY) === '1'; } catch (e) { return false; }
     }
-    syncIcon();
+    function syncToggle() {
+        const collapsed = html.classList.contains(CLS);
+        icon.className = collapsed ? 'bi bi-list' : 'bi bi-chevron-double-left';
+        toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    }
 
     toggle.addEventListener('click', function () {
         const next = !html.classList.contains(CLS);
         html.classList.toggle(CLS, next);
-        localStorage.setItem(KEY, next ? '1' : '0');
-        syncIcon();
+        try { localStorage.setItem(KEY, next ? '1' : '0'); } catch (e) { /* ignore */ }
+        syncToggle();
     });
+
+    function isOpen() { return html.classList.contains(OPEN); }
+    function openMenu() {
+        html.classList.add(OPEN);
+        openBtn.setAttribute('aria-expanded', 'true');
+        page.inert = true;
+        closeBtn.focus();
+    }
+    function closeMenu(returnFocus) {
+        if (!isOpen()) return;
+        html.classList.remove(OPEN);
+        openBtn.setAttribute('aria-expanded', 'false');
+        page.inert = false;
+        if (returnFocus) openBtn.focus();
+    }
+    openBtn.addEventListener('click', openMenu);
+    closeBtn.addEventListener('click', function () { closeMenu(true); });
+    backdrop.addEventListener('click', function () { closeMenu(true); });
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && isOpen()) {
+            e.preventDefault();
+            closeMenu(true);
+        }
+    });
+
+    // Crossing the breakpoint: the rail state only applies on desktop, and an
+    // open mobile menu is closed when the window grows.
+    function applyLayout() {
+        if (mobile.matches) {
+            html.classList.remove(CLS);
+        } else {
+            closeMenu(false);
+            html.classList.toggle(CLS, savedCollapsed());
+        }
+        syncToggle();
+    }
+    if (mobile.addEventListener) mobile.addEventListener('change', applyLayout);
+    else mobile.addListener(applyLayout);
+    applyLayout();
 
     // Remove the no-anim guard after first frame so subsequent toggles
     // animate normally.

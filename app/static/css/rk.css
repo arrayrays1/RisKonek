@@ -6,22 +6,78 @@
  * SECURITY_CSP_STYLE_REPORT.md. Rendering is unchanged; these are the exact
  * rules that previously lived inline. */
 
+/* ── Font: Inter (self-hosted, SIL OFL 1.1 — see /static/fonts/Inter-OFL-LICENSE.txt).
+   Variable weight 100–900, subset to Latin + Latin-Extended (+ arrows, ₱). */
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/static/fonts/InterVariable-latin.woff2") format("woff2");
+}
+
+/* ── Design tokens ─────────────────────────────────────────────────────
+   Contrast ratios are WCAG 2.1, on white / on the page background #f4f6f9. */
 :root {
-  --rk-green: #167736;
+  /* Type */
+  --rk-font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --rk-fs-page: 2rem;          /* h1 page title, 700 */
+  --rk-fs-section: 1.25rem;    /* h2 section title, 600 */
+  --rk-fs-card: 1.0625rem;     /* h3 card title, 600 */
+  --rk-fs-body: 1rem;          /* body, line-height 1.5 */
+  --rk-fs-small: 0.875rem;     /* secondary text — the minimum for text */
+  --rk-fs-badge: 0.8125rem;    /* pills / badges / counts only */
+  --rk-fs-kpi: 2rem;           /* KPI numbers, 800 */
+  --rk-lh-body: 1.5;
+  --rk-lh-tight: 1.2;
+
+  /* Brand + neutrals */
+  --rk-green: #167736;         /* 5.64 / 5.21 — brand, links, focus */
+  --rk-green-hover: #0f5a28;   /* 8.36 / 7.72 */
   --rk-green-mid: #059669;
   --rk-green-dark: #047857;
   --rk-green-light: #d1fae5;
   --rk-bg: #f4f6f9;
-  --rk-text: #1a1a2e;
-  --rk-muted: #6c757d;
+  --rk-surface: #ffffff;
+  --rk-text: #1a1a2e;          /* 17.06 / 15.76 */
+  --rk-muted: #5b6670;         /* 5.87 / 5.42 (was #6c757d: 4.69 / 4.33) */
+  --rk-border: #e2e6eb;        /* decorative dividers only */
+  --rk-border-strong: #7d8794; /* 3.64 / 3.36 — form-field outlines (1.4.11) */
+  --rk-focus: #167736;         /* focus ring, 5.64 / 5.21 */
+
+  /* Status: text on its own tint */
+  --rk-success-fg: #0f5a28;  --rk-success-bg: #e6f4ea;  /* 7.36 */
+  --rk-warning-fg: #7a4f00;  --rk-warning-bg: #fff4d6;  /* 6.51 */
+  --rk-danger-fg:  #9b1c14;  --rk-danger-bg:  #fde8e6;  /* 6.95 */
+  --rk-info-fg:    #1f3f8f;  --rk-info-bg:    #e8eefc;  /* 8.34 */
+  --rk-neutral-fg: #4b5563;  --rk-neutral-bg: #eef0f3;  /* 6.62 */
+  --rk-danger-solid: #b42318;  /* white text on it: 6.57 */
+  --rk-orange-fg: #a33c00;     /* 6.56 / 6.05 */
+
+  /* Charts (dashboard pies — set in app/services/plan_dashboard.py) */
+  --rk-chart-green: #167736;
+  --rk-chart-yellow: #f5b800;  /* the two slices: 3.15 against each other */
+
   --rk-radius: 14px;
   --sidebar-w: 240px;
   --sidebar-w-collapsed: 64px;
+
+  /* Bootstrap 5.3 hooks: one font, one muted colour, brand links */
+  --bs-body-font-family: var(--rk-font);
+  --bs-font-sans-serif: var(--rk-font);
+  --bs-body-color: var(--rk-text);
+  --bs-secondary-color: var(--rk-muted);
+  --bs-link-color: var(--rk-green);
+  --bs-link-color-rgb: 22, 119, 54;
+  --bs-link-hover-color: var(--rk-green-hover);
+  --bs-link-hover-color-rgb: 15, 90, 40;
 }
 
 body {
   background: var(--rk-bg);
-  font-family: "Segoe UI", sans-serif;
+  font-family: var(--rk-font);
+  font-size: var(--rk-fs-body);
+  line-height: var(--rk-lh-body);
   color: var(--rk-text);
 }
 
@@ -86,18 +142,18 @@ body {
 .sidebar-brand .brand-name {
   color: #167736;
   font-weight: 700;
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
 .sidebar-brand .brand-sub {
-  color: rgba(68, 68, 68, 0.65);
-  font-size: 11px;
+  color: var(--rk-muted);
+  font-size: var(--rk-fs-small);
 }
 
 .sidebar-toggle {
   background: transparent;
   border: none;
   color: #167736;
-  font-size: 20px;
+  font-size: 1.25rem;
   cursor: pointer;
   padding: 6px 8px;
   border-radius: 6px;
@@ -105,7 +161,7 @@ body {
   line-height: 1;
 }
 .sidebar-toggle:hover {
-  background: #35a839;
+  background: var(--rk-green);
   color: white;
 }
 
@@ -131,7 +187,7 @@ body {
   justify-content: center;
   font-weight: 700;
   color: white;
-  font-size: 14px;
+  font-size: 0.875rem;
   flex-shrink: 0;
 }
 .sidebar-user .user-info {
@@ -139,12 +195,12 @@ body {
 }
 .sidebar-user .user-name {
   color: white;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 500;
 }
 .sidebar-user .user-role {
   color: rgba(255, 255, 255, 0.6);
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 
 /* Nav scrolls; sidebar-footer stays pinned at bottom */
@@ -172,11 +228,11 @@ body {
   margin: 16px 0 8px; /* group top spacing (16px) + label bottom (8px) */
   padding: 0 16px;
   color: var(--rk-green); /* #167736 */
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  white-space: nowrap;
+  white-space: normal;
   user-select: none;
 }
 /* First group hugs the top instead of getting the full inter-group gap. */
@@ -194,12 +250,13 @@ body {
   border-radius: 10px 0 0px 10px;
   color: rgba(22, 22, 22, 0.78);
   text-decoration: none;
-  font-size: 16px; /* px — consistent at all zoom levels */
+  font-size: 1rem;
   font-weight: 400; /* explicit — blocks Bootstrap .active bold override */
   transition:
     background 0.15s,
     color 0.15s;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .nav-item-link:hover {
   background: #16773621;
@@ -212,15 +269,15 @@ body {
   font-weight: 600; /* prevent Bootstrap .active bold from inflating text size */
 }
 .nav-item-link.active.nav-accent-blue {
-  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
   box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);
 }
 .nav-item-link.active.nav-accent-pink {
-  background: linear-gradient(135deg, #ec4899, #db2777);
+  background: linear-gradient(135deg, #be185d, #9d174d);
   box-shadow: 0 2px 8px rgba(219, 39, 119, 0.35);
 }
 .nav-item-link.active.nav-accent-orange {
-  background: linear-gradient(135deg, #f97316, #ea580c);
+  background: linear-gradient(135deg, #c2410c, #9a3412);
   box-shadow: 0 2px 8px rgba(234, 88, 12, 0.35);
 }
 .nav-item-link.active.nav-accent-slate {
@@ -228,15 +285,15 @@ body {
   box-shadow: 0 2px 8px rgba(30, 41, 59, 0.35);
 }
 .nav-item-link.active.nav-accent-purple {
-  background: linear-gradient(135deg, #a855f7, #7c3aed);
+  background: linear-gradient(135deg, #7c3aed, #6d28d9);
   box-shadow: 0 2px 8px rgba(124, 58, 237, 0.35);
 }
 .nav-item-link.active.nav-accent-green {
-  background: linear-gradient(135deg, #10b981, #059669);
+  background: linear-gradient(135deg, #047857, #065f46);
   box-shadow: 0 2px 8px rgba(5, 150, 105, 0.35);
 }
 .nav-item-link .nav-icon {
-  font-size: 18px;
+  font-size: 1.125rem;
   width: 22px; /* fixed width keeps all icons/labels aligned */
   text-align: center;
   flex-shrink: 0;
@@ -251,8 +308,8 @@ body {
 }
 /* Logout mirrors the nav-item metrics so its icon/label line up with the menu. */
 .sidebar-footer a {
-  color: rgba(226, 0, 0, 0.94);
-  font-size: 16px;
+  color: var(--rk-danger-solid);
+  font-size: 1rem;
   text-decoration: none;
   display: flex;
   align-items: center;
@@ -265,7 +322,7 @@ body {
     color 0.15s;
 }
 .sidebar-footer a:hover {
-  background: rgb(243, 0, 0);
+  background: var(--rk-danger-solid);
   color: white;
 }
 
@@ -323,9 +380,6 @@ html.rk-sidebar-collapsed .sidebar .sidebar-footer .nav-label {
 }
 
 /* ── Main content ──────────────────────────────────────────── */
-body {
-  font-size: 16px; /* px baseline — scales identically with sidebar under zoom */
-}
 .main-content {
   margin-left: var(--sidebar-w);
   transition: margin-left 0.2s ease;
@@ -347,19 +401,22 @@ html.rk-no-anim .main-content {
 .page-header {
   margin-bottom: 20px;
 }
-.page-header h1 {
-  font-size: 22px;
+.page-header h1,
+.rk-page-title {
+  font-size: var(--rk-fs-page);
   font-weight: 700;
-  color: var(--rk-text);
+  line-height: var(--rk-lh-tight);
+  color: var(--rk-green);
   margin: 0;
 }
-.page-header p {
+.page-header p,
+.rk-page-subtitle {
   color: var(--rk-muted);
-  font-size: 14px;
-  margin: 3px 0 0;
+  font-size: var(--rk-fs-body);
+  margin: 4px 0 0;
 }
 .last-updated {
-  font-size: 14px;
+  font-size: 0.875rem;
   color: var(--rk-muted);
   text-align: right;
 }
@@ -384,19 +441,19 @@ html.rk-no-anim .main-content {
 }
 
 .stat-card .stat-label {
-  font-size: 14px;
+  font-size: 0.875rem;
   color: var(--rk-muted);
   margin-bottom: 6px;
 }
 .stat-card .stat-value {
-  font-size: clamp(15px, 2vw, 26px);
+  font-size: clamp(1rem, 2vw, 1.625rem);
   font-weight: 700;
   color: var(--rk-text);
   margin: 0;
   word-break: break-word;
 }
 .stat-card .stat-change {
-  font-size: 14px;
+  font-size: 0.875rem;
   margin-top: 4px;
 }
 .stat-card .stat-icon {
@@ -406,7 +463,7 @@ html.rk-no-anim .main-content {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
+  font-size: 1rem;
 }
 
 .dash-card .card-title-row {
@@ -415,9 +472,10 @@ html.rk-no-anim .main-content {
   gap: 10px;
   margin-bottom: 16px;
 }
-.dash-card .card-title-row h6 {
-  font-size: 16px;
+.dash-card .card-title-row :is(h2, h3, h4, h5, h6) {
+  font-size: 1rem;
   font-weight: 600;
+  line-height: var(--rk-lh-tight);
   color: var(--rk-text);
   margin: 0;
 }
@@ -427,7 +485,7 @@ html.rk-no-anim .main-content {
    Moderate/Low stay neutral so attention isn't spread evenly —
    this mirrors the emphasis used across the reference screens. */
 .risk-badge {
-  font-size: 11px;
+  font-size: var(--rk-fs-small);
   font-weight: 700;
   padding: 4px 12px;
   border-radius: 20px;
@@ -435,65 +493,65 @@ html.rk-no-anim .main-content {
   letter-spacing: 0.01em;
 }
 .risk-critical {
-  background: linear-gradient(135deg, #ef4444, #dc2626);
+  background: var(--rk-danger-solid);
   color: #fff;
 }
 .risk-high {
-  background: linear-gradient(135deg, #f87171, #ef4444);
+  background: #c2410c;
   color: #fff;
 }
 .risk-moderate {
-  background: #f3f4f6;
-  color: #6b7280;
+  background: var(--rk-neutral-bg);
+  color: var(--rk-neutral-fg);
   border: 1px solid #e5e7eb;
   font-weight: 600;
 }
 .risk-low {
-  background: #f3f4f6;
-  color: #6b7280;
+  background: var(--rk-neutral-bg);
+  color: var(--rk-neutral-fg);
   border: 1px solid #e5e7eb;
   font-weight: 600;
 }
 
 /* ── Status pills ──────────────────────────────────────────── */
 .status-pill {
-  font-size: 11px;
+  font-size: var(--rk-fs-small);
   font-weight: 700;
   padding: 4px 12px;
   border-radius: 20px;
   display: inline-block;
 }
 .status-operational {
-  background: #d1fae5;
-  color: #047857;
+  background: var(--rk-success-bg);
+  color: var(--rk-success-fg);
 }
 .status-maintenance {
-  background: #fef3c7;
-  color: #b45309;
+  background: var(--rk-warning-bg);
+  color: var(--rk-warning-fg);
 }
 .status-unavailable {
-  background: #fee2e2;
-  color: #dc2626;
+  background: var(--rk-danger-bg);
+  color: var(--rk-danger-fg);
 }
 .status-none {
-  background: #e7e7e7;
-  color: #838383;
+  background: var(--rk-neutral-bg);
+  color: var(--rk-neutral-fg);
 }
 
 /* ── Buttons ───────────────────────────────────────────────── */
 .btn-rk {
-  background: #167736;
+  background: var(--rk-green);
   color: white;
   border: none;
   border-radius: 9px;
   font-weight: 500;
   box-shadow: 0 1px 3px rgba(4, 120, 87, 0.3);
-  transition: opacity 0.2s ease;
+  transition: background 0.2s ease;
   padding: 8px;
 }
 .btn-rk:hover {
+  background: var(--rk-green-hover);
   color: white;
-  opacity: 0.8;
 }
 .btn-rk:disabled,
 .btn-rk.disabled {
@@ -510,7 +568,7 @@ html.rk-no-anim .main-content {
   color: var(--rk-text);
   border: 1px solid #e5e7eb;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 500;
   padding: 6px 14px;
   transition: background 0.15s;
@@ -533,10 +591,6 @@ html.rk-no-anim .main-content {
   border-left: 0;
   border-radius: 0 10px 10px 0;
 }
-.search-bar-rk input:focus {
-  box-shadow: none;
-  border-color: #ced4da;
-}
 
 /* Reusable alert / insight banner (amber notice strip) */
 .alert-banner {
@@ -544,7 +598,7 @@ html.rk-no-anim .main-content {
   border-left: 4px solid #ffc107;
   border-radius: 8px;
   padding: 10px 14px;
-  font-size: 14px;
+  font-size: 0.875rem;
   color: #856404;
   margin-bottom: 16px;
   display: flex;
@@ -559,43 +613,43 @@ html.rk-no-anim .main-content {
 
 /* Font-size steps (px — matches the existing px-based type scale) */
 .rk-fs-10 {
-  font-size: 10px;
+  font-size: var(--rk-fs-small);
 }
 .rk-fs-11 {
-  font-size: 11px;
+  font-size: var(--rk-fs-small);
 }
 .rk-fs-12 {
-  font-size: 12px;
+  font-size: var(--rk-fs-small);
 }
 .rk-fs-13 {
-  font-size: 13px;
+  font-size: var(--rk-fs-small);
 }
 .rk-fs-14 {
-  font-size: 14px;
+  font-size: var(--rk-fs-small);
 }
 .rk-fs-16 {
-  font-size: 16px;
+  font-size: 1rem;
 }
 .rk-fs-18 {
-  font-size: 18px;
+  font-size: 1.125rem;
 }
 .rk-fs-20 {
-  font-size: 20px;
+  font-size: 1.25rem;
 }
 .rk-fs-22 {
-  font-size: 22px;
+  font-size: 1.375rem;
 }
 .rk-fs-24 {
-  font-size: 24px;
+  font-size: 1.5rem;
 }
 .rk-fs-26 {
-  font-size: 26px;
+  font-size: 1.625rem;
 }
 .rk-fs-30 {
-  font-size: 30px;
+  font-size: 1.875rem;
 }
 .rk-fs-32 {
-  font-size: 32px;
+  font-size: 2rem;
 }
 
 /* Accent text colours used across dashboards/lists */
@@ -609,13 +663,13 @@ html.rk-no-anim .main-content {
   color: #c0392b;
 }
 .rk-text-high {
-  color: #d35400;
+  color: var(--rk-orange-fg);
 }
 .rk-text-mod {
-  color: #b7950b;
+  color: var(--rk-warning-fg);
 }
 .rk-text-info {
-  color: #2980b9;
+  color: #1c5d8a;
 }
 .rk-text-purple {
   color: #8e44ad;
@@ -644,7 +698,7 @@ html.rk-no-anim .main-content {
 
 /* Soft uppercase table-header row (muted, letter-spaced) */
 .rk-th-soft {
-  font-size: 12px;
+  font-size: var(--rk-fs-small);
   color: var(--rk-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -657,7 +711,7 @@ html.rk-no-anim .main-content {
 }
 .rk-tint-blue {
   background: #e8f4fd;
-  color: #2980b9;
+  color: #1c5d8a;
 }
 .rk-tint-purple {
   background: #f3e8fd;
@@ -665,15 +719,15 @@ html.rk-no-anim .main-content {
 }
 .rk-tint-red {
   background: #fde8e8;
-  color: #c0392b;
+  color: #a93226;
 }
 .rk-tint-amber {
   background: #fef9e7;
-  color: #b7950b;
+  color: var(--rk-warning-fg);
 }
 .rk-tint-orange {
   background: #fef3e2;
-  color: #d35400;
+  color: var(--rk-orange-fg);
 }
 
 /* White-space helpers */
@@ -711,10 +765,10 @@ html.rk-no-anim .main-content {
   color: #c0392b;
 }
 .rk-lvl-high {
-  color: #d35400;
+  color: var(--rk-orange-fg);
 }
 .rk-lvl-moderate {
-  color: #f39c12;
+  color: var(--rk-warning-fg);
 }
 .rk-lvl-low {
   color: #047857;
@@ -728,15 +782,15 @@ html.rk-no-anim .main-content {
 }
 .feed-updated {
   background: #e8f4fd;
-  color: #2980b9;
+  color: #1c5d8a;
 }
 .feed-deleted {
   background: #fde8e8;
-  color: #c0392b;
+  color: #a93226;
 }
 .feed-deactivated {
   background: #fef3e2;
-  color: #d35400;
+  color: var(--rk-orange-fg);
 }
 .feed-login {
   background: #f3e8fd;
@@ -744,7 +798,7 @@ html.rk-no-anim .main-content {
 }
 .feed-default {
   background: #f4f6f9;
-  color: #6c757d;
+  color: var(--rk-muted);
 }
 
 /* ── Sizing helpers (replace one-off inline widths/heights) ──── */
@@ -861,7 +915,7 @@ html.rk-no-anim .main-content {
   color: #3b82f6;
 }
 .rk-wx-sun {
-  color: #f59e0b;
+  color: #b45309;
 }
 .rk-wx-cloud {
   color: #64748b;
@@ -886,8 +940,8 @@ html.rk-no-anim .main-content {
   color: #047857;
 }
 .rk-cat-incident {
-  background: #fee2e2;
-  color: #dc2626;
+  background: var(--rk-danger-bg);
+  color: var(--rk-danger-fg);
 }
 .rk-cat-brgy {
   background: #fef3c7;
@@ -902,24 +956,24 @@ html.rk-no-anim .main-content {
   color: #334155;
 }
 .rk-cat-system {
-  background: #f3f4f6;
-  color: #6b7280;
+  background: var(--rk-neutral-bg);
+  color: var(--rk-neutral-fg);
 }
 
 /* Severity status pills (serviceability priority) */
 .rk-pill-high {
   background: #fde8e8;
-  color: #c0392b;
+  color: #a93226;
   border: 1px solid #f4c2bd;
 }
 .rk-pill-med {
   background: #fdebd0;
-  color: #b9770e;
+  color: var(--rk-warning-fg);
   border: 1px solid #f5cba7;
 }
 .rk-pill-low {
-  background: #eef0f2;
-  color: #6c757d;
+  background: var(--rk-neutral-bg);
+  color: var(--rk-neutral-fg);
   border: 1px solid #dee2e6;
 }
 
@@ -934,7 +988,7 @@ html.rk-no-anim .main-content {
   flex: 0 0 auto;
   background: var(--rk-green);
   color: #fff;
-  font-size: 12px;
+  font-size: var(--rk-fs-small);
   font-weight: 700;
 }
 
@@ -962,7 +1016,7 @@ html.rk-no-anim .main-content {
 /* Raw extracted-text preview box */
 .rk-raw-preview {
   white-space: pre-wrap;
-  font-size: 12px;
+  font-size: var(--rk-fs-small);
   background: #f9fafb;
   padding: 10px;
   border-radius: 6px;
@@ -1297,7 +1351,7 @@ html.rk-no-anim .main-content {
   overflow-y: auto;
 }
 .filter-panel h6 {
-  font-size: 12px;
+  font-size: var(--rk-fs-small);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--rk-muted);
@@ -1308,14 +1362,14 @@ html.rk-no-anim .main-content {
   margin-bottom: 18px;
 }
 .filter-section .form-check-label {
-  font-size: 13px;
+  font-size: var(--rk-fs-small);
 }
 .filter-section .form-check {
   margin-bottom: 4px;
 }
 .filter-section select,
 .filter-section input[type="search"] {
-  font-size: 13px;
+  font-size: var(--rk-fs-small);
 }
 
 .map-area {
@@ -1366,12 +1420,12 @@ html.rk-no-anim .main-content {
   border-radius: 8px;
   padding: 10px 12px;
   box-shadow: 0 1px 6px rgba(0, 0, 0, 0.12);
-  font-size: 12px;
+  font-size: var(--rk-fs-small);
   max-width: 260px;
   z-index: 500;
 }
 .map-overlay .legend-title {
-  font-size: 11px;
+  font-size: var(--rk-fs-small);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--rk-muted);
@@ -1408,7 +1462,7 @@ html.rk-no-anim .main-content {
   border-radius: 10px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
   padding: 8px 12px;
-  font-size: 13px;
+  font-size: var(--rk-fs-small);
   z-index: 600;
   display: flex;
   flex-direction: column;
@@ -1460,39 +1514,39 @@ html.rk-no-anim .main-content {
 }
 .picker-search-result-name {
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--rk-fs-small);
 }
 .picker-search-result-sub {
-  font-size: 11px;
+  font-size: var(--rk-fs-small);
   color: var(--rk-muted);
 }
 .picker-search-result-cat {
-  font-size: 10px;
+  font-size: var(--rk-fs-badge);
   color: var(--rk-muted);
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
 .picker-search-empty {
   padding: 8px 12px;
-  font-size: 12px;
+  font-size: var(--rk-fs-small);
   color: var(--rk-muted);
 }
 .picker-landmarks-toggle {
-  font-size: 12px;
+  font-size: var(--rk-fs-small);
 }
 .picker-selected-summary {
   line-height: 1.3;
 }
 .picker-selected-name {
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--rk-fs-small);
 }
 .picker-boundary-warning {
   background: #fef3cd;
   color: #856404;
   border-radius: 6px;
   padding: 6px 10px;
-  font-size: 12px;
+  font-size: var(--rk-fs-small);
   font-weight: 600;
 }
 
@@ -1527,7 +1581,7 @@ html.rk-no-anim .main-content {
   flex-shrink: 0;
 }
 .landmark-ref-label {
-  font-size: 10px;
+  font-size: var(--rk-fs-badge);
   color: var(--rk-muted);
   font-style: italic;
   margin-top: 4px;
@@ -1545,7 +1599,7 @@ body.facility-location-picking .map-area .leaflet-container {
   border-left: 4px solid #2980b9;
   border-radius: 6px;
   padding: 10px 14px;
-  font-size: 13px;
+  font-size: var(--rk-fs-small);
   color: #1d4d6c;
   margin-bottom: 16px;
   display: flex;
@@ -1553,7 +1607,7 @@ body.facility-location-picking .map-area .leaflet-container {
   gap: 10px;
 }
 .hazard-notice i {
-  font-size: 16px;
+  font-size: 1rem;
   margin-top: 1px;
 }
 
@@ -1570,7 +1624,7 @@ body.facility-location-picking .map-area .leaflet-container {
     0 1px 3px rgba(16, 24, 40, 0.06),
     0 1px 8px rgba(16, 24, 40, 0.04);
   padding: 8px 14px;
-  font-size: 13px;
+  font-size: var(--rk-fs-badge);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1581,7 +1635,7 @@ body.facility-location-picking .map-area .leaflet-container {
 }
 
 .rk-form-section-title {
-  font-size: 12px;
+  font-size: var(--rk-fs-small);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.03em;
@@ -1590,7 +1644,7 @@ body.facility-location-picking .map-area .leaflet-container {
 }
 
 .popup-table {
-  font-size: 12px;
+  font-size: var(--rk-fs-small);
 }
 .popup-table th {
   text-align: left;
@@ -1604,13 +1658,13 @@ body.facility-location-picking .map-area .leaflet-container {
   vertical-align: top;
 }
 .popup-name {
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 700;
   color: var(--rk-text);
   margin-bottom: 2px;
 }
 .popup-sub {
-  font-size: 11px;
+  font-size: var(--rk-fs-small);
   color: var(--rk-muted);
   margin-bottom: 8px;
 }
@@ -1621,7 +1675,7 @@ body.facility-location-picking .map-area .leaflet-container {
   gap: 4px;
 }
 .popup-badge {
-  font-size: 10px;
+  font-size: var(--rk-fs-badge);
   font-weight: 600;
   padding: 2px 8px;
   border-radius: 12px;
@@ -1658,7 +1712,7 @@ body.facility-location-picking .map-area .leaflet-container {
 
 /* Section heading level, matching the .card-title-row h6 scale it replaces */
 .rk-h-section {
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 600;
   color: var(--rk-text);
   margin: 0;
@@ -1831,7 +1885,7 @@ body.facility-location-picking .map-area .leaflet-container {
 }
 .rk-hero-warn .rk-hero-icon {
   background: #fdf0cf;
-  color: #b45309;
+  color: #92400e;
 }
 .rk-hero-ok .rk-hero-icon {
   background: #d1fae5;
@@ -1845,7 +1899,7 @@ body.facility-location-picking .map-area .leaflet-container {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 20px;
+  font-size: 1.25rem;
 }
 
 /* Band wording — darker than the Bootstrap text-* utilities for contrast on
@@ -1863,16 +1917,16 @@ body.facility-location-picking .map-area .leaflet-container {
   letter-spacing: 0.02em;
 }
 .rk-hero-note {
-  color: #6b7280;
+  color: var(--rk-muted);
 }
 .rk-hero-crit .rk-hero-note {
   color: #8a5a5a;
 }
 .rk-hero-warn .rk-hero-note {
-  color: #8a7448;
+  color: #6f5a2e;
 }
 .rk-hero-ok .rk-hero-note {
-  color: #5b7a68;
+  color: #44624f;
 }
 
 /* ── Key-figure cards ──────────────────────────────────────────
@@ -1886,7 +1940,7 @@ body.facility-location-picking .map-area .leaflet-container {
   margin-bottom: 6px;
 }
 .rk-figure-head .stat-label {
-  font-size: 12px;
+  font-size: var(--rk-fs-small);
   color: var(--rk-muted);
 }
 /* .stat-icon's box is scoped to .stat-card upstream, so restate it here. */
@@ -1898,7 +1952,7 @@ body.facility-location-picking .map-area .leaflet-container {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .rk-figure-dots {
   display: flex;
@@ -1964,8 +2018,8 @@ body.facility-location-picking .map-area .leaflet-container {
   border-left: 1px solid rgb(160, 160, 160);
 }
 .header-text {
-  color: #167736;
-  font-size: 15px;
+  color: var(--rk-green);
+  font-size: 0.9375rem;
   font-weight: 700;
 }
 .barangay-text-container {
@@ -1986,8 +2040,284 @@ body.facility-location-picking .map-area .leaflet-container {
   height: 50px;
   width: 80px;
 }
+/* Legacy page-title id (71 templates) — same look as .rk-page-title */
 #header {
+  font-size: var(--rk-fs-page);
+  font-weight: 700;
+  line-height: var(--rk-lh-tight);
+  color: var(--rk-green);
   margin: 0;
-  color: #167736;
-  font-size: 40px;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   FOUNDATIONS — typography, Bootstrap overrides, focus, shared components,
+   responsive sidebar. Loaded after Bootstrap, so equal-specificity rules
+   here win. Tokens are defined at the top of this file.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* ── Type scale ──────────────────────────────────────────────────────── */
+h1, h2, h3, h4, h5, h6,
+.h1, .h2, .h3, .h4, .h5, .h6 {
+  line-height: var(--rk-lh-tight);
+}
+/* Bootstrap's .small / <small> are 0.875em, so they shrink again inside
+   small text. Pin them (and the other "em"-sized helpers) to 14px. */
+.small,
+small,
+.form-text,
+.invalid-feedback,
+.valid-feedback {
+  font-size: var(--rk-fs-small);
+}
+.badge {
+  font-size: var(--rk-fs-badge);
+}
+.btn,
+.form-control,
+.form-select {
+  font-family: inherit;
+}
+/* Tabular numbers keep KPI figures and table columns aligned. */
+.rk-stat-value,
+.stat-value,
+.rk-tnum,
+table {
+  font-variant-numeric: tabular-nums;
+}
+
+.rk-eyebrow,
+.rkd-eyebrow {
+  font-size: var(--rk-fs-small);
+  font-weight: 600;
+  color: var(--rk-muted);
+  margin-bottom: 2px;
+}
+.rk-section-title {
+  font-size: var(--rk-fs-section);
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--rk-text);
+  margin: 0 0 12px;
+}
+.rk-card-title {
+  font-size: var(--rk-fs-card);
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--rk-text);
+  margin: 0;
+}
+/* Keeps a heading's old h6 look after it becomes an h2/h3 (modal titles,
+   small card titles) — the semantics change, the size does not. */
+.rk-title-6 {
+  font-size: 1rem;
+  font-weight: 500;
+  line-height: var(--rk-lh-tight);
+}
+.rk-title-6.rk-title-strong {
+  font-weight: 600;
+}
+
+/* ── Cards ───────────────────────────────────────────────────────────── */
+.rk-card {
+  background: var(--rk-surface);
+  border: 1px solid var(--rk-border);
+  border-radius: var(--rk-radius);
+  padding: 20px;
+}
+.rk-card-note {
+  font-size: var(--rk-fs-small);
+  color: var(--rk-muted);
+  margin: 2px 0 12px;
+}
+
+/* ── Status pills: one look, five tones ─────────────────────────────── */
+.rk-pill,
+.status-pill,
+.risk-badge {
+  display: inline-block;
+  font-size: var(--rk-fs-badge);
+  font-weight: 700;
+  line-height: 1.3;
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+.rk-pill--success { background: var(--rk-success-bg); color: var(--rk-success-fg); }
+.rk-pill--warning { background: var(--rk-warning-bg); color: var(--rk-warning-fg); }
+.rk-pill--danger  { background: var(--rk-danger-bg);  color: var(--rk-danger-fg); }
+.rk-pill--info    { background: var(--rk-info-bg);    color: var(--rk-info-fg); }
+.rk-pill--neutral { background: var(--rk-neutral-bg); color: var(--rk-neutral-fg); }
+
+/* ── Tables ──────────────────────────────────────────────────────────── */
+.rk-table {
+  width: 100%;
+  font-size: var(--rk-fs-small);
+}
+.rk-table th {
+  font-weight: 600;
+  color: var(--rk-muted);
+  border-bottom: 1px solid var(--rk-border);
+  padding: 8px 6px;
+}
+.rk-table td {
+  border-bottom: 1px solid #f2f4f7;
+  padding: 10px 6px;
+  vertical-align: middle;
+}
+
+/* ── Bootstrap colour utilities that failed 4.5:1 as text ─────────────
+   (.text-warning was 1.63:1, .text-info 1.96:1 on white.) */
+.text-warning {
+  color: var(--rk-warning-fg) !important;
+}
+.text-info {
+  color: var(--rk-info-fg) !important;
+}
+.text-secondary {
+  color: var(--rk-muted) !important;
+}
+
+/* ── Form controls: 3:1 outlines (WCAG 1.4.11) ──────────────────────── */
+.form-control,
+.form-select,
+.input-group-text,
+.form-check-input {
+  border-color: var(--rk-border-strong);
+}
+.form-control:disabled,
+.form-select:disabled {
+  border-color: var(--rk-border);
+}
+
+/* ── Focus: one visible, brand-coloured ring for everything ───────────
+   5.64:1 on white, 5.21:1 on the page. Replaces Bootstrap's 1.41:1 blue
+   glow and the rule that hid focus on the search inputs. */
+:focus-visible {
+  outline: 3px solid var(--rk-focus);
+  outline-offset: 2px;
+}
+/* Containers focused by script (modals, tabindex="-1") don't get a ring. */
+[tabindex="-1"]:focus-visible {
+  outline: none;
+}
+.btn:focus-visible,
+.btn-rk:focus-visible,
+.btn-soft:focus-visible,
+.btn-close:focus-visible,
+.nav-link:focus-visible,
+.page-link:focus-visible,
+.dropdown-item:focus-visible,
+.accordion-button:focus-visible,
+.list-group-item-action:focus-visible {
+  outline: 3px solid var(--rk-focus);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+.form-control:focus,
+.form-select:focus,
+.form-check-input:focus {
+  border-color: var(--rk-green);
+  outline: 2px solid var(--rk-focus);
+  outline-offset: 1px;
+  box-shadow: none;
+}
+/* Sidebar links sit at the edge of a clipped column: draw the ring inside.
+   On the green active row the ring turns white (5.64:1 against the green). */
+.nav-item-link:focus-visible,
+.sidebar-footer a:focus-visible,
+.sidebar-toggle:focus-visible {
+  outline: 3px solid var(--rk-focus);
+  outline-offset: -3px;
+}
+.nav-item-link.active:focus-visible {
+  outline-color: #ffffff;
+}
+
+/* ── Top bar: room for the mobile menu button, wraps on narrow screens ─ */
+.main-header {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+/* The logo block takes the free space, so the menu button sits at the far left
+   and the barangay chip at the far right. */
+.logo-text-container {
+  flex: 1 1 auto;
+  min-width: 0;
+  align-items: center;
+}
+.rk-menu-btn,
+.sidebar-close {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  border: 1px solid var(--rk-border);
+  border-radius: 10px;
+  background: var(--rk-surface);
+  color: var(--rk-green);
+  font-size: 1.5rem;
+  line-height: 1;
+}
+.rk-menu-btn:hover,
+.sidebar-close:hover {
+  background: var(--rk-success-bg);
+}
+.rk-sidebar-backdrop {
+  display: none;
+}
+
+/* ── Sidebar: off-canvas below 992px ──────────────────────────────────
+   Closed = moved off screen AND visibility:hidden, so its links are not in
+   the tab order. Opening is handled in base.html (Esc closes, focus returns
+   to the menu button, the page behind is inert while it is open). */
+@media (max-width: 991.98px) {
+  .sidebar,
+  html.rk-sidebar-collapsed .sidebar {
+    width: min(85vw, 300px);
+    transform: translateX(-100%);
+    visibility: hidden;
+    box-shadow: none;
+    z-index: 1045;
+    transition: transform 0.2s ease, visibility 0s linear 0.2s;
+  }
+  html.rk-nav-open .sidebar {
+    transform: none;
+    visibility: visible;
+    box-shadow: 0 0 24px rgba(15, 23, 42, 0.25);
+    transition: transform 0.2s ease;
+  }
+  .main-content,
+  html.rk-sidebar-collapsed .main-content {
+    margin-left: 0;
+  }
+  .rk-menu-btn,
+  .sidebar-close {
+    display: inline-flex;
+  }
+  .sidebar-toggle {
+    display: none;
+  }
+  html.rk-nav-open .rk-sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 1040;
+    background: rgba(15, 23, 42, 0.45);
+  }
+  .main-body {
+    padding: 16px;
+  }
+  #cdrrmo-logo {
+    height: 40px;
+    width: 64px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar,
+  .main-content,
+  html.rk-nav-open .sidebar {
+    transition: none !important;
+  }
 }
