@@ -3122,10 +3122,68 @@ def equipment_list(
     archived: Optional[str] = None,
     page: Optional[str] = None,
     per_page: Optional[str] = None,
+    edit: Optional[str] = None,
 ):
     user, barangay = _resolve_scope(request, db)
     if isinstance(user, RedirectResponse):
         return user
+
+    # ?open=add / ?edit=<id> open the Add/Edit modal on load (old form URLs
+    # redirect here). Edit only ever pre-fills the user's OWN equipment.
+    modal = None
+    error = None
+    if barangay and request.query_params.get("open") == "add":
+        modal = _equipment_modal("add")
+    elif barangay and edit:
+        e = _own_bdrrmo_equipment(db, barangay, int(edit)) if edit.isdigit() else None
+        if e:
+            modal = _equipment_modal("edit", e.id, _equipment_form_values(e))
+        else:
+            error = "Equipment not found"
+
+    return _render_equipment_list(
+        request, db, user, barangay,
+        q=q, equipment_type=equipment_type, status=status, archived=archived,
+        page=page, per_page=per_page, modal=modal, error=error,
+    )
+
+
+def _own_bdrrmo_equipment(db, barangay, equipment_id):
+    """An equipment unit of the current BDRRMO's OWN barangay, or None."""
+    if not barangay:
+        return None
+    return db.query(Equipment).filter(
+        Equipment.id == equipment_id,
+        Equipment.barangay_id == barangay.id,
+    ).first()
+
+
+def _equipment_not_found():
+    return RedirectResponse(
+        url="/bdrrmo/equipment_bdrrmo?error=Equipment+not+found", status_code=302
+    )
+
+
+def _equipment_form_values(e) -> dict:
+    """A unit's current values in the shape the Add/Edit modal fills in."""
+    return {
+        "name": e.name or "",
+        "equipment_type": e.equipment_type.value if e.equipment_type else "",
+        "plate_or_serial": e.plate_or_serial or "",
+    }
+
+
+def _equipment_modal(mode, equipment_id=None, values=None, error=None) -> dict:
+    """State for the Add/Edit Equipment modal, rendered as JSON for the page
+    script: which mode, which unit, the values to fill in and an error."""
+    return {"mode": mode, "id": equipment_id, "values": values or {}, "error": error}
+
+
+def _render_equipment_list(request, db, user, barangay, *, q=None, equipment_type=None,
+                           status=None, archived=None, page=None, per_page=None,
+                           modal=None, error=None):
+    """The Vehicle & Equipment list page. Also used by the Add/Edit POST
+    routes to re-render the page with the modal open when validation fails."""
 
     query = db.query(Equipment)
     show_archived = (archived == "1")
@@ -3163,6 +3221,8 @@ def equipment_list(
             ),
             "plate_or_serial": e.plate_or_serial or "—",
             "is_archived": e.is_archived,
+            # Pre-fill values for the Edit modal (rendered as JSON).
+            "form": _equipment_form_values(e),
             "repair_reminder": reminder["state"] if reminder else None,
         })
 
@@ -3213,36 +3273,29 @@ def equipment_list(
             "show_archived": show_archived,
             # Default + max for the status modal's date-time field (PHT).
             "now_local": datetime.now(_PHT).strftime("%Y-%m-%dT%H:%M"),
+            "equipment_modal": modal,
+            # {id: current values} for the Edit buttons on this page.
+            "equipment_edit_data": {row["id"]: row["form"] for row in page_obj.items},
+            "page_error": error,
         },
     )
 
-@router.get("/equipment_bdrrmo/new", response_class=HTMLResponse)
+
+# Old form pages: kept as URLs, now open the modal on the list page.
+@router.get("/equipment_bdrrmo/new")
 def equipment_new_form(request: Request, db: Session = Depends(get_db)):
     user, barangay = _resolve_scope(request, db)
     if isinstance(user, RedirectResponse):
         return user
-    return templates.TemplateResponse(
-        request=request,
-        name="bdrrmo/equipment_form.html",
-        context={
-            "user": user,
-            "active_nav": "equipment",
-            "edit_mode": False,
-            "target": None,
-            "barangay": barangay,
-            "types": [(t.value, EQUIPMENT_TYPE_LABELS.get(t.value, t.value.title()))
-                      for t in EquipmentType],
-            "error": None,
-        },
-    )
+    return RedirectResponse(url="/bdrrmo/equipment_bdrrmo?open=add", status_code=302)
 
 
 @router.post("/equipment_bdrrmo/new")
 def equipment_create(
     request: Request,
     db: Session = Depends(get_db),
-    name: str = Form(...),
-    equipment_type: str = Form(...),
+    name: str = Form(""),
+    equipment_type: str = Form(""),
     plate_or_serial: str = Form(""),
 ):
     user, barangay = _resolve_scope(request, db)
@@ -3250,19 +3303,9 @@ def equipment_create(
         return user
 
     def render_error(msg):
-        return templates.TemplateResponse(
-            request=request,
-            name="bdrrmo/equipment_form.html",
-            context={
-                "user": user,
-                "barangay": barangay,
-                "active_nav": "equipment",
-                "edit_mode": False,
-                "target": None,
-                "types": [(t.value, EQUIPMENT_TYPE_LABELS.get(t.value, t.value.title()))
-                          for t in EquipmentType],
-                "error": msg,
-            },
+        values = {"name": name, "equipment_type": equipment_type, "plate_or_serial": plate_or_serial}
+        return _render_equipment_list(
+            request, db, user, barangay, modal=_equipment_modal("add", None, values, msg),
         )
 
     name = name.strip()
@@ -3294,36 +3337,15 @@ def equipment_create(
         status_code=302,
     )
 
-@router.get("/equipment_bdrrmo/{equipment_id}/edit", response_class=HTMLResponse)
+@router.get("/equipment_bdrrmo/{equipment_id}/edit")
 def equipment_edit_form(equipment_id: int, request: Request, db: Session = Depends(get_db)):
     user, barangay = _resolve_scope(request, db)
     if isinstance(user, RedirectResponse):
         return user
-    e = db.query(Equipment).filter(Equipment.id == equipment_id).first()
+    e = _own_bdrrmo_equipment(db, barangay, equipment_id)
     if not e:
-        return RedirectResponse(url="/bdrrmo/equipment_bdrrmo", status_code=302)
-
-    # Repair follow-up for this unit (most-relevant report, if any).
-    reminder = equipment_repair_reminders(db).get(e.id)
-    return templates.TemplateResponse(
-        request=request,
-        name="bdrrmo/equipment_form.html",
-        context={
-            "user": user,
-            "barangay": barangay,
-            "active_nav": "equipment",
-            "edit_mode": True,
-            "target": e,
-            "types": [(t.value, EQUIPMENT_TYPE_LABELS.get(t.value, t.value.title()))
-                      for t in EquipmentType],
-            "error": None,
-            "repair_reminder": reminder["state"] if reminder else None,
-            "repair_report": reminder["report"] if reminder else None,
-            "live_status_label": EQUIPMENT_STATUS_LABELS.get(
-                e.status.value if e.status else "", "—"
-            ),
-        },
-    )
+        return _equipment_not_found()
+    return RedirectResponse(url=f"/bdrrmo/equipment_bdrrmo?edit={e.id}", status_code=302)
 
 
 @router.post("/equipment_bdrrmo/{equipment_id}/edit")
@@ -3331,16 +3353,30 @@ def equipment_edit(
     equipment_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    name: str = Form(...),
-    equipment_type: str = Form(...),
+    name: str = Form(""),
+    equipment_type: str = Form(""),
     plate_or_serial: str = Form(""),
 ):
-    user, _ = _resolve_scope(request, db)
+    user, barangay = _resolve_scope(request, db)
     if isinstance(user, RedirectResponse):
         return user
-    e = db.query(Equipment).filter(Equipment.id == equipment_id).first()
+    # Own barangay only: the modal never shows, and this never saves,
+    # another barangay's unit.
+    e = _own_bdrrmo_equipment(db, barangay, equipment_id)
     if not e:
-        return RedirectResponse(url="/bdrrmo/equipment_bdrrmo", status_code=302)
+        return _equipment_not_found()
+
+    def render_error(msg):
+        values = {"name": name, "equipment_type": equipment_type, "plate_or_serial": plate_or_serial}
+        return _render_equipment_list(
+            request, db, user, barangay, modal=_equipment_modal("edit", e.id, values, msg),
+        )
+
+    # Same required-field checks as Add; shown in the modal, nothing saved.
+    if not name.strip():
+        return render_error("Equipment name is required.")
+    if equipment_type not in {t.value for t in EquipmentType}:
+        return render_error("Invalid equipment type.")
 
     # Status is changed via the dedicated status-change action so the
     # audit log captures it as a status transition, not a generic edit.
