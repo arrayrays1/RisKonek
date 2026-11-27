@@ -44,8 +44,7 @@
         <div class="rkd-card">
             <h2 class="rkd-card-title">Barangays with submitted BDRRM Plans</h2>
             <p class="rkd-card-note">
-                Latest plan per barangay: {{ plan_pie.pie.total }} approved or pending ·
-                {{ pc.returned }} returned and {{ pc.no_plan }} not submitted are not shown
+                Latest plan per barangay · {{ pc.no_plan }} not submitted {{ 'is' if pc.no_plan == 1 else 'are' }} not shown
             </p>
             {{ pie_block('plansPie', plan_pie.pie, 'barangays') }}
 
@@ -56,7 +55,7 @@
                 <div class="rkd-row">
                     <span>{{ r.barangay }}</span>
                     <span class="d-flex align-items-center gap-2">
-                        {{ plan_pill(r.status) }}
+                        {% if r.status == 'rejected' %}{{ pill('returned', 'Rejected') }}{% else %}{{ plan_pill(r.status) }}{% endif %}
                         <a href="/admin/planning/activities/{{ r.plan_id }}" class="rkd-icon-link"
                            aria-label="View activities of {{ r.barangay }}'s plan"><i class="bi bi-eye" aria-hidden="true"></i></a>
                     </span>

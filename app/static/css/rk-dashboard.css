@@ -81,6 +81,7 @@
 .rkd-swatch { width: 14px; height: 14px; border-radius: 4px; flex: 0 0 14px; margin-top: 3px; }
 .rkd-swatch-green { background: #167736; }
 .rkd-swatch-yellow { background: #f5b800; }
+.rkd-swatch-red { background: #b42318; }
 .rkd-legend-label { font-size: 14px; font-weight: 600; color: var(--rk-text); }
 .rkd-legend-sub { font-size: 12px; color: var(--rk-muted); }
 

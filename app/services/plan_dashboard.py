@@ -12,7 +12,8 @@ Rules shared by both dashboards
         awaiting  - submitted, waiting for review      (is_proof_submitted, pending)
         none      - nothing submitted yet
   * "Upcoming" = dated today .. today + 6 (7 days, today included).
-  * Every pie has exactly two slices: green first, yellow second.
+  * Pie slices come in a fixed order (green, yellow, then red where used);
+    percentages always add up to exactly 100.
 """
 
 import re
@@ -27,6 +28,10 @@ from app.models import Activity, AuditLog, Planning, PlanningStatus
 UPCOMING_DAYS = 7
 PIE_GREEN = "#167736"
 PIE_YELLOW = "#f5b800"
+PIE_RED = "#b42318"
+# Slice tone -> colour. The tone also names the legend swatch class
+# (rkd-swatch-<tone>), since the CSP does not allow inline styles.
+PIE_COLORS = {"green": PIE_GREEN, "yellow": PIE_YELLOW, "red": PIE_RED}
 _PHT = timezone(timedelta(hours=8))
 
 PROOF_APPROVED, PROOF_RETURNED, PROOF_AWAITING, PROOF_NONE = "approved", "returned", "awaiting", "none"
@@ -84,16 +89,29 @@ def long_date(d: date) -> str:
     return f"{d:%A}, {d:%B} {d.day}, {d.year}"
 
 
-def pie(green_label, green_count, yellow_label, yellow_count) -> dict:
-    """Two-slice pie + legend data. Percentages always add up to 100."""
-    total = green_count + yellow_count
-    green_pct = round(green_count * 100 / total) if total else 0
-    yellow_pct = 100 - green_pct if total else 0
+def pie(*slices) -> dict:
+    """Pie + legend data from (label, count, tone) slices, in display order.
+
+    Percentages add up to exactly 100 (largest-remainder rounding): every
+    slice gets its whole percent, then the points left over go to the
+    largest remainders. Ties go to the odd whole percent first, which is
+    round-half-to-even; for two slices that is exactly the earlier
+    round() + 100-minus rule, so existing two-slice pies are unchanged.
+    """
+    total = sum(count for _, count, _ in slices)
+    pcts = [0] * len(slices)
+    if total:
+        exact = [count * 100 / total for _, count, _ in slices]
+        pcts = [int(x) for x in exact]
+        order = sorted(range(len(slices)),
+                       key=lambda i: (-(exact[i] - pcts[i]), pcts[i] % 2 == 0, i))
+        for i in order[:100 - sum(pcts)]:
+            pcts[i] += 1
     return {
         "total": total,
         "slices": [
-            {"label": green_label, "count": green_count, "pct": green_pct, "color": PIE_GREEN},
-            {"label": yellow_label, "count": yellow_count, "pct": yellow_pct, "color": PIE_YELLOW},
+            {"label": label, "count": count, "pct": pct, "color": PIE_COLORS[tone], "tone": tone}
+            for (label, count, tone), pct in zip(slices, pcts)
         ],
     }
 
@@ -214,10 +232,17 @@ def progress_segments(activities) -> dict:
 # ADMIN dashboard
 # ─────────────────────────────────────────────────────────────────────
 
-def admin_plan_cards(latest: dict, total_barangays: int, today: date) -> dict:
+def _plans_by_status(latest: dict) -> dict:
+    """{'approved' | 'pending' | 'rejected': [plan, ...]} from each barangay's
+    latest plan. The plan cards and the plans pie both count from this."""
     by_status = {"approved": [], "pending": [], "rejected": []}
     for p in latest.values():
         by_status.setdefault(plan_status(p), []).append(p)
+    return by_status
+
+
+def admin_plan_cards(latest: dict, total_barangays: int, today: date) -> dict:
+    by_status = _plans_by_status(latest)
     pending_dates = [pht_date(p.created_at) for p in by_status["pending"] if p.created_at]
     return {
         "total_barangays": total_barangays,
@@ -233,16 +258,25 @@ def approved_plans(latest: dict) -> list:
     return [p for p in latest.values() if plan_status(p) == "approved"]
 
 
+# List order under the plans pie: pending first, then rejected, then approved.
+_PLAN_ROW_ORDER = {"pending": 0, "rejected": 1, "approved": 2}
+
+
 def admin_plan_pie(latest: dict, limit: int = 5) -> dict:
-    """Approved vs pending barangays (returned / no plan are left out)."""
+    """Barangays by their latest plan: approved / pending / rejected
+    (barangays with no plan are left out). Same counts as admin_plan_cards."""
+    by_status = _plans_by_status(latest)
     rows = [
-        {"barangay": p.barangay.name if p.barangay else "—", "status": plan_status(p), "plan_id": p.id}
-        for p in latest.values() if plan_status(p) in ("approved", "pending")
+        {"barangay": p.barangay.name if p.barangay else "—", "status": status, "plan_id": p.id}
+        for status in _PLAN_ROW_ORDER for p in by_status[status]
     ]
-    rows.sort(key=lambda r: (r["status"] != "pending", r["barangay"].lower()))
-    approved = sum(1 for r in rows if r["status"] == "approved")
+    rows.sort(key=lambda r: (_PLAN_ROW_ORDER[r["status"]], r["barangay"].lower()))
     return {
-        "pie": pie("Approved", approved, "Pending review", len(rows) - approved),
+        "pie": pie(
+            ("Approved", len(by_status["approved"]), "green"),
+            ("Pending review", len(by_status["pending"]), "yellow"),
+            ("Rejected", len(by_status["rejected"]), "red"),
+        ),
         "rows": rows[:limit],
         "total_rows": len(rows),
     }
@@ -271,7 +305,7 @@ def admin_proof_review(activities, limit: int = 5) -> dict:
         # the "Proofs awaiting review" card reads these same two numbers
         "approved": approved,
         "pending": pending,
-        "pie": pie("Approved", approved, "Pending review", pending),
+        "pie": pie(("Approved", approved, "green"), ("Pending review", pending, "yellow")),
         "rows": rows[:limit],
         "total_rows": len(rows),
     }
@@ -387,7 +421,7 @@ def bdrrmo_timing_pie(activities, today: date) -> dict:
     done = sum(1 for a in dated if a.start_date < today)
     future = sort_by_date(a for a in dated if a.start_date >= today)
     return {
-        "pie": pie("Done", done, "Upcoming", len(dated) - done),
+        "pie": pie(("Done", done, "green"), ("Upcoming", len(dated) - done, "yellow")),
         "done": done,
         "dated": len(dated),
         "unscheduled": len(activities) - len(dated),
@@ -400,7 +434,7 @@ def bdrrmo_proof_pie(activities) -> dict:
     cards = activity_cards(activities)
     submitted = sum(1 for a in activities if a.is_proof_submitted)
     return {
-        "pie": pie("Submitted", submitted, "None yet", len(activities) - submitted),
+        "pie": pie(("Submitted", submitted, "green"), ("None yet", len(activities) - submitted, "yellow")),
         "submitted": submitted,  # also the "Accomplishment Report" card number
         "approved": cards["approved"],
         "awaiting": cards["awaiting"],

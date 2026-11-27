@@ -1,4 +1,4 @@
-{# Draws every two-slice pie in the `pies` context dict ({canvas_id: pie}).
+{# Draws every pie in the `pies` context dict ({canvas_id: pie}).
    Data goes in through | tojson (escaped), never | safe. #}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"
         integrity="sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4" crossorigin="anonymous"></script>
@@ -9,17 +9,20 @@
         const pie = pies[id];
         const el = document.getElementById(id);
         if (!el || !pie || !pie.total || typeof Chart === "undefined") return;
+        // 0-count slices are left out of the chart (no thin line) but stay
+        // in the legend, which the template renders from all slices.
+        const shown = pie.slices.filter(function (s) { return s.count > 0; });
         new Chart(el, {
             type: "pie",
             data: {
-                labels: pie.slices.map(function (s) { return s.label; }),
+                labels: shown.map(function (s) { return s.label; }),
                 datasets: [{
-                    data: pie.slices.map(function (s) { return s.count; }),
-                    backgroundColor: pie.slices.map(function (s) { return s.color; }),
+                    data: shown.map(function (s) { return s.count; }),
+                    backgroundColor: shown.map(function (s) { return s.color; }),
                     borderColor: "#ffffff",
-                    // A lone 100% slice would draw its border as a white line
-                    // from the centre; the 0 slice stays in the legend.
-                    borderWidth: pie.slices.some(function (s) { return s.count === 0; }) ? 0 : 2,
+                    // 2px white gaps between slices; a lone 100% slice gets
+                    // none (it would draw a white line from the centre).
+                    borderWidth: shown.length > 1 ? 2 : 0,
                 }],
             },
             options: {
@@ -30,7 +33,7 @@
                     tooltip: {
                         callbacks: {
                             label: function (ctx) {
-                                const s = pie.slices[ctx.dataIndex];
+                                const s = shown[ctx.dataIndex];
                                 return " " + s.label + ": " + s.count + " (" + s.pct + "%)";
                             },
                         },
