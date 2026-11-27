@@ -2527,11 +2527,59 @@ def resources_list(
     archived: Optional[str] = None,
     page: Optional[str] = None,
     per_page: Optional[str] = None,
+    edit: Optional[str] = None,
 ):
     user, barangay = _resolve_scope(request, db)
     if isinstance(user, RedirectResponse):
         return user
 
+    # ?open=add / ?edit=<id> open the Add/Edit modal on load (old form URLs
+    # redirect here). Edit only ever pre-fills the user's OWN resource.
+    modal = None
+    error = None
+    if barangay and request.query_params.get("open") == "add":
+        modal = _resource_modal("add")
+    elif barangay and edit:
+        r = _own_resource(db, barangay, int(edit)) if edit.isdigit() else None
+        if r:
+            modal = _resource_modal("edit", r.id, _resource_form_values(r))
+        else:
+            error = "Resource not found"
+
+    return _render_resources_list(
+        request, db, user, barangay,
+        q=q, category=category, food_type=food_type, alert=alert,
+        archived=archived, page=page, per_page=per_page,
+        modal=modal, error=error,
+    )
+
+
+def _resource_form_values(r) -> dict:
+    """A resource's current values in the shape the Add/Edit modal fills in."""
+    return {
+        "name": r.name or "",
+        "category": r.category.value if r.category else "",
+        "food_type": r.food_type or "",
+        "quantity": "",
+        "unit": r.unit or "",
+        "restock_threshold": "" if r.restock_threshold is None else str(r.restock_threshold),
+        "storage_location": r.storage_location or "",
+        "is_perishable": bool(r.is_perishable),
+        "expiry_date": r.expiry_date.strftime("%Y-%m-%d") if r.expiry_date else "",
+    }
+
+
+def _resource_modal(mode, resource_id=None, values=None, error=None) -> dict:
+    """State for the Add/Edit Resource modal, rendered as JSON for the page
+    script: which mode, which resource, the values to fill in and an error."""
+    return {"mode": mode, "id": resource_id, "values": values or {}, "error": error}
+
+
+def _render_resources_list(request, db, user, barangay, *, q=None, category=None,
+                           food_type=None, alert=None, archived=None, page=None,
+                           per_page=None, modal=None, error=None):
+    """The Resources list page. Also used by the Add/Edit POST routes to
+    re-render the page with the modal open when validation fails."""
     query = db.query(Resource)
     show_archived = (archived == "1")
     query = query.filter(Resource.is_archived == show_archived, Resource.barangay_id == user['barangay_id'])
@@ -2566,7 +2614,7 @@ def resources_list(
             "category": r.category.value if r.category else "",
             "category_label": r.category.value.title() if r.category else "—",
             "food_type": r.food_type or "",
-            "food_type_label": FOOD_TYPE_LABELS.get(r.food_type or "", ""),
+            "food_type_label": FOOD_TYPE_LABELS.get(r.food_type, "") if r.food_type else "",
             "is_perishable": r.is_perishable,
             "quantity": r.quantity or 0,
             "unit": r.unit or "",
@@ -2576,6 +2624,8 @@ def resources_list(
             "is_archived": r.is_archived,
             "alert": _resource_alert(r),
             "last_updated": r.last_updated,
+            # Pre-fill values for the Edit modal (rendered as JSON).
+            "form": _resource_form_values(r),
         })
 
     page_obj = paginate(view_rows, parse_page(page), parse_per_page(per_page))
@@ -2605,6 +2655,10 @@ def resources_list(
             "show_archived": show_archived,
             # Default + max for the stock modal's date-time field (PHT).
             "now_local": datetime.now(_PHT).strftime("%Y-%m-%dT%H:%M"),
+            "resource_modal": modal,
+            # {id: current values} for the Edit buttons on this page.
+            "resource_edit_data": {row["id"]: row["form"] for row in page_obj.items},
+            "page_error": error,
         },
     )
 
@@ -2633,33 +2687,38 @@ def _own_resource(db, barangay, resource_id):
     ).first()
 
 
-def _render_resource_form(request, user, barangay, target, error=None):
-    """The Add / Edit resource form. `barangay` is required by the BDRRMO
-    header in admin/base.html."""
-    return templates.TemplateResponse(
-        request=request,
-        name="bdrrmo/resource_form.html",
-        context={
-            "user": user,
-            "barangay": barangay,
-            "active_nav": "resources",
-            "edit_mode": target is not None,
-            "target": target,
-            "categories": [c.value for c in ResourceCategory],
-            "food_types": [(v, FOOD_TYPE_LABELS[v]) for v in FOOD_TYPE_CHOICES],
-            "error": error,
-        },
-    )
+def _parse_whole_number(raw, label, required):
+    """(value, error) for a whole-number form field (>= 0). Read as text so a
+    blank or bad value becomes a message in the modal, not a 422 page."""
+    s = (raw or "").strip()
+    if not s:
+        return (None, f"{label} is required.") if required else (0, None)
+    if not s.isdigit():
+        return None, f"{label} must be a whole number (0 or more)."
+    return int(s), None
 
 
-@router.get("/resources/new", response_class=HTMLResponse)
+def _submitted_resource_values(name, category, food_type, is_perishable, quantity,
+                               unit, storage_location, restock_threshold, expiry_date) -> dict:
+    """What the user typed, to put back into the modal after an error."""
+    return {
+        "name": name or "", "category": category or "", "food_type": food_type or "",
+        "quantity": quantity or "", "unit": unit or "",
+        "restock_threshold": restock_threshold or "",
+        "storage_location": storage_location or "",
+        "is_perishable": bool(is_perishable), "expiry_date": expiry_date or "",
+    }
+
+
+# Old form pages: kept as URLs, now open the modal on the list page.
+@router.get("/resources/new")
 def resource_new_form(request: Request, db: Session = Depends(get_db)):
     user, barangay = _resolve_scope(request, db)
     if isinstance(user, RedirectResponse):
         return user
     if not barangay:
         return _no_barangay_redirect()
-    return _render_resource_form(request, user, barangay, None)
+    return RedirectResponse(url="/bdrrmo/resources?open=add", status_code=302)
 
 def _parse_date_or_none(s: Optional[str]):
     if not s:
@@ -2673,14 +2732,14 @@ def _parse_date_or_none(s: Optional[str]):
 def resource_create(
     request: Request,
     db: Session = Depends(get_db),
-    name: str = Form(...),
-    category: str = Form(...),
+    name: str = Form(""),
+    category: str = Form(""),
     food_type: str = Form(""),
     is_perishable: Optional[str] = Form(None),
-    quantity: int = Form(0),
+    quantity: str = Form(""),
     unit: str = Form(""),
     storage_location: str = Form(""),
-    restock_threshold: int = Form(0),
+    restock_threshold: str = Form(""),
     expiry_date: str = Form(""),
 ):
     user, barangay = _resolve_scope(request, db)
@@ -2690,13 +2749,26 @@ def resource_create(
         return _no_barangay_redirect()
 
     def render_error(msg):
-        return _render_resource_form(request, user, barangay, None, msg)
+        values = _submitted_resource_values(
+            name, category, food_type, is_perishable, quantity, unit,
+            storage_location, restock_threshold, expiry_date,
+        )
+        return _render_resources_list(
+            request, db, user, barangay,
+            modal=_resource_modal("add", None, values, msg),
+        )
 
     name = name.strip()
     if not name:
         return render_error("Resource name is required.")
     if category not in {c.value for c in ResourceCategory}:
         return render_error("Invalid category.")
+    qty, err = _parse_whole_number(quantity, "Initial quantity", required=True)
+    if err:
+        return render_error(err)
+    threshold, err = _parse_whole_number(restock_threshold, "Restock threshold", required=True)
+    if err:
+        return render_error(err)
 
     perish = bool(is_perishable)
     exp = _parse_date_or_none(expiry_date) if perish else None
@@ -2713,10 +2785,10 @@ def resource_create(
         category=ResourceCategory(category),
         food_type=food_type_value,
         is_perishable=perish,
-        quantity=max(0, quantity or 0),
+        quantity=qty,
         unit=unit.strip() or None,
         storage_location=storage_location.strip() or None,
-        restock_threshold=max(0, restock_threshold or 0),
+        restock_threshold=threshold,
         expiry_date=exp,
         is_archived=False,
         updated_by=user["id"],
@@ -2735,20 +2807,18 @@ def resource_create(
         status_code=302,
     )
 
-@router.get("/resources/{resource_id}/edit", response_class=HTMLResponse)
+@router.get("/resources/{resource_id}/edit")
 def resource_edit_form(resource_id: int, request: Request, db: Session = Depends(get_db)):
     user, barangay = _resolve_scope(request, db)
     if isinstance(user, RedirectResponse):
         return user
 
+    # Ownership is checked here too, so an old link never reveals whether
+    # another barangay's id exists.
     r = _own_resource(db, barangay, resource_id)
     if not r:
         return _resource_not_found()
-
-    # The stock route sends its errors here as ?error=…
-    return _render_resource_form(
-        request, user, barangay, r, request.query_params.get("error")
-    )
+    return RedirectResponse(url=f"/bdrrmo/resources?edit={r.id}", status_code=302)
 
 
 @router.post("/resources/{resource_id}/edit")
@@ -2756,13 +2826,13 @@ def resource_edit(
     resource_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    name: str = Form(...),
-    category: str = Form(...),
+    name: str = Form(""),
+    category: str = Form(""),
     food_type: str = Form(""),
     is_perishable: Optional[str] = Form(None),
     unit: str = Form(""),
     storage_location: str = Form(""),
-    restock_threshold: int = Form(0),
+    restock_threshold: str = Form(""),
     expiry_date: str = Form(""),
 ):
     user, barangay = _resolve_scope(request, db)
@@ -2773,11 +2843,24 @@ def resource_edit(
     if not r:
         return _resource_not_found()
 
-    # Same required-field checks as Add; shown on the form, nothing saved.
+    def render_error(msg):
+        values = _submitted_resource_values(
+            name, category, food_type, is_perishable, "", unit,
+            storage_location, restock_threshold, expiry_date,
+        )
+        return _render_resources_list(
+            request, db, user, barangay,
+            modal=_resource_modal("edit", r.id, values, msg),
+        )
+
+    # Same required-field checks as Add; shown in the modal, nothing saved.
     if not name.strip():
-        return _render_resource_form(request, user, barangay, r, "Resource name is required.")
+        return render_error("Resource name is required.")
     if category not in {c.value for c in ResourceCategory}:
-        return _render_resource_form(request, user, barangay, r, "Invalid category.")
+        return render_error("Invalid category.")
+    new_thr, err = _parse_whole_number(restock_threshold, "Restock threshold", required=True)
+    if err:
+        return render_error(err)
 
     # Quantity is intentionally not editable here — use Add/Deduct Stock so
     # every quantity change is auditable with before/after numbers.
@@ -2818,7 +2901,6 @@ def resource_edit(
         changes.append(f"storage_location: '{r.storage_location or ''}' → '{new_loc or ''}'")
         r.storage_location = new_loc
 
-    new_thr = max(0, restock_threshold or 0)
     if new_thr != (r.restock_threshold or 0):
         changes.append(f"restock_threshold: {r.restock_threshold or 0} → {new_thr}")
         r.restock_threshold = new_thr
@@ -2897,7 +2979,7 @@ def resource_stock_change(
         )
     if not amount or amount <= 0:
         return RedirectResponse(
-            url=f"/bdrrmo/resources/{resource_id}/edit?error=Amount+must+be+positive",
+            url="/bdrrmo/resources?error=Amount+must+be+positive",
             status_code=302,
         )
 
@@ -2918,7 +3000,7 @@ def resource_stock_change(
     else:
         if amount > before:
             return RedirectResponse(
-                url=f"/bdrrmo/resources/{resource_id}/edit?error=Cannot+deduct+more+than+current+stock",
+                url="/bdrrmo/resources?error=Cannot+deduct+more+than+current+stock",
                 status_code=302,
             )
         after = before - amount

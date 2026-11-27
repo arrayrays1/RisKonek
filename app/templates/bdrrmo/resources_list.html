@@ -27,9 +27,11 @@
         <h1 id="header">Resource Goods Inventory</h1>
         <p>Consumable disaster-response resources (food packs, water, medicine, hygiene kits, blankets, tarpaulins, sleeping kits).</p>
     </div>
-    <a href="/bdrrmo/resources/new" class="btn btn-rk">
-        <i class="bi bi-plus-lg"></i> Add Resource
-    </a>
+    {% if barangay %}
+    <button type="button" class="btn btn-rk" id="resourceAddBtn">
+        <i class="bi bi-plus-lg" aria-hidden="true"></i> Add Resource
+    </button>
+    {% endif %}
 </div>
 
 {% if request.query_params.get('success') %}
@@ -39,10 +41,11 @@
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
 </div>
 {% endif %}
-{% if request.query_params.get('error') %}
+{% set top_error = page_error or request.query_params.get('error') %}
+{% if top_error %}
 <div class="alert alert-danger alert-dismissible fade show">
     <i class="bi bi-exclamation-triangle-fill me-1"></i>
-    {{ request.query_params.get('error') }}
+    {{ top_error }}
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
 </div>
 {% endif %}
@@ -194,9 +197,10 @@
                             data-bs-toggle="modal" data-bs-target="#stockModal-{{ r.id }}">
                         <i class="bi bi-plus-slash-minus"></i> Stock
                     </button>
-                    <a href="/bdrrmo/resources/{{ r.id }}/edit" class="btn-soft" title="Edit" aria-label="Edit {{ r.name }}">
-                        <i class="bi bi-pencil"></i>
-                    </a>
+                    <button type="button" class="btn-soft" data-resource-edit="{{ r.id }}"
+                            title="Edit" aria-label="Edit {{ r.name }}">
+                        <i class="bi bi-pencil" aria-hidden="true"></i>
+                    </button>
                     <form method="POST" action="/bdrrmo/resources/{{ r.id }}/archive"
                           data-confirm='Archive {{ r.name }}?'>
                         <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
@@ -293,4 +297,197 @@
 {% endif %}
 {% endfor %}
 
+{% if barangay %}
+<!-- ── Add / Edit Resource modal (one for both) ───────────────── -->
+<div class="modal fade" id="resourceModal" tabindex="-1" aria-labelledby="resourceModalTitle" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable modal-fullscreen-sm-down">
+    <form method="POST" action="/bdrrmo/resources/new" id="resourceForm" class="modal-content" data-validate>
+      <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title" id="resourceModalTitle">Add Resource</h5>
+          <p class="text-muted small mb-0" id="resourceModalIntro">Register a new consumable resource item in the inventory.</p>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-danger d-none" id="resourceModalError" role="alert"></div>
+        <div class="row g-3">
+          <div class="col-md-8">
+            <label class="form-label small fw-semibold" for="rf-name">Item Name *</label>
+            <input type="text" name="name" id="rf-name" required class="form-control"
+                   placeholder="e.g. Family Food Packs">
+          </div>
+
+          <div class="col-md-4">
+            <label class="form-label small fw-semibold" for="rf-category">Category *</label>
+            <select name="category" id="rf-category" required class="form-select">
+              {% for c in categories %}
+              <option value="{{ c }}">{{ c.title() }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="col-md-4" id="rf-food-wrap">
+            <label class="form-label small fw-semibold" for="rf-food">Food Classification</label>
+            <select name="food_type" id="rf-food" class="form-select" aria-describedby="rf-food-help">
+              <option value="">— Unclassified —</option>
+              {% for v, label in food_types %}
+              <option value="{{ v }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+            <div class="form-text small" id="rf-food-help">Applies to the Food category only.</div>
+          </div>
+
+          <div class="col-md-4" id="rf-qty-wrap">
+            <label class="form-label small fw-semibold" for="rf-qty">Initial Quantity</label>
+            <input type="number" name="quantity" id="rf-qty" min="0" class="form-control" required
+                   aria-describedby="rf-qty-help">
+            <div class="form-text small" id="rf-qty-help">After creation, use Add/Deduct Stock to adjust.</div>
+          </div>
+
+          <div class="col-md-4">
+            <label class="form-label small fw-semibold" for="rf-unit">Unit</label>
+            <input type="text" name="unit" id="rf-unit" class="form-control"
+                   placeholder="packs, liters, kg, pieces">
+          </div>
+
+          <div class="col-md-4">
+            <label class="form-label small fw-semibold" for="rf-threshold">Restock Threshold</label>
+            <input type="number" name="restock_threshold" id="rf-threshold" min="0" class="form-control" required
+                   aria-describedby="rf-threshold-help">
+            <div class="form-text small" id="rf-threshold-help">Alert fires when quantity ≤ threshold.</div>
+          </div>
+
+          <div class="col-md-8">
+            <label class="form-label small fw-semibold" for="rf-location">Storage Location</label>
+            <input type="text" name="storage_location" id="rf-location" class="form-control"
+                   placeholder="e.g. Warehouse A, Shelf 3">
+          </div>
+
+          <div class="col-md-4 d-flex align-items-center pt-3">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="rf-perishable" name="is_perishable" value="1">
+              <label class="form-check-label small fw-semibold" for="rf-perishable">Perishable</label>
+            </div>
+          </div>
+
+          <div class="col-md-4">
+            <label class="form-label small fw-semibold" for="rf-expiry">Expiry Date</label>
+            <input type="date" name="expiry_date" id="rf-expiry" class="form-control" aria-describedby="rf-expiry-help">
+            <div class="form-text small" id="rf-expiry-help">Used only for perishable items.</div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" class="btn-rk">
+          <i class="bi bi-check2" aria-hidden="true"></i> <span id="resourceModalSubmit">Create Resource</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# Data for the modal script: current values of this page's rows, and the
+   state to open with (after ?open=add / ?edit=<id> or a failed save). #}
+<script type="application/json" id="resourceEditData">{{ resource_edit_data | tojson }}</script>
+<script type="application/json" id="resourceModalState">{{ resource_modal | tojson }}</script>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script nonce="{{ request.state.csp_nonce }}">
+// Add / Edit Resource modal: one form for both modes. CSP-safe (nonce'd,
+// no inline handlers). Posts to the existing /bdrrmo/resources routes.
+(function () {
+    var modalEl = document.getElementById('resourceModal');
+    if (!modalEl || !window.bootstrap) return;
+    var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+    var form = document.getElementById('resourceForm');
+    var addBtn = document.getElementById('resourceAddBtn');
+    var rows = JSON.parse(document.getElementById('resourceEditData').textContent || '{}');
+    var state = JSON.parse(document.getElementById('resourceModalState').textContent || 'null');
+    var el = function (id) { return document.getElementById(id); };
+    var cat = el('rf-category'), foodWrap = el('rf-food-wrap'), qtyWrap = el('rf-qty-wrap'), qty = el('rf-qty');
+    var opener = null;
+
+    var TEXT = {
+        add:  { title: 'Add Resource', submit: 'Create Resource',
+                intro: 'Register a new consumable resource item in the inventory.' },
+        edit: { title: 'Edit Resource', submit: 'Save changes',
+                intro: 'Update resource details. Quantity changes are handled via Add/Deduct Stock so they are audited individually.' }
+    };
+
+    // Food Classification shows only for the Food category (as before).
+    function syncFood() { foodWrap.hidden = cat.value !== 'food'; }
+    cat.addEventListener('change', syncFood);
+
+    function setMode(mode, id, values, error) {
+        values = values || {};
+        form.action = mode === 'edit' ? '/bdrrmo/resources/' + id + '/edit' : '/bdrrmo/resources/new';
+        el('resourceModalTitle').textContent = TEXT[mode].title;
+        el('resourceModalIntro').textContent = TEXT[mode].intro;
+        el('resourceModalSubmit').textContent = TEXT[mode].submit;
+
+        // Initial Quantity exists only when adding; disabled fields are
+        // neither validated nor submitted.
+        qtyWrap.hidden = mode === 'edit';
+        qty.disabled = mode === 'edit';
+
+        el('rf-name').value = values.name || '';
+        cat.value = values.category || cat.options[0].value;
+        el('rf-food').value = values.food_type || '';
+        qty.value = values.quantity || '';
+        el('rf-unit').value = values.unit || '';
+        el('rf-threshold').value = values.restock_threshold || '';
+        el('rf-location').value = values.storage_location || '';
+        el('rf-perishable').checked = !!values.is_perishable;
+        el('rf-expiry').value = values.expiry_date || '';
+        syncFood();
+
+        form.querySelectorAll('.is-invalid').forEach(function (f) { f.classList.remove('is-invalid'); });
+        var err = el('resourceModalError');
+        err.textContent = error || '';
+        err.classList.toggle('d-none', !error);
+    }
+
+    function openWith(button, mode, id, values, error) {
+        opener = button;
+        setMode(mode, id, values, error);
+        modal.show();
+    }
+
+    if (addBtn) addBtn.addEventListener('click', function () { openWith(addBtn, 'add'); });
+    document.querySelectorAll('[data-resource-edit]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var id = btn.getAttribute('data-resource-edit');
+            openWith(btn, 'edit', id, rows[id]);
+        });
+    });
+
+    // Focus the first field on open; give focus back to the opener on close.
+    modalEl.addEventListener('shown.bs.modal', function () { el('rf-name').focus(); });
+    modalEl.addEventListener('hidden.bs.modal', function () {
+        if (opener && document.body.contains(opener)) opener.focus();
+    });
+
+    // Open on load after ?open=add / ?edit=<id> (old form URLs) or a failed
+    // save. Drop those params so a refresh does not reopen the modal.
+    if (state) {
+        var btn = state.mode === 'edit'
+            ? document.querySelector('[data-resource-edit="' + state.id + '"]') || addBtn
+            : addBtn;
+        openWith(btn, state.mode, state.id, state.values, state.error);
+        var url = new URL(window.location.href);
+        if (url.searchParams.has('open') || url.searchParams.has('edit')) {
+            url.searchParams.delete('open');
+            url.searchParams.delete('edit');
+            history.replaceState(null, '', url.pathname + (url.search || ''));
+        }
+    }
+    syncFood();
+})();
+</script>
 {% endblock %}
