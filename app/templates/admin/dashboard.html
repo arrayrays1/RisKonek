@@ -172,10 +172,13 @@
                 Pending plans and proofs awaiting review, oldest first{% if needs_review.total > needs_review.rows | length %} · showing {{ needs_review.rows | length }} of {{ needs_review.total }}{% endif %}
             </p>
             {% if needs_review.rows %}
-            <div class="table-responsive">
-                <table class="rkd-table">
+            <div class="rk-table-scroll">
+                <table class="rk-table">
                     <thead>
-                        <tr><th>Barangay</th><th>Item</th><th>Submitted</th><th>Status</th><th></th></tr>
+                        <tr>
+                            <th scope="col">Barangay</th><th scope="col">Item</th><th scope="col">Submitted</th>
+                            <th scope="col">Status</th><th scope="col"><span class="visually-hidden">Action</span></th>
+                        </tr>
                     </thead>
                     <tbody>
                         {% for i in needs_review.rows %}
@@ -184,7 +187,7 @@
                             <td>{{ i.item }}</td>
                             <td class="text-nowrap">{{ fmt_date(i.submitted) or '—' }}</td>
                             <td>{{ pill(i.pill_class, i.pill) }}</td>
-                            <td class="text-end"><a href="{{ i.url }}" class="rkd-link">Review</a></td>
+                            <td><a href="{{ i.url }}" class="rkd-link">Review</a></td>
                         </tr>
                         {% endfor %}
                     </tbody>

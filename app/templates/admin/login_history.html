@@ -1,5 +1,6 @@
 {% extends "admin/base.html" %}
-{% from "shared/_pagination.html" import pager %}
+{% from "shared/_pagination.html" import rk_pager %}
+{% from "shared/_table.html" import clear_filters %}
 
 {% block title %}Login History — RisKonek{% endblock %}
 
@@ -49,80 +50,74 @@
 </div>
 
 <!-- ── Filters (auto-apply) ───────────────────────────────────── -->
-<div class="dash-card mb-3">
-    <form method="GET" action="/admin/login-history" class="row g-2 align-items-end js-live-filter">
-        <div class="col-md-4">
-            <label class="form-label small fw-semibold mb-1">Search</label>
-            <input type="text" name="q" value="{{ f_q }}" class="form-control form-control-sm"
-                   placeholder="Search username or detail…" autocomplete="off">
-        </div>
-        <div class="col-md-3">
-            <label class="form-label small fw-semibold mb-1">User</label>
-            <select name="user_id" class="form-select form-select-sm">
-                <option value="">All users</option>
-                {% for u in users %}
-                <option value="{{ u.id }}" {% if f_user_id|string == u.id|string %}selected{% endif %}>{{ u.username }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="col-md-2">
-            <label class="form-label small fw-semibold mb-1">Status</label>
-            <select name="status" class="form-select form-select-sm">
-                <option value="">All</option>
-                {% for v, label in statuses %}
-                <option value="{{ v }}" {% if f_status == v %}selected{% endif %}>{{ label }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="col-md-3">
-            <div class="row g-1">
-                <div class="col-6">
-                    <label class="form-label small fw-semibold mb-1">From</label>
-                    <input type="date" name="date_from" value="{{ f_date_from }}" class="form-control form-control-sm">
-                </div>
-                <div class="col-6">
-                    <label class="form-label small fw-semibold mb-1">To</label>
-                    <input type="date" name="date_to" value="{{ f_date_to }}" class="form-control form-control-sm">
-                </div>
-            </div>
-        </div>
-    </form>
-</div>
+<form method="GET" action="/admin/login-history" class="rk-filter-bar js-live-filter" role="search">
+    <div class="rk-filter-search">
+        <label for="lh-q" class="visually-hidden">Search username or detail</label>
+        <i class="bi bi-search" aria-hidden="true"></i>
+        <input type="text" id="lh-q" name="q" value="{{ f_q }}" class="form-control"
+               placeholder="Search username or detail…" autocomplete="off">
+    </div>
+    <div class="rk-filter-select">
+        <label for="lh-user" class="visually-hidden">User</label>
+        <select id="lh-user" name="user_id" class="form-select">
+            <option value="">All users</option>
+            {% for u in users %}
+            <option value="{{ u.id }}" {% if f_user_id|string == u.id|string %}selected{% endif %}>{{ u.username }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="rk-filter-select">
+        <label for="lh-status" class="visually-hidden">Status</label>
+        <select id="lh-status" name="status" class="form-select">
+            <option value="">All statuses</option>
+            {% for v, label in statuses %}
+            <option value="{{ v }}" {% if f_status == v %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="rk-filter-date">
+        <label for="lh-from">From</label>
+        <input type="date" id="lh-from" name="date_from" value="{{ f_date_from }}" class="form-control">
+    </div>
+    <div class="rk-filter-date">
+        <label for="lh-to">To</label>
+        <input type="date" id="lh-to" name="date_to" value="{{ f_date_to }}" class="form-control">
+    </div>
+    {{ clear_filters("/admin/login-history") }}
+</form>
 
 <!-- ── Table ──────────────────────────────────────────────────── -->
-<div class="dash-card overflow-hidden p-0">
-    <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
-            <thead class="rk-bg-soft">
-                <tr class="rk-th-soft">
-                    <th class="px-3 py-3">Time</th>
-                    <th class="py-3">User</th>
-                    <th class="py-3">Status</th>
-                    <th class="py-3 px-3">IP Address</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for r in rows %}
-                <tr class="rk-fs-13">
-                    <td class="px-3 text-nowrap">{{ r.timestamp | pht }}</td>
-                    <td class="fw-semibold">{{ r.username }}</td>
-                    <td><span class="status-pill {{ r.status_badge }}">{{ r.status_label }}</span></td>
-                    <td class="px-3 text-muted">{{ r.ip }}</td>
-                </tr>
-                {% else %}
-                <tr>
-                    <td colspan="4" class="text-center text-muted py-5">
-                        <i class="bi bi-shield-lock fs-3 d-block mb-2"></i>
-                        No login events match your filters.
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+<div class="rk-table-card">
+    <table class="rk-table">
+        <thead>
+            <tr>
+                <th scope="col">Time</th>
+                <th scope="col">User</th>
+                <th scope="col">Status</th>
+                <th scope="col">IP Address</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in rows %}
+            <tr>
+                <td class="text-nowrap">{{ r.timestamp | pht }}</td>
+                <td class="fw-semibold">{{ r.username }}</td>
+                <td><span class="status-pill {{ r.status_badge }}">{{ r.status_label }}</span></td>
+                <td class="text-muted">{{ r.ip }}</td>
+            </tr>
+            {% else %}
+            <tr class="rk-table-empty"><td colspan="4">
+                No records found.
+                {% if f_q or f_user_id or f_status or f_date_from or f_date_to %}
+                <a href="/admin/login-history" class="ms-1">Clear filters</a>
+                {% endif %}
+            </td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
 </div>
 
-{{ pager(page_obj, "/admin/login-history", base_query) }}
+{{ rk_pager(page_obj, "/admin/login-history", base_query, "Login history pages") }}
 
 <p class="text-muted small mt-3 mb-0">
     <i class="bi bi-info-circle me-1"></i>

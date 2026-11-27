@@ -2829,6 +2829,8 @@ def get_activities(
     plan_id: int,
     request: Request,
     db: Session = Depends(get_db),
+    page: Optional[str] = None,
+    per_page: Optional[str] = None,
 ):
     user = require_role(request, ["admin"])
 
@@ -2841,6 +2843,9 @@ def get_activities(
 
     # All activities (finished ones too), by date with undated last.
     activities = pdash.activities_for_plans(db, [plan.id])
+    page_obj = paginate(
+        pdash.admin_activity_rows(activities), parse_page(page), parse_per_page(per_page)
+    )
 
     return templates.TemplateResponse(
         request=request,
@@ -2849,7 +2854,8 @@ def get_activities(
             "user": user,
             "active_nav": "planning",
             "plan": plan,
-            "rows": pdash.admin_activity_rows(activities),
+            "rows": page_obj.items,
+            "page_obj": page_obj,
             "error": request.query_params.get("error"),
         },
     )

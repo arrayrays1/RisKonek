@@ -167,22 +167,22 @@
             </div>
 
             {% if facility_rows %}
-            <div class="table-responsive">
-                <table class="table align-middle mb-0">
+            <div class="rk-table-scroll">
+                <table class="rk-table">
                     <thead>
-                        <tr class="rk-th-soft">
-                            <th>Facility Name</th>
-                            <th>Type</th>
-                            <th class="text-end">Capacity</th>
-                            <th>Status</th>
+                        <tr>
+                            <th scope="col">Facility Name</th>
+                            <th scope="col">Type</th>
+                            <th scope="col">Capacity</th>
+                            <th scope="col">Status</th>
                         </tr>
                     </thead>
-                    <tbody class="rk-fs-13">
+                    <tbody>
                         {% for f in facility_rows %}
                         <tr>
                             <td>{{ f.name }}</td>
                             <td>{{ f.type }}</td>
-                            <td class="text-end">{{ f.capacity }}</td>
+                            <td>{{ f.capacity }}</td>
                             <td>
                                 <span class="status-pill {{ f.status_class }}">
                                     {{ f.status_label }}
@@ -194,7 +194,7 @@
                 </table>
             </div>
             {% else %}
-            <div class="text-center text-muted py-4 rk-fs-13">
+            <div class="text-muted py-3 rk-fs-13">
                 No critical facilities recorded for this barangay yet.
             </div>
             {% endif %}
@@ -281,25 +281,25 @@
             <div class="info-section">
                 <h6><i class="bi bi-journal-text"></i> Recent Incidents</h6>
                 {% if recent_incidents %}
-                <div class="table-responsive">
-                    <table class="table align-middle mb-0">
+                <div class="rk-table-scroll">
+                    <table class="rk-table">
                         <thead>
-                            <tr class="rk-th-soft">
-                                <th>Date</th>
-                                <th>Type</th>
-                                <th>Severity</th>
-                                <th class="text-end">Affected Families</th>
-                                <th class="text-end">Casualties</th>
+                            <tr>
+                                <th scope="col">Date</th>
+                                <th scope="col">Type</th>
+                                <th scope="col">Severity</th>
+                                <th scope="col">Affected Families</th>
+                                <th scope="col">Casualties</th>
                             </tr>
                         </thead>
-                        <tbody class="rk-fs-13">
+                        <tbody>
                             {% for inc in recent_incidents %}
                             <tr>
                                 <td>{{ inc.date_occurred.strftime('%b %d, %Y') }}</td>
                                 <td>{{ inc.disaster_type.value.title() }}</td>
                                 <td>{{ inc.severity.value.title() }}</td>
-                                <td class="text-end">{{ "{:,}".format(inc.affected_families) }}</td>
-                                <td class="text-end">{{ inc.casualties }}</td>
+                                <td>{{ "{:,}".format(inc.affected_families) }}</td>
+                                <td>{{ inc.casualties }}</td>
                             </tr>
                             {% endfor %}
                         </tbody>

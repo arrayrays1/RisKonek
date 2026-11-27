@@ -2069,6 +2069,25 @@ body.facility-location-picking .map-area .leaflet-container {
 }
 .rk-table .rk-table-actions form { display: inline-flex; margin: 0; }
 
+/* Date-range filters: a short visible label beside each date input. */
+.rk-filter-bar .rk-filter-date { display: flex; align-items: center; gap: 6px; flex: 0 1 auto; }
+.rk-filter-bar .rk-filter-date label {
+  margin: 0; font-size: 12px; font-weight: 600; color: var(--rk-muted); white-space: nowrap;
+}
+.rk-filter-bar .rk-filter-date .form-control { width: 150px; }
+
+/* Table inside an existing card (dashboard, profile tabs): same header/row
+   style, no extra border; scrolls sideways when narrow. */
+.rk-table-scroll { overflow-x: auto; }
+.rk-table-scroll .rk-table { min-width: 520px; }
+
+/* Group heading row inside a table (e.g. audit trail day labels). */
+.rk-table tbody tr.rk-table-group td {
+  height: auto; padding: 8px 16px; background: #f6faf4;
+  color: var(--rk-muted); font-size: 12px; font-weight: 600;
+}
+.rk-table tbody tr.rk-table-group:hover td { background: #f6faf4; }
+
 /* ── Numbered pagination footer ──────────────────────────────────── */
 .rk-pagination {
   display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center;

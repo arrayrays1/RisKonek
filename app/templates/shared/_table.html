@@ -1,0 +1,11 @@
+{# Shared bits of the list-table style (.rk-filter-bar / .rk-table, rk.css).
+
+     {% from "shared/_table.html" import clear_filters %}
+     {{ clear_filters("/admin/users") }}
+#}
+{% macro clear_filters(url, label="Clear filters") -%}
+<a href="{{ url }}" class="rk-clear-filters">
+    <span class="rk-funnel-x" aria-hidden="true"><i class="bi bi-funnel-fill"></i><i class="bi bi-x-circle-fill"></i></span>
+    {{ label }}
+</a>
+{%- endmacro %}
