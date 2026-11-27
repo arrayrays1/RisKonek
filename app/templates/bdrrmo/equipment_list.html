@@ -83,9 +83,7 @@
             <tr>
                 <th scope="col">Equipment</th>
                 <th scope="col">Type</th>
-                <th scope="col">Assigned</th>
                 <th scope="col">Plate / Serial</th>
-                <th scope="col">Last Inspected</th>
                 <th scope="col">Actions</th>
             </tr>
         </thead>
@@ -94,9 +92,7 @@
             <tr>
                 <td class="fw-semibold">{{ e.name }}</td>
                 <td>{{ e.type_label }}</td>
-                <td class="text-muted">{{ e.assigned }}</td>
                 <td class="text-muted">{{ e.plate_or_serial }}</td>
-                <td class="text-muted">{{ e.last_inspected.strftime('%Y-%m-%d') if e.last_inspected else '—' }}</td>
                 <td>
                 <div class="rk-table-actions">
                     {# History stays available for archived units too. #}
@@ -131,7 +127,7 @@
                 </td>
             </tr>
             {% else %}
-            <tr class="rk-table-empty"><td colspan="6">
+            <tr class="rk-table-empty"><td colspan="4">
                 No records found.
                 {% if f_q or f_type or f_status or show_archived %}
                 <a href="{{ equipment_route }}" class="ms-1">Clear filters</a>

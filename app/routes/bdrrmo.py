@@ -3080,8 +3080,6 @@ def equipment_list(
                 e.status.value if e.status else "", "—"
             ),
             "plate_or_serial": e.plate_or_serial or "—",
-            "assigned": e.assigned_to_user.username if e.assigned_to_user else "—",
-            "last_inspected": e.last_inspected,
             "is_archived": e.is_archived,
             "repair_reminder": reminder["state"] if reminder else None,
         })
@@ -3152,7 +3150,6 @@ def equipment_new_form(request: Request, db: Session = Depends(get_db)):
             "barangay": barangay,
             "types": [(t.value, EQUIPMENT_TYPE_LABELS.get(t.value, t.value.title()))
                       for t in EquipmentType],
-            "status_choices": [(v, EQUIPMENT_STATUS_LABELS[v]) for v in EQUIPMENT_STATUS_CHOICES],
             "error": None,
         },
     )
@@ -3164,11 +3161,9 @@ def equipment_create(
     db: Session = Depends(get_db),
     name: str = Form(...),
     equipment_type: str = Form(...),
-    status: str = Form("available"),
     plate_or_serial: str = Form(""),
-    last_inspected: str = Form(""),
 ):
-    user, _ = _resolve_scope(request, db)
+    user, barangay = _resolve_scope(request, db)
     if isinstance(user, RedirectResponse):
         return user
 
@@ -3178,12 +3173,12 @@ def equipment_create(
             name="bdrrmo/equipment_form.html",
             context={
                 "user": user,
+                "barangay": barangay,
                 "active_nav": "equipment",
                 "edit_mode": False,
                 "target": None,
                 "types": [(t.value, EQUIPMENT_TYPE_LABELS.get(t.value, t.value.title()))
                           for t in EquipmentType],
-                "status_choices": [(v, EQUIPMENT_STATUS_LABELS[v]) for v in EQUIPMENT_STATUS_CHOICES],
                 "error": msg,
             },
         )
@@ -3193,16 +3188,14 @@ def equipment_create(
         return render_error("Equipment name is required.")
     if equipment_type not in {t.value for t in EquipmentType}:
         return render_error("Invalid equipment type.")
-    if status not in {s.value for s in EquipmentStatus}:
-        status = "available"
 
+    # Status takes the model default (serviceable); later changes go through
+    # the audited status action. last_inspected is left unset.
     e = Equipment(
         name=name,
         barangay_id=user['barangay_id'],
         equipment_type=EquipmentType(equipment_type),
-        status=EquipmentStatus(status),
         plate_or_serial=plate_or_serial.strip() or None,
-        last_inspected=_parse_date_or_none(last_inspected),
         is_archived=False,
     )
     db.add(e)
@@ -3221,7 +3214,7 @@ def equipment_create(
 
 @router.get("/equipment_bdrrmo/{equipment_id}/edit", response_class=HTMLResponse)
 def equipment_edit_form(equipment_id: int, request: Request, db: Session = Depends(get_db)):
-    user, _ = _resolve_scope(request, db)
+    user, barangay = _resolve_scope(request, db)
     if isinstance(user, RedirectResponse):
         return user
     e = db.query(Equipment).filter(Equipment.id == equipment_id).first()
@@ -3235,12 +3228,12 @@ def equipment_edit_form(equipment_id: int, request: Request, db: Session = Depen
         name="bdrrmo/equipment_form.html",
         context={
             "user": user,
+            "barangay": barangay,
             "active_nav": "equipment",
             "edit_mode": True,
             "target": e,
             "types": [(t.value, EQUIPMENT_TYPE_LABELS.get(t.value, t.value.title()))
                       for t in EquipmentType],
-            "status_choices": [(v, EQUIPMENT_STATUS_LABELS[v]) for v in EQUIPMENT_STATUS_CHOICES],
             "error": None,
             "repair_reminder": reminder["state"] if reminder else None,
             "repair_report": reminder["report"] if reminder else None,
@@ -3259,7 +3252,6 @@ def equipment_edit(
     name: str = Form(...),
     equipment_type: str = Form(...),
     plate_or_serial: str = Form(""),
-    last_inspected: str = Form(""),
 ):
     user, _ = _resolve_scope(request, db)
     if isinstance(user, RedirectResponse):
@@ -3285,11 +3277,7 @@ def equipment_edit(
         changes.append(f"plate_or_serial: '{e.plate_or_serial or ''}' → '{new_ps or ''}'")
         e.plate_or_serial = new_ps
 
-    new_insp = _parse_date_or_none(last_inspected)
-    if new_insp != e.last_inspected:
-        changes.append(f"last_inspected: {e.last_inspected} → {new_insp}")
-        e.last_inspected = new_insp
-
+    # last_inspected is not edited here; the stored value is kept as is.
     db.commit()
 
     if changes:
