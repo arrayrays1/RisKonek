@@ -1,0 +1,86 @@
+{#
+  Building blocks for the Admin / BDRRMO dashboards and the plan activity
+  pages. Styles: /static/css/rk-dashboard.css. Pies are drawn by
+  shared/_pie_script.html from the `pies` context dict (| tojson).
+#}
+
+{# 'Nov 30, 2026' — no zero padding, works on Windows hosts too. #}
+{% macro fmt_date(d) -%}
+{%- if d -%}{{ d.strftime('%b') }} {{ d.day }}, {{ d.year }}{%- endif -%}
+{%- endmacro %}
+
+{% macro pill(kind, text) -%}
+<span class="rkd-pill rkd-pill-{{ kind }}">{{ text }}</span>
+{%- endmacro %}
+
+{# Plan status → pill (approved / pending / rejected=returned). #}
+{% macro plan_pill(status) -%}
+{%- if status == 'approved' -%}{{ pill('approved', 'Approved') }}
+{%- elif status == 'rejected' -%}{{ pill('returned', 'Returned') }}
+{%- else -%}{{ pill('pending', 'Pending review') }}{%- endif -%}
+{%- endmacro %}
+
+{# Summary card. tone: neutral | green | red | amber; icon: a Bootstrap Icons name. #}
+{% macro stat(label, value, tone='neutral', icon=None, sub=None) -%}
+<div class="rk-stat-card rk-stat-{{ tone }}">
+    {% if icon %}<i class="bi bi-{{ icon }} rk-stat-icon" aria-hidden="true"></i>{% endif %}
+    <div class="rk-stat-text">
+        <div class="rk-stat-label">{{ label }}</div>
+        <div class="rk-stat-value">{{ value }}</div>
+        {% if sub %}<div class="rk-stat-sub">{{ sub }}</div>{% endif %}
+    </div>
+</div>
+{%- endmacro %}
+
+{% macro empty(text='No data yet', icon='inbox') -%}
+<div class="rkd-empty"><i class="bi bi-{{ icon }}" aria-hidden="true"></i>{{ text }}</div>
+{%- endmacro %}
+
+{# Pie (canvas, filled by _pie_script.html) + legend with count and %. #}
+{% macro pie_block(canvas_id, p, unit='', empty_text='No data yet') -%}
+{% if p.total %}
+<div class="rkd-pie">
+    <div class="rkd-pie-canvas">
+        <canvas id="{{ canvas_id }}" width="190" height="190" role="img"
+                aria-label="{% for s in p.slices %}{{ s.label }} {{ s.count }} ({{ s.pct }}%){% if not loop.last %}, {% endif %}{% endfor %}"></canvas>
+    </div>
+    <ul class="rkd-legend">
+        {% for s in p.slices %}
+        <li>
+            <span class="rkd-swatch {{ 'rkd-swatch-green' if loop.first else 'rkd-swatch-yellow' }}" aria-hidden="true"></span>
+            <span>
+                <span class="rkd-legend-label">{{ s.label }}</span><br>
+                <span class="rkd-legend-sub">{{ s.count }}{% if unit %} {{ unit }}{% endif %} · {{ s.pct }}%</span>
+            </span>
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+{% else %}
+{{ empty(empty_text) }}
+{% endif %}
+{%- endmacro %}
+
+{% macro date_badge(d) -%}
+<div class="rkd-date" aria-hidden="true">
+    <div class="rkd-date-mon">{{ d.strftime('%b') | upper }}</div>
+    <div class="rkd-date-day">{{ '%02d' % d.day }}</div>
+</div>
+{%- endmacro %}
+
+{# Stacked bar: segments = [(count, 'approved'|'submitted'|'scheduled'|'unscheduled', label), ...] #}
+{% macro stacked_bar(segments, total, label='Progress') -%}
+<div class="rkd-bar">
+    <svg role="img" aria-label="{{ label }}: {% for c, cls, text in segments %}{{ c }} {{ text }}{% if not loop.last %}, {% endif %}{% endfor %}"
+         preserveAspectRatio="none">
+        {% if total %}
+        {% set ns = namespace(x=0) %}
+        {% for c, cls, text in segments %}{% if c %}
+        {% set w = c * 100.0 / total %}
+        <rect x="{{ '%.3f' % ns.x }}%" y="0" width="{{ '%.3f' % w }}%" height="10" class="rkd-fill-{{ cls }}"></rect>
+        {% set ns.x = ns.x + w %}
+        {% endif %}{% endfor %}
+        {% endif %}
+    </svg>
+</div>
+{%- endmacro %}

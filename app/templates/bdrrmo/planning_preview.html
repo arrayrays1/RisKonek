@@ -1,0 +1,53 @@
+{% extends "admin/base.html" %}
+{% from "shared/_plan_preview.html" import plan_preview_styles, plan_preview %}
+
+{% block title %}Preview Plan — RisKonek{% endblock %}
+
+{% set active_nav = 'planning' %}
+
+{% block head_extra %}
+<style nonce="{{ request.state.csp_nonce }}">
+    #header { margin: 0; color: #167736; font-size: 40px;}
+</style>
+{{ plan_preview_styles(request.state.csp_nonce) }}
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start page-header">
+    <div>
+        <h1 id="header">Preview Plan</h1>
+        <p>Check <strong>{{ filename }}</strong> and its AI summary before extracting the activities.</p>
+    </div>
+</div>
+
+{% if error %}
+<div class="alert alert-danger alert-dismissible fade show">
+    <i class="bi bi-exclamation-triangle-fill me-1"></i>{{ error | replace('+', ' ') }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+{% if extraction_error %}
+<div class="alert alert-warning">
+    <strong>Extraction failed:</strong> {{ extraction_error }}<br>
+    You can still continue and encode the activities manually.
+</div>
+{% endif %}
+
+{% call plan_preview("/bdrrmo/planning/draft/" ~ draft_id ~ "/file", filename, ai_summary, ai_recommendation) %}
+    <form method="POST" action="/bdrrmo/planning/preview/{{ draft_id }}/cancel" class="d-inline"
+          data-confirm="Cancel this upload? The file will be discarded.">
+        <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+        <button type="submit" class="btn btn-outline-secondary btn-sm" id="cancel-upload-btn">
+            <i class="bi bi-x-circle"></i> Cancel upload
+        </button>
+    </form>
+    <form method="POST" action="/bdrrmo/planning/preview/{{ draft_id }}/extract" class="d-inline"
+          data-loading-text="Extracting activities…" data-loading-disable="#cancel-upload-btn">
+        <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+        <button type="submit" class="btn-rk btn-sm">
+            <i class="bi bi-arrow-right-circle"></i> Continue to activities
+        </button>
+    </form>
+{% endcall %}
+{% endblock %}

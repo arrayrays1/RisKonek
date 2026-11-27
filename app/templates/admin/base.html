@@ -42,7 +42,7 @@
 <!-- ── SIDEBAR ────────────────────────────────────────────────────── -->
 <div class="sidebar {{ 'sidebar-personnel' if not is_admin else '' }}" id="sidebar">
     <div class="sidebar-brand">
-        <div class="brand-icon"><img src="/static/img/RisKonek-Logo-v2.png" alt="RisKonek logo"></div>
+        <div class="brand-icon"><img src="/static/img/Riskonek-Logo-v2.png" alt="RisKonek logo"></div>
         <div class="brand-text">
             <div class="brand-name">Riskonek</div>
             <div class="brand-sub">{{ portal_label }}</div>
@@ -120,8 +120,8 @@
         {% if is_bdrrmo %}
             <a href="/bdrrmo/profile"
             class="nav-item-link {{ 'active' if active == 'bdrrmo_profile' else '' }}"
-            title="Disaster profile and planning priority for your barangay">
-                <i class="bi bi-geo-alt-fill nav-icon"></i><span class="nav-label">Barangay Profile</span>
+            title="Your barangay's plan, activities and reminders">
+                <i class="bi bi-geo-alt-fill nav-icon"></i><span class="nav-label">Dashboard</span>
             </a>
             <a href="/bdrrmo/facilities"
             class="nav-item-link {{ 'active' if active == 'bdrrmo_facilities' else '' }}"

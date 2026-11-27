@@ -710,7 +710,7 @@ class Activity(Base):
     )
 
     title = Column(String(255), nullable=False)
-    start_date = Column(Date, nullable=False)
+    start_date = Column(Date, nullable=True)  # optional; BDRRMO can set it later
     status = Column(Enum(ActivityStatus), default=ActivityStatus.pending)
     is_proof_submitted = Column(Boolean, default=False)
     reason = Column(Text, nullable=True)

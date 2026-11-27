@@ -11,7 +11,7 @@ import json
 import uuid
 import os
 import re
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 from io import BytesIO
 from app.database import get_db
 from app.models import (
@@ -20,15 +20,16 @@ from app.models import (
     UploadedReport, ReportStatus, FileType, LifecycleStatus, UploadEvent,
     add_upload_history, BarangayEquipment, EquipmentType,
     IncidentReport, ServiceabilityStatus, Resource, ResourceCategory, Equipment, 
-    EquipmentReport, EquipmentStatus, Planning, PlanningStatus, Activity, ActivityProof
+    EquipmentReport, EquipmentStatus, Planning, PlanningStatus, Activity, ActivityProof,
+    ActivityStatus,
 )
 from app.auth import require_role, require_barangay_access
 from app.utils.pagination import (
     paginate, parse_per_page, parse_page, build_base_query,
 )
-# Reuse Week 4 barangay-profile helpers so the BDRRMO profile renders the
-# exact same population / incident / facility / planning-priority data.
-from app.routes.admin import barangay_profile_context, _vulnerable_percent
+# Reuse the Week 4 barangay-profile helper for the population view.
+from app.routes.admin import _vulnerable_percent
+from app.services import plan_dashboard as pdash
 # Reuse the Week 6 / 8.1 ETL building blocks rather than rebuilding them —
 # the same upload validation, extraction, strict matcher and resolve-or-create
 # gateway used by the Admin medallion and CFAU post-incident paths.
@@ -170,50 +171,46 @@ def dashboard(request: Request):
 
 @router.get("/profile", response_class=HTMLResponse)
 def profile(request: Request, db: Session = Depends(get_db)):
+    """BDRRMO dashboard for the barangay's latest non-archived plan. Every
+    count comes from a small function in app/services/plan_dashboard.py."""
     user, barangay = _resolve_scope(request, db)
     if isinstance(user, RedirectResponse):
         return user
 
-    if not barangay:
-        return templates.TemplateResponse(
-            request=request,
-            name="bdrrmo/profile.html",
-            context={"user": user, "active_nav": "bdrrmo_profile", "barangay": None},
+    today = date.today()
+    context = {
+        "user": user,
+        "active_nav": "bdrrmo_profile",
+        "barangay": barangay,
+        "today": today,
+        "today_label": pdash.long_date(today),
+        "plan": None,
+    }
+
+    plan = pdash.latest_plan_for_barangay(db, barangay.id) if barangay else None
+    if plan:
+        activities = pdash.activities_for_plans(db, [plan.id])
+        rows = pdash.bdrrmo_activity_rows(
+            activities, plan, pdash.rescheduled_counts(db, [a.id for a in activities])
         )
-
-    barangay_id = user["barangay_id"]
-    
-
-    stmt = select(Planning).order_by(Planning.created_at.desc()).where(Planning.barangay_id == barangay_id,).limit(1)
-    latest_plan = db.scalars(stmt).first()
-
-    upcoming_activities = get_upcoming_activities(db, barangay_id)
-
-    upcoming_activities_number = len(upcoming_activities)
-
-    if latest_plan:
-        submitted_count, not_submitted_count, total = get_submitted_activities(db, latest_plan.id)
-        status = PLANNING_STATUS_LABELS.get(latest_plan.status.value, "-")
-        activities_chart = get_activity_status_summary(db, latest_plan.id)
-        accomplishments_chart = get_activity_accomplishment_summary(db, latest_plan.id)
-    else:
-        submitted_count = not_submitted_count = total = 0
-        status = "No plan uploaded yet"
-        activities_chart = {"pending": 0, "approved": 0, "rejected": 0}
-        accomplishments_chart = {"True": 0, "False": 0}
-    
-
-    context = barangay_profile_context(db, barangay)
-    context["user"] = user
-    context["active_nav"] = "bdrrmo_profile"
-    context["upcoming_activities"] = upcoming_activities
-    context["upcoming_activities_number"] = upcoming_activities_number
-    context["plan_status"] = status
-    context["activities_total"] = total
-    context["activities_submitted"] = submitted_count
-    context["activities_not_submitted"] = not_submitted_count
-    context["activities_data_chart"] = activities_chart
-    context["accomplishments_data_chart"] = accomplishments_chart
+        timing = pdash.bdrrmo_timing_pie(activities, today)
+        proofs = pdash.bdrrmo_proof_pie(activities)
+        # As before, the 7-day reminder only covers an approved plan.
+        upcoming = pdash.upcoming(activities, today) if pdash.plan_status(plan) == "approved" else []
+        context.update({
+            "plan": plan,
+            "plan_status": pdash.plan_status(plan),
+            "cards": pdash.activity_cards(activities),
+            "upcoming": upcoming,
+            "upcoming_end": today + timedelta(days=pdash.UPCOMING_DAYS - 1),
+            "timing": timing,
+            "proofs": proofs,
+            "attention": pdash.bdrrmo_attention(activities, plan),
+            "segments": pdash.progress_segments(activities),
+            "rows": rows,  # the table shows the first 8; modals cover all
+            # rendered with | tojson by shared/_pie_script.html
+            "pies": {"timingPie": timing["pie"], "proofPie": proofs["pie"]},
+        })
 
     return templates.TemplateResponse(
         request=request, name="bdrrmo/profile.html", context=context
@@ -3532,8 +3529,9 @@ async def planning_upload_submit(
             status_code=302,
         )
 
-    ai_json, extracted = planning_ai_activities_extraction(temp_path, stored_name)
-
+    # Read the PDF text once; the extract step reuses it from the draft.
+    extracted = planning_extract_text(temp_path, stored_name)
+    summary, recommendation = planning_draft_summary(extracted)
 
     save_temporary_draft(
         user_id=user['id'],
@@ -3541,11 +3539,139 @@ async def planning_upload_submit(
         file_path=temp_path,
         filename=original_name,
         extracted=extracted,
-        activities=(ai_json or {}).get("activities") or []
+        activities=[],
+        summary=summary,
+        recommendation=recommendation,
     )
 
     return RedirectResponse(
-        url=f"/bdrrmo/planning/review/{draft_id}", status_code=302
+        url=f"/bdrrmo/planning/preview/{draft_id}", status_code=302
+    )
+
+
+def _resolve_draft(request: Request, db: Session, draft_id: str):
+    """(user, barangay, draft) for a draft owned by the current BDRRMO.
+
+    Returns (RedirectResponse, None, None) when not authorised, no barangay is
+    assigned, or the draft is missing / belongs to someone else.
+    """
+    user, barangay = _resolve_scope(request, db)
+    if isinstance(user, RedirectResponse):
+        return user, None, None
+    if not barangay:
+        return RedirectResponse(
+            url="/bdrrmo/planning?error=No+barangay+is+assigned+to+your+account",
+            status_code=302,
+        ), None, None
+
+    draft = get_temporary_draft(draft_id, user_id=user["id"])
+    if not draft:
+        return RedirectResponse(
+            url="/bdrrmo/planning?error=Draft+not+found",
+            status_code=302,
+        ), None, None
+
+    return user, barangay, draft
+
+
+@router.get("/planning/preview/{draft_id}", response_class=HTMLResponse)
+def planning_preview(
+    draft_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    user, barangay, draft = _resolve_draft(request, db, draft_id)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    return templates.TemplateResponse(
+        request=request,
+        name="bdrrmo/planning_preview.html",
+        context={
+            "user": user,
+            "active_nav": "planning",
+            "barangay": barangay,
+            "draft_id": draft_id,
+            "filename": draft.get("filename"),
+            "ai_summary": draft.get("summary"),
+            "ai_recommendation": draft.get("recommendation"),
+            "extraction_error": (draft.get("extracted") or {}).get("error"),
+            "error": request.query_params.get("error"),
+        },
+    )
+
+
+@router.get("/planning/draft/{draft_id}/file")
+def planning_draft_file(
+    draft_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    user, _, draft = _resolve_draft(request, db, draft_id)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    pdf_path = os.path.join(TEMP_DIR, f"{draft_id}.pdf")
+    if not os.path.isfile(pdf_path):
+        return RedirectResponse(
+            url="/bdrrmo/planning?error=Draft+file+not+found",
+            status_code=302,
+        )
+
+    # Framed by the preview page; main.py allows same-origin framing for this path only.
+    return FileResponse(
+        pdf_path,
+        media_type="application/pdf",
+        filename=draft.get("filename") or "plan.pdf",
+        content_disposition_type="inline",
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+@router.post("/planning/preview/{draft_id}/extract")
+def planning_preview_extract(
+    draft_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    user, _, draft = _resolve_draft(request, db, draft_id)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    review_url = f"/bdrrmo/planning/review/{draft_id}"
+
+    # Already extracted (refresh / second click): no second AI call.
+    if draft.get("activities_extracted"):
+        return RedirectResponse(url=review_url, status_code=302)
+
+    ai_json, extracted = planning_ai_activities_extraction(draft.get("extracted"))
+
+    # The upload may have been cancelled while the AI call was running.
+    if not os.path.isfile(os.path.join(TEMP_DIR, f"{draft_id}.pdf")):
+        return RedirectResponse(url="/bdrrmo/planning?error=Draft+not+found", status_code=302)
+
+    draft["extracted"] = extracted
+    draft["activities"] = (ai_json or {}).get("activities") or []
+    draft["activities_extracted"] = True
+    _write_temporary_draft(draft)
+
+    return RedirectResponse(url=review_url, status_code=302)
+
+
+@router.post("/planning/preview/{draft_id}/cancel")
+def planning_preview_cancel(
+    draft_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    user, _, draft = _resolve_draft(request, db, draft_id)
+    if isinstance(user, RedirectResponse):
+        return user
+
+    delete_temporary_draft(draft_id)
+
+    return RedirectResponse(
+        url="/bdrrmo/planning?success=Upload+cancelled", status_code=302
     )
 
 @router.get("/planning/{document_id}/view")
@@ -3554,27 +3680,62 @@ async def view_document(
     request: Request,
     db: Session = Depends(get_db), 
 ):
-    user, _ = _resolve_scope(request, db)
+    user, barangay = _resolve_scope(request, db)
     if isinstance(user, RedirectResponse):
         return user
-    
-    # Retrieve the document from your database
-    document = db.query(Planning).filter(Planning.id == document_id).first()
+
+    # Only plans of the user's own barangay; checked before touching storage.
+    document = _get_planning_owned_upload(db, document_id, barangay)
 
     if not document:
-        return RedirectResponse(url="/bdrrmo/planning", status_code=302)
+        return RedirectResponse(url="/bdrrmo/planning?error=Plan+not+found", status_code=302)
 
     response = download_file(document.file_path)
 
+    # Uploads are stored without a content type; plans are PDFs, so say so —
+    # otherwise the browser downloads the file instead of showing it.
+    media_type = "application/pdf" if document.file_path.lower().endswith(".pdf") \
+        else response.get("ContentType", "application/octet-stream")
+
     return StreamingResponse(
         response["Body"],
-        media_type=response.get(
-            "ContentType",
-            "application/octet-stream"
-        ),
+        media_type=media_type,
         headers={
             "Content-Disposition": "inline"
         }
+    )
+
+@router.get("/planning/{planning_id}/details", response_class=HTMLResponse)
+def planning_details(
+    planning_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """The plan's PDF side by side with its AI summary and recommendations."""
+    user, barangay = _resolve_scope(request, db)
+    if isinstance(user, RedirectResponse):
+        return user
+    if not barangay:
+        return RedirectResponse(
+            url="/bdrrmo/planning?error=No+barangay+is+assigned+to+your+account",
+            status_code=302,
+        )
+
+    plan = _get_planning_owned_upload(db, planning_id, barangay)
+    if not plan:
+        return RedirectResponse(url="/bdrrmo/planning?error=Plan+not+found", status_code=302)
+
+    status_value = plan.status.value if plan.status else ""
+    return templates.TemplateResponse(
+        request=request,
+        name="bdrrmo/planning_view.html",
+        context={
+            "user": user,
+            "active_nav": "planning",
+            "barangay": barangay,
+            "plan": plan,
+            "status_label": PLANNING_STATUS_LABELS.get(status_value, "—"),
+        },
     )
 
 @router.post("/planning/{planning_id}/archive")
@@ -3583,12 +3744,12 @@ def planning_archive_toggle(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    user, _ = _resolve_scope(request, db)
+    user, barangay = _resolve_scope(request, db)
     if isinstance(user, RedirectResponse):
         return user
-    p = db.query(Planning).filter(Planning.id == planning_id).first()
+    p = _get_planning_owned_upload(db, planning_id, barangay)
     if not p:
-        return RedirectResponse(url="/bdrrmo/planning", status_code=302)
+        return RedirectResponse(url="/bdrrmo/planning?error=Plan+not+found", status_code=302)
 
     p.is_archived = not bool(p.is_archived)
     db.commit()
@@ -3603,23 +3764,25 @@ def planning_archive_toggle(
         else "/bdrrmo/planning?success=" + verb.title()
     return RedirectResponse(url=url, status_code=302)
 
-def _get_planning_owned_upload(db, planning_id, user):
-    """A BDRRMO incident upload the current user may act on (own only)."""
-    r = db.query(Planning).filter(Planning.id == planning_id).first()
-    if not r:
+def _get_planning_owned_upload(db, planning_id, barangay):
+    """A BDRRMO plan the current user may act on: any plan of their own
+    barangay (the `barangay` from _resolve_scope), matching the plan list and
+    the activity/proof routes. None when missing, not theirs, or no barangay."""
+    if not barangay:
         return None
-    if r.uploaded_by != user["id"]:
-        return None
-    return r
+    return db.query(Planning).filter(
+        Planning.id == planning_id,
+        Planning.barangay_id == barangay.id,
+    ).first()
 
 @router.get("/planning/{planning_id}/review", response_class=HTMLResponse)
 def planning_review(planning_id: int, request: Request, db: Session = Depends(get_db)):
     user, barangay = _resolve_scope(request, db)
     if isinstance(user, RedirectResponse):
         return user
-    plan = _get_planning_owned_upload(db, planning_id, user)
+    plan = _get_planning_owned_upload(db, planning_id, barangay)
     if not plan:
-        return RedirectResponse(url="/bdrrmo/planning", status_code=302)
+        return RedirectResponse(url="/bdrrmo/planning?error=Plan+not+found", status_code=302)
 
     data = plan.extracted_data or {}
 
@@ -3648,12 +3811,12 @@ def planning_review(
     summary_retry: Optional[bool] = False,
     db: Session = Depends(get_db)):
 
-    user, _ = _resolve_scope(request, db)
+    user, barangay = _resolve_scope(request, db)
     if isinstance(user, RedirectResponse):
         return user
-    p = _get_planning_owned_upload(db, planning_id, user)
+    p = _get_planning_owned_upload(db, planning_id, barangay)
     if not p:
-        return RedirectResponse(url="/bdrrmo/planning", status_code=302)
+        return RedirectResponse(url="/bdrrmo/planning?error=Plan+not+found", status_code=302)
 
     if(extract_retry):
     
@@ -3725,7 +3888,15 @@ class ActivitySchema(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     title: str
-    start_date: Optional[date]
+    start_date: Optional[date] = None
+
+    @field_validator("start_date", mode="before")
+    @classmethod
+    def blank_date_to_none(cls, v):
+        # A blank <input type="date"> is posted as "" — treat it as no date.
+        if isinstance(v, str) and not v.strip():
+            return None
+        return v
 
 
 class ActivityExtractionSchema(BaseModel):
@@ -3789,6 +3960,8 @@ async def save_confirmed_activities(
             status=PlanningStatus.pending,
             barangay_id=barangay.id,
             extracted_data=draft["extracted"],
+            summary=draft.get("summary"),
+            recommendation=draft.get("recommendation"),
         )
         db.add(planning)
         db.flush()
@@ -3873,20 +4046,15 @@ def get_activities(
             status_code=302,
         )
 
-    plan = _get_planning_owned_upload(db, plan_id, user)
+    plan = _get_planning_owned_upload(db, plan_id, barangay)
+    if not plan:
+        return RedirectResponse(url="/bdrrmo/planning?error=Plan+not+found", status_code=302)
 
-    query = (
-        select(Activity)
-        .join(Activity.planning)
-        .options(joinedload(Activity.planning))
-        .where(
-            Activity.planning_id == plan_id,
-            Activity.is_proof_submitted == False,
-        )
+    # All activities (finished ones too), by date with undated last.
+    activities = pdash.activities_for_plans(db, [plan.id])
+    rows = pdash.bdrrmo_activity_rows(
+        activities, plan, pdash.rescheduled_counts(db, [a.id for a in activities])
     )
-
-    activities = db.scalars(query).all()
-    
 
     return templates.TemplateResponse(
         request=request,
@@ -3896,9 +4064,102 @@ def get_activities(
             "active_nav": "planning",
             "barangay": barangay,
             "plan": plan,
-            "activities": activities
+            "rows": rows,
+            "today": date.today(),
+            "error": request.query_params.get("error"),
+            "success": request.query_params.get("success"),
         },
     )
+
+
+@router.post("/activities/{activity_id}/schedule")
+async def activity_schedule(
+    request: Request,
+    activity_id: int,
+    db: Session = Depends(get_db),
+    start_date: str = Form(""),
+    reason: str = Form(""),
+):
+    user, barangay = _resolve_scope(request, db)
+    if isinstance(user, RedirectResponse):
+        return user
+    if not barangay:
+        return RedirectResponse(
+            url="/bdrrmo/planning?error=No+barangay+is+assigned+to+your+account",
+            status_code=302,
+        )
+
+    a = (
+        db.query(Activity)
+        .join(Planning, Activity.planning_id == Planning.id)
+        .filter(Activity.id == activity_id, Planning.barangay_id == barangay.id)
+        .first()
+    )
+    if not a:
+        return RedirectResponse(url="/bdrrmo/planning?error=Activity+not+found", status_code=302)
+
+    back = f"/bdrrmo/planning/activities/{a.planning_id}"
+
+    if a.planning.status == PlanningStatus.rejected:
+        return RedirectResponse(
+            url=f"{back}?error=This+plan+was+returned.+Dates+can+no+longer+be+changed",
+            status_code=302,
+        )
+    if a.status == ActivityStatus.approved:
+        return RedirectResponse(
+            url=f"{back}?error=Proof+for+this+activity+is+already+approved",
+            status_code=302,
+        )
+
+    # Blank means "not yet scheduled".
+    new_date = None
+    if start_date.strip():
+        try:
+            new_date = date.fromisoformat(start_date.strip())
+        except ValueError:
+            return RedirectResponse(url=f"{back}?error=Invalid+date", status_code=302)
+
+    old_date = a.start_date
+    reason = reason.strip()
+
+    if new_date == old_date:
+        return RedirectResponse(url=f"{back}?error=The+date+was+not+changed", status_code=302)
+    if new_date and new_date < date.today():
+        return RedirectResponse(
+            url=f"{back}?error=The+date+cannot+be+earlier+than+today",
+            status_code=302,
+        )
+    # Changing an existing date needs a reason; setting one for the first time does not.
+    if old_date is not None and not reason:
+        return RedirectResponse(
+            url=f"{back}?error=A+reason+is+required+when+changing+the+date",
+            status_code=302,
+        )
+
+    try:
+        a.start_date = new_date
+
+        verb = "scheduled" if old_date is None else "rescheduled"
+        old_label = old_date.isoformat() if old_date else "not yet scheduled"
+        new_label = new_date.isoformat() if new_date else "not yet scheduled"
+        log_action(
+            db, user["id"], verb, "Activity", a.id,
+            f"Activity '{a.title}' {verb}: {old_label} -> {new_label}."
+            + (f" Reason: {reason}" if reason else ""),
+            reason=reason or None,
+        )  # log_action commits the date change together with the log entry
+
+        return RedirectResponse(
+            url=f"{back}?success=Activity+date+updated", status_code=302
+        )
+
+    except Exception as e:
+        print(e)
+        db.rollback()
+
+        return RedirectResponse(
+            url=f"{back}?error=Date+not+saved,+try+again", status_code=302
+        )
 
 @router.post("/activities/{activity_id}/submit")
 async def activity_proof_submit(
@@ -4082,7 +4343,9 @@ def planning_ai_summary(stored_path, file_name):
 
     return ai_json, extracted
 
-def planning_ai_activities_extraction(stored_path, file_name):
+def planning_extract_text(stored_path, file_name):
+    """Read the plan PDF once (page text + tables, the layout that the
+    Section VI finder needs). Returns {"raw_text", "error"}."""
     extracted = {
         "raw_text": "", "error": None,
     }
@@ -4093,16 +4356,38 @@ def planning_ai_activities_extraction(stored_path, file_name):
     except Exception as e:
         print(f"Extraction failed for plan '{file_name}': {e}")
         extracted["error"] = "Extraction failed. The file could not be read or was malformed."
+
+    return extracted
+
+def planning_draft_summary(extracted):
+    """(summary, recommendation) for a draft. Never raises; (None, None)
+    when the AI is unavailable, the call fails, or there is no text."""
+    raw_text = (extracted or {}).get("raw_text")
+    if not raw_text:
+        return None, None
+
+    try:
+        # Collapse layout padding so the AI sees more of the plan (same as the Admin path).
+        ai_json = ai_planning_summarize(re.sub(r"[ \t]+", " ", raw_text))
+    except Exception as e:
+        print(e)
+        ai_json = None
+
+    if not isinstance(ai_json, dict):
+        return None, None
+    return ai_json.get("summary") or None, ai_json.get("recommendation") or None
+
+def planning_ai_activities_extraction(extracted):
+    """Section VI + AI activity extraction on text already read by
+    planning_extract_text. Returns (ai_json, extracted); extracted["error"]
+    is set when the activities have to be encoded manually."""
+    extracted = dict(extracted or {"raw_text": "", "error": None})
+
+    if extracted.get("error"):
         return {"activities": []}, extracted
 
-
-    # Optional AI summary — never blocks the flow.
     ai_json = None
     if extracted.get("raw_text"):
-        pattern = r"\bVI\b[\s\.:]*(.*?)\bVII\b"
-
-        match = re.search(pattern, extracted.get("raw_text"), flags=re.DOTALL)
-
         section_text = find_ppa_section(extracted["raw_text"])
 
         if not section_text:
@@ -4141,31 +4426,45 @@ TEMP_DIR = os.path.join("uploads", "temp")
 def ensure_temp_directory(): 
     os.makedirs(TEMP_DIR, exist_ok=True)
     
-def save_temporary_draft( draft_id: str, file_path: str, filename: str, activities: list, user_id: int, extracted: json ) -> dict: 
-    ensure_temp_directory() 
-
-    draft_data = { 
-        "draft_id": draft_id, 
-        "file_path": file_path, 
-        "filename": filename, 
-        "user_id": user_id, 
+def save_temporary_draft(draft_id: str, file_path: str, filename: str, activities: list, user_id: int, extracted: json,
+                         summary: Optional[str] = None, recommendation: Optional[str] = None) -> dict:
+    draft_data = {
+        "draft_id": draft_id,
+        "file_path": file_path,
+        "filename": filename,
+        "user_id": user_id,
         "extracted": extracted,
-        "activities": [ 
-            activity.model_dump(mode="json") 
-            if hasattr(activity, "model_dump") 
-            else activity 
-            for activity in activities ], 
-        "created_at": datetime.now(timezone.utc).isoformat() } 
-    
-    draft_path = os.path.join(TEMP_DIR, f"{draft_id}.json") 
-    
-    with open(draft_path, "w", encoding="utf-8") as file: 
-        json.dump( draft_data, file, indent=4, ensure_ascii=False ) 
-    return draft_data 
+        "summary": summary,
+        "recommendation": recommendation,
+        "activities_extracted": False,
+        "activities": [
+            activity.model_dump(mode="json")
+            if hasattr(activity, "model_dump")
+            else activity
+            for activity in activities],
+        "created_at": datetime.now(timezone.utc).isoformat()}
+
+    return _write_temporary_draft(draft_data)
+
+def _write_temporary_draft(draft_data: dict) -> dict:
+    """Write (or overwrite) a draft's JSON metadata, keeping its created_at."""
+    ensure_temp_directory()
+
+    draft_path = os.path.join(TEMP_DIR, f"{draft_data['draft_id']}.json")
+
+    with open(draft_path, "w", encoding="utf-8") as file:
+        json.dump(draft_data, file, indent=4, ensure_ascii=False)
+    return draft_data
 
 def get_temporary_draft( draft_id: str, user_id: Optional[int] = None ) -> Optional[dict]: 
     ensure_temp_directory() 
-    
+
+    # Draft ids are uuid4s; anything else (e.g. path tricks) is not a draft.
+    try:
+        uuid.UUID(str(draft_id))
+    except ValueError:
+        return None
+
     draft_path = os.path.join(TEMP_DIR, f"{draft_id}.json")
     
     try: 
@@ -4186,8 +4485,9 @@ def delete_temporary_draft(draft_id: str) -> bool:
     draft_path = os.path.join(TEMP_DIR, f"{draft_id}.json")
     pdf_draft_path = os.path.join(TEMP_DIR, f"{draft_id}.pdf")
 
-    os.remove(draft_path)
-    os.remove(pdf_draft_path)
+    for path in (draft_path, pdf_draft_path):
+        if os.path.exists(path):
+            os.remove(path)
 
     return True
 
@@ -4253,89 +4553,6 @@ def extract_column_text(text, column_index=1):
             results.append(value)
 
     return "\n".join(results)
-
-def get_upcoming_activities(db, barangay_id):
-    today = date.today()
-    reminder_date = today + timedelta(days=7)
-
-    query = (
-        select(Activity)
-        .join(Activity.planning)
-        .options(joinedload(Activity.planning))
-        .where(
-            Activity.start_date >= today,
-            Activity.start_date <= reminder_date,
-            Planning.status == "approved",
-            Planning.barangay_id == barangay_id,
-        )
-        .order_by(Activity.start_date.asc())
-    )
-
-    return db.scalars(query).all()
-
-def get_submitted_activities(db, planning_id):
-
-    query = (
-        select(Activity)
-        .where(
-            Activity.planning_id == planning_id,
-        )
-    )
-
-    data = db.scalars(query).all()
-
-    submitted_count = 0
-    not_submitted_count = 0
-    total = len(data)
-
-    for item in data:
-        if item.is_proof_submitted == True:
-            submitted_count += 1
-        else:
-            not_submitted_count += 1
-
-    return submitted_count, not_submitted_count, total
-
-def get_activity_status_summary(db, planning_id=None):
-    stmt = (
-        select(
-            Activity.status,
-            func.count(Activity.id).label("total")
-        )
-        .group_by(Activity.status)
-    )
-
-    if planning_id:
-        stmt = stmt.where(Activity.planning_id == planning_id)
-
-    results = db.execute(stmt).all()
-
-    return {
-        "pending": 0,
-        "approved": 0,
-        "rejected": 0,
-        **{status: total for status, total in results}
-    }
-
-def get_activity_accomplishment_summary(db, planning_id=None):
-    stmt = (
-        select(
-            Activity.is_proof_submitted,
-            func.count(Activity.id).label("total")
-        )
-        .group_by(Activity.is_proof_submitted)
-    )
-
-    if planning_id:
-        stmt = stmt.where(Activity.planning_id == planning_id)
-
-    results = db.execute(stmt).all()
-
-    return {
-        "True": 0,
-        "False": 0,
-        **{is_proof_submitted: total for is_proof_submitted, total in results}
-    }
 
 def cleanup_expired_drafts(hours: int = 24):
 

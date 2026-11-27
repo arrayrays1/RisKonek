@@ -1,236 +1,232 @@
 {% extends "admin/base.html" %}
+{% from "shared/_dashboard.html" import fmt_date, pill, plan_pill, stat, empty, pie_block, date_badge, stacked_bar %}
 
 {% block title %}Dashboard — RisKonek{% endblock %}
 
-{% block head_extra %}
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-      integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous"/>
-<style nonce="{{ request.state.csp_nonce }}">
-    .brgy-item {
-        padding: 12px 0;
-        border-bottom: 1px solid #f0f0f0;
-    }
-    .brgy-item:last-child { border-bottom: none; }
-    .brgy-rank {
-        width: 24px; height: 24px; background: var(--rk-green);
-        border-radius: 50%; color: white; font-size: 11px;
-        font-weight: 700; display: flex; align-items: center;
-        justify-content: center; flex-shrink: 0;
-    }
-    .brgy-name { font-size: 14px; font-weight: 600; color: var(--rk-text); }
-    .brgy-sub { font-size: 11px; color: var(--rk-muted); }
-    .score-bar-track {
-        height: 6px; background: #f0f0f0; border-radius: 3px;
-        overflow: hidden; margin-top: 6px;
-    }
-    .score-bar-fill {
-        height: 100%; border-radius: 3px;
-        transition: width 0.6s ease;
-    }
-
-    .feed-item {
-        display: flex; gap: 12px; align-items: flex-start;
-        padding: 10px 0; border-bottom: 1px solid #f0f0f0;
-    }
-    .feed-item:last-child { border-bottom: none; }
-    .feed-icon {
-        width: 34px; height: 34px; border-radius: 50%;
-        display: flex; align-items: center; justify-content: center;
-        font-size: 14px; flex-shrink: 0;
-    }
-    .feed-text { font-size: 13px; color: var(--rk-text); }
-    .feed-time { font-size: 11px; color: #aaa; margin-top: 2px; }
-
-    #dashMap { height: 320px; border-radius: 8px; }
-
-    .prep-table th { font-size: 12px; color: var(--rk-muted); font-weight: 500; border: none; }
-    .prep-table td { font-size: 13px; vertical-align: middle; border-color: #f5f5f5; }
-
-    .alert-banner {
-        background: #fff8e1; border-left: 4px solid #ffc107;
-        border-radius: 6px; padding: 10px 14px;
-        font-size: 13px; color: #856404; margin-bottom: 16px;
-        display: flex; align-items: center; gap: 8px;
-    }
-</style>
-{% endblock %}
-
 {% set active_nav = 'analytics' %}
 
+{% block head_extra %}
+<link rel="stylesheet" href="/static/css/rk-dashboard.css">
+{% endblock %}
+
 {% block content %}
-<!-- Page header -->
-<div class="d-flex justify-content-between align-items-start page-header">
-    <div>
-        <h1 id="header">Analytics Overview Dashboard</h1>
+{% set pc = plan_cards %}
+
+<!-- ── 1. Header ──────────────────────────────────────────────── -->
+<div class="page-header">
+    <div class="rkd-eyebrow">CDRRMO · {{ today_label }}</div>
+    <h1 id="header">Dashboard</h1>
+</div>
+
+<!-- ── 2. Cards: plans per barangay (latest plan) + proofs ─────── -->
+<div class="row row-cols-1 row-cols-sm-2 row-cols-lg-4 g-3 mb-4">
+    <div class="col">
+        {{ stat('Plans approved', pc.approved ~ ' / ' ~ pc.total_barangays, 'green', 'check2-circle', 'barangays') }}
     </div>
-    <div class="last-updated">
-        Last updated<br>
-        <strong id="currentDateTime"></strong>
+    <div class="col">
+        {{ stat('Plans awaiting review', pc.pending, 'neutral', 'hourglass-split',
+                ('oldest: ' ~ pc.oldest_pending_days ~ (' day' if pc.oldest_pending_days == 1 else ' days')) if pc.oldest_pending_days is not none else 'none waiting') }}
+    </div>
+    <div class="col">
+        {{ stat('Plans returned', pc.returned, 'red', 'arrow-counterclockwise', 'waiting for revised upload') }}
+    </div>
+    <div class="col">
+        {# Same numbers as the "Accomplishment report review" chart (admin_proof_review). #}
+        {% set ar_total = proof_review.pending + proof_review.approved %}
+        {{ stat('Pending AR Review', proof_review.pending, 'amber', 'clipboard-check',
+                (proof_review.approved ~ ' of ' ~ ar_total ~ ' Reviewed') if ar_total else 'No reports submitted yet') }}
     </div>
 </div>
 
-<!-- ── STAT CARDS ─────────────────────────────────────────────── -->
 <div class="row g-3 mb-4">
+    <!-- ── 4. Plans pie ───────────────────────────────────────── -->
+    <div class="col-lg-6">
+        <div class="rkd-card">
+            <h2 class="rkd-card-title">Barangays with submitted BDRRM Plans</h2>
+            <p class="rkd-card-note">
+                Latest plan per barangay: {{ plan_pie.pie.total }} approved or pending ·
+                {{ pc.returned }} returned and {{ pc.no_plan }} not submitted are not shown
+            </p>
+            {{ pie_block('plansPie', plan_pie.pie, 'barangays') }}
 
-    <div class="col-md-3">
-        <div class="stat-card">
-            <div class="d-flex justify-content-between align-items-start">
-                <div class="stat-label">Total Barangays</div>
-            </div>
-            <div class="stat-value rk-text-ok">{{ total_barangays }}</div>
-            <div class="stat-change text-muted">
-                City of San Pedro
-            </div>
-        </div>
-    </div>
-
-    <div class="col-md-3">
-        <div class="stat-card">
-            <div class="d-flex justify-content-between align-items-start">
-                <div class="stat-label">Submitted BDRRM Plan</div>
-            </div>
-            <div class="stat-value">{{ barangays_with_planning }}</div>
-            <div class="stat-change text-muted">
-                Barangays
-            </div>
-        </div>
-    </div>
-
-    <div class="col-md-3">
-        <div class="stat-card">
-            <div class="d-flex justify-content-between align-items-start">
-                <div class="stat-label">Reviewed BDDRM Plan</div>
-            </div>
-            <div class="stat-value">{{ reviewed_plans }}</div>
-        </div>
-    </div>
-
-    <div class="col-md-3">
-        <div class="stat-card">
-            <div class="d-flex justify-content-between align-items-start">
-                <div class="stat-label">Pending AR Review</div>
-            </div>
-            <div class="stat-value {{ 'rk-text-crit' if active_alerts > 0 else 'rk-text-ok' }}">
-                {{ pending_activities }}
-            </div>
-            <div class="stat-change text-muted">
-                {{reviewed_activities}} of {{ activities}} reviewed
-            </div>
-        </div>
-    </div>
-
-</div>
-
-<div class="row g-3 mb-4">
-
-    <div class="col-md-6">
-        <div class="dash-card">
-            <div class="card-title-row">
-                <i class="bi bi-pie-chart-fill rk-text-info"></i>
-                <h6>Barangays with submitted BDRRM Plans</h6>
-            </div>
-            <canvas id="plansChart" height="180"></canvas>
-        </div>
-    </div>
-
-    <div class="col-md-6">
-        <div class="dash-card">
-            <div class="card-title-row">
-                <i class="bi bi-pie-chart-fill rk-text-green"></i>
-                <h6>Accomplishment Report Review</h6>
-            </div>
-            <canvas id="accomplishmentsChart" height="180"></canvas>
-        </div>
-    </div>
-
-</div>
-
-<!-- ── ROW 2: Insights feed + Mini map ────────────────────────── -->
-<div class="row g-3 mb-4">
-
-    <div class="col-md-12">
-        <div class="dash-card">
-            <div class="card-title-row">
-                <i class="bi bi-bell text-warning"></i>
-                <h6>Insights & Latest Updates</h6>
-            </div>
-
-            {% if recent_logs %}
-                {% for log in recent_logs %}
-                {% set fa = log.action if log.action in ['created','updated','deleted','deactivated','login'] else 'default' %}
-                <div class="feed-item">
-                    <div class="feed-icon feed-{{ fa }}">
-                        {% if log.action == 'created' %}<i class="bi bi-check-circle-fill"></i>
-                        {% elif log.action == 'updated' %}<i class="bi bi-pencil-fill"></i>
-                        {% elif log.action == 'deleted' %}<i class="bi bi-trash-fill"></i>
-                        {% elif log.action == 'deactivated' %}<i class="bi bi-slash-circle-fill"></i>
-                        {% elif log.action == 'login' %}<i class="bi bi-person-fill"></i>
-                        {% elif log.action == 'logout' %}<i class="bi bi-box-arrow-right"></i>
-                        {% elif log.action == 'activated' %}<i class="bi bi-check-circle-fill"></i>
-                        {% else %}<i class="bi bi-file-text-fill"></i>{% endif %}
-                    </div>
-                    <div>
-                        <div class="feed-text">{{ log.description }}</div>
-                        <div class="feed-time">
-                            {{ log.timestamp | pht if log.timestamp else 'Just now' }}
-                        </div>
-                    </div>
+            {% if plan_pie.rows %}
+            <div class="rkd-rows">
+                <div class="rkd-row rkd-row-head"><span>Barangay</span><span>Status</span></div>
+                {% for r in plan_pie.rows %}
+                <div class="rkd-row">
+                    <span>{{ r.barangay }}</span>
+                    <span class="d-flex align-items-center gap-2">
+                        {{ plan_pill(r.status) }}
+                        <a href="/admin/planning/activities/{{ r.plan_id }}" class="rkd-icon-link"
+                           aria-label="View activities of {{ r.barangay }}'s plan"><i class="bi bi-eye" aria-hidden="true"></i></a>
+                    </span>
                 </div>
                 {% endfor %}
-            {% else %}
-                <div class="text-center text-muted py-4 rk-fs-13">
-                    No recent activity yet. Actions taken in the system will appear here.
+            </div>
+            {% endif %}
+            <a href="/admin/planning" class="rkd-link d-inline-block mt-2">View all plans</a>
+        </div>
+    </div>
+
+    <!-- ── 5. Proof review pie ────────────────────────────────── -->
+    <div class="col-lg-6">
+        <div class="rkd-card">
+            <h2 class="rkd-card-title">Accomplishment report review</h2>
+            <p class="rkd-card-note">
+                {{ proof_review.pie.total }} proofs submitted for activities of approved plans · returned proofs are not counted
+            </p>
+            {{ pie_block('proofsPie', proof_review.pie, 'reports', 'Nothing to review') }}
+
+            {% if proof_review.rows %}
+            <div class="rkd-rows">
+                <div class="rkd-row rkd-row-head"><span>Barangay</span><span>Status</span></div>
+                {% for r in proof_review.rows %}
+                <div class="rkd-row">
+                    <span>{{ r.barangay }}</span>
+                    <span class="d-flex align-items-center gap-2">
+                        {% if r.pending %}
+                        {{ pill('pending', r.pending ~ ' pending · ' ~ r.approved ~ '/' ~ r.submitted ~ ' approved') }}
+                        {% else %}
+                        {{ pill('approved', r.approved ~ '/' ~ r.submitted ~ ' approved') }}
+                        {% endif %}
+                        <a href="/admin/planning/activities/{{ r.plan_id }}" class="rkd-icon-link"
+                           aria-label="Review {{ r.barangay }}'s proofs"><i class="bi bi-eye" aria-hidden="true"></i></a>
+                    </span>
                 </div>
+                {% endfor %}
+            </div>
+            <a href="/admin/planning?status=approved" class="rkd-link d-inline-block mt-2">View all {{ proof_review.total_rows }} barangays</a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <!-- ── 6. Progress by barangay ────────────────────────────── -->
+    <div class="col-lg-7">
+        <div class="rkd-card">
+            <div class="rkd-card-head">
+                <div>
+                    <h2 class="rkd-card-title">Activity progress by barangay</h2>
+                    <p class="rkd-card-note mb-2">Barangays with an approved plan · "N of M" = done or scheduled, of all activities</p>
+                </div>
+                {% if progress | length > 6 %}
+                <a class="rkd-link" data-bs-toggle="collapse" href="#progressMore" role="button"
+                   aria-expanded="false" aria-controls="progressMore">All {{ progress | length }} barangays</a>
+                {% endif %}
+            </div>
+            {% if progress %}
+            <div class="rkd-bar-legend mb-2">
+                <span><span class="rkd-key rkd-key-approved"></span>Done (proof approved)</span>
+                <span><span class="rkd-key rkd-key-scheduled"></span>Scheduled</span>
+                <span><span class="rkd-key rkd-key-unscheduled"></span>Not yet scheduled</span>
+            </div>
+            {% macro progress_row(r) %}
+            <div class="rkd-progress-row">
+                <span class="rkd-progress-name" title="{{ r.barangay }}">{{ r.barangay }}</span>
+                {{ stacked_bar([(r.done, 'approved', 'done'), (r.scheduled, 'scheduled', 'scheduled'), (r.unscheduled, 'unscheduled', 'not yet scheduled')], r.total, r.barangay) }}
+                <span class="rkd-progress-n">{{ r.with_date_or_done }} of {{ r.total }}</span>
+            </div>
+            {% endmacro %}
+            {% for r in progress[:6] %}{{ progress_row(r) }}{% endfor %}
+            {% if progress | length > 6 %}
+            <div class="collapse" id="progressMore">
+                {% for r in progress[6:] %}{{ progress_row(r) }}{% endfor %}
+            </div>
+            {% endif %}
+            {% else %}
+            {{ empty('No approved plans yet') }}
             {% endif %}
         </div>
     </div>
 
+    <!-- ── 7. Upcoming ────────────────────────────────────────── -->
+    <div class="col-lg-5">
+        <div class="rkd-card">
+            <h2 class="rkd-card-title">Upcoming in the next 7 days</h2>
+            <p class="rkd-card-note">{{ fmt_date(today) }} – {{ fmt_date(upcoming_end) }} · all barangays</p>
+            {% for u in upcoming[:8] %}
+            <div class="rkd-upcoming">
+                {{ date_badge(u.date) }}
+                <div>
+                    <div class="rkd-upcoming-title">{{ u.activity.title }}</div>
+                    <div class="rkd-upcoming-sub">{{ u.activity.planning.barangay.name if u.activity.planning.barangay else '—' }} · {{ u.in_days }}</div>
+                </div>
+            </div>
+            {% else %}
+            {{ empty('No activities in the next 7 days', 'calendar') }}
+            {% endfor %}
+            {% if upcoming | length > 8 %}
+            <div class="small text-muted mt-2">and {{ upcoming | length - 8 }} more</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <!-- ── 8. Needs your review ───────────────────────────────── -->
+    <div class="col-lg-7">
+        <div class="rkd-card">
+            <h2 class="rkd-card-title">Needs your review</h2>
+            <p class="rkd-card-note">
+                Pending plans and proofs awaiting review, oldest first{% if needs_review.total > needs_review.rows | length %} · showing {{ needs_review.rows | length }} of {{ needs_review.total }}{% endif %}
+            </p>
+            {% if needs_review.rows %}
+            <div class="table-responsive">
+                <table class="rkd-table">
+                    <thead>
+                        <tr><th>Barangay</th><th>Item</th><th>Submitted</th><th>Status</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                        {% for i in needs_review.rows %}
+                        <tr>
+                            <td>{{ i.barangay }}</td>
+                            <td>{{ i.item }}</td>
+                            <td class="text-nowrap">{{ fmt_date(i.submitted) or '—' }}</td>
+                            <td>{{ pill(i.pill_class, i.pill) }}</td>
+                            <td class="text-end"><a href="{{ i.url }}" class="rkd-link">Review</a></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            {{ empty('Nothing to review', 'check2-circle') }}
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- ── 9. Recent date changes ─────────────────────────────── -->
+    <div class="col-lg-5">
+        <div class="rkd-card">
+            <div class="rkd-card-head">
+                <h2 class="rkd-card-title">Recent date changes</h2>
+                <span class="small text-muted">View only</span>
+            </div>
+            <p class="rkd-card-note">Set by BDRRMOs. No approval needed.</p>
+            {% for c in date_changes %}
+            <div class="rkd-row d-block">
+                <div class="fw-semibold">{{ c.title }}</div>
+                <div class="small text-muted">
+                    {{ c.barangay }} ·
+                    {% if c.rescheduled %}rescheduled {{ c.rescheduled }}x{% else %}date set{% endif %}
+                </div>
+                <div class="small fw-semibold">
+                    <span class="rkd-val-amber">{{ fmt_date(c.old) if c.old else 'Not yet scheduled' }}</span>
+                    →
+                    <span class="rkd-val-green">{{ fmt_date(c.new) if c.new else 'Not yet scheduled' }}</span>
+                </div>
+                {% if c.reason %}<div class="small text-muted">Reason: {{ c.reason }}</div>{% endif %}
+            </div>
+            {% else %}
+            {{ empty('No date changes yet', 'calendar') }}
+            {% endfor %}
+            <a href="/admin/audit?q=scheduled%3A" class="rkd-link d-inline-block mt-2">View all history</a>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"
-        integrity="sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4" crossorigin="anonymous"></script>
-<script nonce="{{ request.state.csp_nonce }}">
-// ── Current date/time ─────────────────────────────────────────────
-const plansData = {{ plans_data_chart | safe }}
-new Chart(document.getElementById('plansChart'), {
-    type: 'pie',
-    data: {
-        labels: Object.keys(plansData).map(k => k.charAt(0).toUpperCase() + k.slice(1)),
-        datasets: [{
-            label: 'Count',
-            data: Object.values(plansData),
-            backgroundColor: [
-                '#3498db','#e74c3c','#f39c12'
-            ],
-        }]
-    },
-    options: {
-        responsive: true,
-        plugins: { legend: { display: false } },
-    }
-});
-
-// ── Trend line chart ─────────────────────────────────────────────
-const accomplishmentsData = {{ accomplishments_data_chart | safe }}
-new Chart(document.getElementById('accomplishmentsChart'), {
-    type: 'pie',
-    data: {
-        labels:Object.keys(accomplishmentsData).map(k => k.charAt(0).toUpperCase() + k.slice(1)),
-        datasets: [{
-            label: 'Activities',
-            data: Object.values(accomplishmentsData),
-            backgroundColor: [
-                '#3498db','#e74c3c','#f39c12'
-            ],
-        }]
-    },
-    options: {
-        responsive: true,
-        plugins: { legend: { display: false } },
-    }
-});
-
-</script>
+{% include "shared/_pie_script.html" %}
 {% endblock %}

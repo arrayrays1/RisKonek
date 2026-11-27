@@ -1,0 +1,38 @@
+{% extends "admin/base.html" %}
+{% from "shared/_plan_preview.html" import plan_preview_styles, plan_preview %}
+
+{% block title %}View Plan — RisKonek{% endblock %}
+
+{% set active_nav = 'planning' %}
+
+{% block head_extra %}
+<style nonce="{{ request.state.csp_nonce }}">
+    #header { margin: 0; color: #167736; font-size: 40px;}
+</style>
+{{ plan_preview_styles(request.state.csp_nonce) }}
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start page-header">
+    <div>
+        <h1 id="header">View Plan</h1>
+        <p>
+            <strong>{{ plan.file_name }}</strong>
+            · {{ plan.barangay.name if plan.barangay else '—' }}
+            · {{ status_label }}
+            · uploaded {{ plan.created_at | pht }}
+        </p>
+    </div>
+    <a href="/admin/planning" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Back
+    </a>
+</div>
+
+{% call plan_preview("/admin/planning/" ~ plan.id ~ "/view", plan.file_name,
+                     plan.summary, plan.recommendation,
+                     "No AI summary is available for this plan yet.") %}
+    <a href="/admin/planning/activities/{{ plan.id }}" class="btn-rk btn-sm">
+        <i class="bi bi-list-check"></i> View Activities
+    </a>
+{% endcall %}
+{% endblock %}

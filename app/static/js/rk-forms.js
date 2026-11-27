@@ -303,4 +303,60 @@
     }
     document.addEventListener("input", liveRevalidate);
     document.addEventListener("change", liveRevalidate);
+
+    // ── Loading state for slow submits ─────────────────────────────────────
+    //
+    //   <form data-loading-text="Saving…">            → disable the submit
+    //        data-loading-disable="#other-btn"           button(s), show a
+    //                                                    spinner + the text,
+    //                                                    and optionally disable
+    //                                                    other controls too
+    //
+    // Deferred with setTimeout so the confirm / validation handlers above have
+    // already run: a cancelled or invalid submit never shows the spinner. A
+    // second submit while the first is in flight is swallowed.
+    document.addEventListener("submit", function (e) {
+        var form = e.target;
+        if (!form || !form.matches || !form.matches("form[data-loading-text]")) return;
+        if (form.getAttribute("data-submitting") === "1") {
+            e.preventDefault();
+            return;
+        }
+        var submitter = e.submitter || form.querySelector('button[type="submit"]');
+        setTimeout(function () {
+            if (e.defaultPrevented) return;
+            form.setAttribute("data-submitting", "1");
+            var targets = Array.prototype.slice.call(
+                form.querySelectorAll('button[type="submit"], input[type="submit"]'));
+            var extra = form.getAttribute("data-loading-disable");
+            if (extra) {
+                targets = targets.concat(Array.prototype.slice.call(document.querySelectorAll(extra)));
+            }
+            targets.forEach(function (el) {
+                el.setAttribute("data-original-html", el.innerHTML);
+                el.disabled = true;
+            });
+            if (submitter && submitter.tagName === "BUTTON") {
+                var spinner = document.createElement("span");
+                spinner.className = "spinner-border spinner-border-sm me-1";
+                spinner.setAttribute("aria-hidden", "true");
+                submitter.textContent = " " + form.getAttribute("data-loading-text");
+                submitter.insertBefore(spinner, submitter.firstChild);
+            }
+        }, 0);
+    });
+
+    // Coming back via the browser's back button can restore the page from the
+    // back/forward cache with the buttons still disabled; reset them.
+    window.addEventListener("pageshow", function (e) {
+        if (!e.persisted) return;
+        document.querySelectorAll('form[data-submitting="1"]').forEach(function (form) {
+            form.removeAttribute("data-submitting");
+        });
+        document.querySelectorAll("[data-original-html]").forEach(function (el) {
+            el.innerHTML = el.getAttribute("data-original-html");
+            el.removeAttribute("data-original-html");
+            el.disabled = false;
+        });
+    });
 })();

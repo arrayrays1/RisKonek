@@ -1,26 +1,25 @@
 {% extends "admin/base.html" %}
+{% from "shared/_dashboard.html" import fmt_date, pill, plan_pill, empty %}
 
 {% block title %}Activities — RisKonek{% endblock %}
 
 {% set active_nav = 'planning' %}
 
-{% macro status_pill(v, label) -%}
-    {% if v == 'approved' %}
-        <span class="status-pill status-operational">{{ label }}</span>
-    {% elif v == 'pending' %}
-        <span class="status-pill status-maintenance">{{ label }}</span>
-    {% elif v in 'rejected' %}
-        <span class="status-pill status-unavailable">{{ label }}</span>
-    {% else %}
-        <span class="badge bg-light text-dark border">{{ label }}</span>
-    {% endif %}
-{%- endmacro %}
+{% block head_extra %}
+<link rel="stylesheet" href="/static/css/rk-dashboard.css">
+<style nonce="{{ request.state.csp_nonce }}">
+    #header { margin: 0; color: #167736; font-size: 40px;}
+</style>
+{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-start page-header">
     <div>
         <h1 id="header">Activities</h1>
-        <p>Activities from <strong>{{ plan.file_name }}</strong>.</p>
+        <p class="mb-1">
+            Activities from <strong>{{ plan.file_name }}</strong>{% if plan.barangay %} · {{ plan.barangay.name }}{% endif %}.
+        </p>
+        {{ plan_pill(plan.status.value if plan.status else 'pending') }}
     </div>
     <a href="/admin/planning" class="btn btn-outline-secondary">
         <i class="bi bi-arrow-left"></i> Back
@@ -34,77 +33,82 @@
 </div>
 {% endif %}
 
-{% if extraction_error %}
-<div class="alert alert-warning">
-    <strong>Extraction failed:</strong> {{ extraction_error }}<br>
-    The file was stored, but no content could be extracted.
-</div>
-{% endif %}
-
-
-<div id="input-container" class="container">
-    {% for activity in activities %}
-
-    <div class="row mb-2">
-      
-        <div class="form-control col-lg">{{ activity.title }}</div>
-        <div class="form-control col-lg">{{ activity.start_date}}</div>
-
-        <div class="m-1 col-sm-2">
-        {% if activity.is_proof_submitted %}
-            <a
-              href="/admin/activities/{{ activity.id }}/proof"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="btn btn-outline-primary btn-sm"
-            >
-              <i class="bi bi-eye"></i>
-              View Proof
-            </a>
-            <button type="button" class="btn-soft rk-text-ok mt-1"
-                data-bs-toggle="modal" data-bs-target="#changeStatusModal-{{ activity.id }}">
-                <i class="bi bi-plus-slash-minus"></i> Change Status
-            </button>
-        {% else %}
-            <button type="button" disabled class="remove-btn btn btn-outline-secondary btn-sm">
-            Proof not yet submitted
-            </button> 
-        {% endif %}
-        </div>
-
-
+<div class="rkd-card">
+    {% if rows %}
+    <div class="table-responsive">
+        <table class="rkd-table">
+            <thead>
+                <tr>
+                    <th>Activity (PPA)</th>
+                    <th>Date</th>
+                    <th>Proof</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                {% set a = row.activity %}
+                <tr>
+                    <td>{{ a.title }}</td>
+                    <td>
+                        {% if a.start_date %}{{ fmt_date(a.start_date) }}{% else %}<span class="rkd-unscheduled">Not yet scheduled</span>{% endif %}
+                    </td>
+                    <td>
+                        {{ pill(row.state, row.label) }}
+                        {% if row.state == 'returned' and a.reason %}
+                        <div class="small text-muted mt-1">"{{ a.reason }}"</div>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="rkd-actions">
+                            {% if row.has_proof %}
+                            <a href="/admin/activities/{{ a.id }}/proof" target="_blank" rel="noopener noreferrer"
+                               class="btn btn-outline-primary btn-sm">
+                                <i class="bi bi-eye" aria-hidden="true"></i> View proof
+                            </a>
+                            {% endif %}
+                            {% if row.can_review %}
+                            <button type="button" class="btn btn-success btn-sm"
+                                    data-bs-toggle="modal" data-bs-target="#changeStatusModal-{{ a.id }}">
+                                Approve / Return
+                            </button>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
-
-    {% endfor %}
-
+    {% else %}
+    {{ empty('No activities in this plan yet') }}
+    {% endif %}
 </div>
 
-{% for activity in activities %}
-
-<div class="modal fade" id="changeStatusModal-{{ activity.id }}" tabindex="-1" aria-hidden="true">
+{% for row in rows if row.can_review %}
+{% set a = row.activity %}
+<div class="modal fade" id="changeStatusModal-{{ a.id }}" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog">
-    <form method="POST" action="/admin/activities/{{ activity.id }}/status" class="modal-content" data-validate>
+    <form method="POST" action="/admin/activities/{{ a.id }}/status" class="modal-content" data-validate>
         <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
       <div class="modal-header">
-        <h6 class="modal-title">Status change</h6>
+        <h6 class="modal-title">Review proof</h6>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-        <div class="mb-2 small text-muted">
-            Current status: {{ status_pill(activity.status_value, activity.status_label) }}
-        </div>
+        <p class="small mb-2"><strong>{{ a.title }}</strong> · {{ pill(row.state, row.label) }}</p>
         <div class="row g-2">
           <div class="col-12">
-            <label class="form-label small">Status</label>
-            <select name="status" class="form-select form-select-sm status-select" required>
+            <label class="form-label small" for="status-{{ a.id }}">Decision</label>
+            <select name="status" id="status-{{ a.id }}" class="form-select form-select-sm status-select" required>
               <option value="approved">Approve</option>
-              <option value="rejected">Reject</option>
+              <option value="rejected">Return (re-upload needed)</option>
             </select>
           </div>
         </div>
         <div class="mt-2 reason-field" data-show-when="rejected" hidden>
-          <label class="form-label small">Reason <span class="text-danger">*</span></label>
-          <input type="text" name="reason" class="form-control form-control-sm reason-input"
+          <label class="form-label small" for="reason-{{ a.id }}">Reason <span class="text-danger">*</span></label>
+          <input type="text" name="reason" id="reason-{{ a.id }}" class="form-control form-control-sm reason-input"
                  placeholder="e.g. incomplete">
         </div>
       </div>
@@ -120,31 +124,20 @@
 <script nonce="{{ request.state.csp_nonce }}">
 document.querySelectorAll(".status-select").forEach((select) => {
     function toggleFields() {
-        // Find conditional fields associated with this select.
         const form = select.closest("form") || document;
-
         form.querySelectorAll(".reason-field").forEach((field) => {
             const shouldShow = select.value === field.dataset.showWhen;
-
             field.hidden = !shouldShow;
-
             const input = field.querySelector(".reason-input");
-
             if (input) {
                 input.required = shouldShow;
-
-                if (!shouldShow) {
-                    input.value = "";
-                }
+                if (!shouldShow) input.value = "";
             }
         });
     }
-
     select.addEventListener("change", toggleFields);
-
-    // Set the initial visibility.
     toggleFields();
-}); // Handle an initially selected value when editing a record. toggleOtherField();
+});
 </script>
 
 {% endblock %}

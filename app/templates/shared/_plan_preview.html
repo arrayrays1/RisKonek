@@ -1,0 +1,98 @@
+{#
+  Side-by-side plan preview: the PDF in a same-origin iframe on the left, the
+  AI summary and recommendations on the right. Used by the BDRRMO upload
+  preview (draft) and the Admin / BDRRMO "View" page of a saved plan.
+
+  {% from "shared/_plan_preview.html" import plan_preview_styles, plan_preview %}
+  {% block head_extra %}{{ plan_preview_styles(request.state.csp_nonce) }}{% endblock %}
+  {% call plan_preview(file_url, filename, summary, recommendation, empty_text) %}
+      …action buttons, shown under the cards…
+  {% endcall %}
+
+  file_url must be a route main.py allows to be framed (_SAME_ORIGIN_FRAMEABLE).
+#}
+
+{% macro plan_preview_styles(nonce) %}
+<style nonce="{{ nonce }}">
+    .plan-preview-frame { width: 100%; height: 70vh; border: 1px solid #dee2e6; border-radius: 6px; }
+
+    /* AI cards: tinted header band, body scrolls inside the card. */
+    .ai-card { padding: 0; height: auto; overflow: hidden; display: flex; flex-direction: column; }
+    .ai-card .card-title-row { margin: 0; padding: .6rem 1rem; border-bottom: 1px solid #dee2e6; }
+    .ai-card-summary .card-title-row { background: #e3f5e8; }
+    .ai-card-reco .card-title-row { background: #fdf8d8; }
+    .ai-card-body { padding: .75rem 1rem; overflow-y: auto; }
+
+    /* Desktop: fit the whole preview in one screen, no long scroll. */
+    @media (min-width: 992px) {
+        .preview-pane { height: calc(100vh - 220px); min-height: 420px; }
+        .preview-pane .pdf-card { height: 100%; display: flex; flex-direction: column; }
+        .preview-pane .plan-preview-frame { flex: 1 1 auto; height: auto; min-height: 0; }
+        .preview-side { display: flex; flex-direction: column; gap: 1rem; }
+        .preview-side .ai-card { flex: 1 1 0; min-height: 0; margin: 0 !important; }
+        .preview-side .ai-card-body { flex: 1 1 auto; min-height: 0; }
+    }
+</style>
+{% endmacro %}
+
+{% macro plan_preview(file_url, filename, summary, recommendation,
+                      empty_text="AI summary is unavailable right now. You can still continue.") %}
+<div class="row g-3">
+    <!-- ── Uploaded PDF ───────────────────────────────────────────── -->
+    <div class="col-lg-7 preview-pane">
+        <div class="dash-card pdf-card">
+            <div class="card-title-row">
+                <i class="bi bi-file-earmark-pdf"></i>
+                <h6>Uploaded Plan</h6>
+            </div>
+            <iframe src="{{ file_url }}"
+                    class="plan-preview-frame"
+                    title="Uploaded plan: {{ filename }}"></iframe>
+            <div class="form-text">
+                PDF not showing?
+                <a href="{{ file_url }}" target="_blank" rel="noopener noreferrer">Open it in a new tab</a>.
+            </div>
+        </div>
+    </div>
+
+    <!-- ── AI summary & recommendations ───────────────────────────── -->
+    <div class="col-lg-5 preview-pane preview-side">
+        <div class="dash-card ai-card ai-card-summary mb-3">
+            <div class="card-title-row">
+                <i class="bi bi-robot"></i>
+                <h6>AI summary</h6>
+            </div>
+            <div class="ai-card-body">
+                {% if summary %}
+                    <p class="mb-0 rk-pre-line">{{ summary }}</p>
+                {% else %}
+                    <p class="text-muted mb-0 small">{{ empty_text }}</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="dash-card ai-card ai-card-reco mb-3">
+            <div class="card-title-row">
+                <i class="bi bi-robot"></i>
+                <h6>Recommendations</h6>
+            </div>
+            <div class="ai-card-body">
+                <p class="text-muted small">
+                    (These are intended for informational purposes only, and their implementation remains solely at your discretion.)
+                </p>
+                {% if recommendation %}
+                    <p class="mb-0 rk-pre-line">{{ recommendation }}</p>
+                {% else %}
+                    <p class="text-muted mb-0 small">{{ empty_text }}</p>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if caller is defined %}
+        <div class="d-flex justify-content-end gap-2">
+            {{ caller() }}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endmacro %}

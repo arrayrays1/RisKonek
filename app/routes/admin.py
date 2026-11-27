@@ -14,6 +14,7 @@ from app.models import (
     Activity, ActivityProof
 )
 from app.etl.extract_pdf import extract_pdf
+from app.services import plan_dashboard as pdash
 from app.etl.ai_pipeline import summarize_planning as ai_summarize
 from app.auth import require_role, hash_password
 from app.analytics.simulator import compute_risk_score
@@ -68,164 +69,41 @@ templates.env.filters['pht'] = _to_pht
 
 @router.get("/dashboard", response_class=HTMLResponse)
 def dashboard(request: Request, db: Session = Depends(get_db)):
+    """Plans and activities across all barangays. Every count comes from a
+    small function in app/services/plan_dashboard.py. A barangay counts once,
+    through its latest non-archived plan; activity figures cover the
+    activities of those plans that are approved."""
     user = require_role(request, ["admin"])
     if isinstance(user, RedirectResponse):
         return user
 
-    # ── Stat cards ───────────────────────────────────────────────────
+    today = date.today()
     total_barangays = db.query(Barangay).count()
-    total_population = db.query(
-        func.sum(Population.total_population)
-    ).scalar() or 0
+    latest = pdash.latest_plans_by_barangay(db)
+    approved = pdash.approved_plans(latest)
+    activities = pdash.activities_for_plans(db, [p.id for p in approved])
 
-    total_equip = db.query(Equipment).count()
-    serviceable = db.query(Equipment).filter(
-        Equipment.status == EquipmentStatus.serviceable
-    ).count()
-    equip_ratio = (serviceable / total_equip * 100) if total_equip > 0 else 0
-
-    resources = db.query(Resource).filter(Resource.is_archived == False).all()
-    adequate = sum(1 for r in resources if r.quantity >= r.restock_threshold)
-    resource_ratio = (adequate / len(resources) * 100) if resources else 0
-    readiness_score = round((equip_ratio * 0.5) + (resource_ratio * 0.5))
-
-    six_months_ago = date.today() - timedelta(days=180)
-    recent_pops = db.query(
-        func.count(func.distinct(Population.barangay_id))
-    ).filter(
-        Population.recorded_at >= six_months_ago
-    ).scalar() or 0
-    data_relevance = round((recent_pops / total_barangays * 100)) if total_barangays > 0 else 0
-
-    low_stock = [r for r in resources if r.quantity < r.restock_threshold]
-    expiring = [
-        r for r in resources
-        if r.expiry_date and r.expiry_date <= date.today() + timedelta(days=30)
-    ]
-    # Distinct assets with an overdue / due-today repair reminder.
-    repair_attention_count = len(assets_needing_repair_attention(db))
-    active_alerts = len(low_stock) + len(expiring) + repair_attention_count
-
-    # ── Charts ───────────────────────────────────────────────────────
-    disaster_counts = {}
-    for dtype in DisasterType:
-        count = db.query(Incident).filter(
-            Incident.disaster_type == dtype
-        ).count()
-        disaster_counts[dtype.value] = count
-
-    current_year = date.today().year
-    yearly_data = {}
-    for y in range(current_year - 5, current_year + 1):
-        count = db.query(Incident).filter(
-            extract('year', Incident.date_occurred) == int(y)
-        ).count()
-        yearly_data[str(y)] = count
-
-    # ── Barangay risk scores ─────────────────────────────────────────
-    all_barangays = db.query(Barangay).all()
-    barangay_scores = []
-    for brgy in all_barangays:
-        incidents = brgy.incidents
-        population = db.query(Population).filter(
-            Population.barangay_id == brgy.id
-        ).order_by(Population.recorded_at.desc()).first()
-        result = compute_risk_score(brgy, incidents, population)
-        barangay_scores.append({
-            "id": brgy.id,
-            "name": brgy.name,
-            "score": result["score"],
-            "level": result["level"].value,
-            "hazard_types": brgy.hazard_types or "",
-            "population": population.total_population if population else 0,
-        })
-
-    barangay_scores.sort(key=lambda x: x["score"], reverse=True)
-    top5 = barangay_scores[:5]
-    all_scores = barangay_scores
-
-    # ── Map markers ──────────────────────────────────────────────────
-    map_markers = []
-    for b in barangay_scores:
-        coords = BARANGAY_COORDS.get(b["name"])
-        if coords:
-            map_markers.append({
-                "name": b["name"],
-                "lat": coords["lat"],
-                "lng": coords["lng"],
-                "score": b["score"],
-                "level": b["level"],
-            })
-
-    # ── Recent activity feed ─────────────────────────────────────────
-    recent_logs = db.query(AuditLog).order_by(
-        AuditLog.timestamp.desc()
-    ).limit(5).all()
-
-    barangays_with_planning = db.scalar(
-        select(func.count(Barangay.id)).where(
-            exists().where(
-                Planning.barangay_id == Barangay.id
-            )
-        )
-    )
-
-    reviewed_plans = db.scalar(
-        select(func.count(Barangay.id)).where(
-            exists().where(
-                Planning.barangay_id == Barangay.id,
-                or_(Planning.status == "approved", Planning.status == "rejected")
-            )
-        )
-    )
-
-    barangays_without_planning = (
-        total_barangays - barangays_with_planning
-    )
-
-    activities = db.query(Activity).count()
-
-    pending_activities = db.query(Activity).filter(
-        Activity.status == "pending",
-        Activity.is_proof_submitted == True
-    ).count()
-
-    reviewed_activities = db.query(Activity).filter(
-        Activity.status != "pending",
-    ).count()
+    plan_pie = pdash.admin_plan_pie(latest)
+    proof_review = pdash.admin_proof_review(activities)
 
     return templates.TemplateResponse(
         request=request,
         name="admin/dashboard.html",
         context={
             "user": user,
-            "total_barangays": total_barangays,
-            "barangays_with_planning": barangays_with_planning,
-            "barangays_without_planning": barangays_without_planning,
-            "reviewed_plans": reviewed_plans,
-            "activities": activities,
-            "pending_activities": pending_activities,
-            "reviewed_activities": reviewed_activities,
-            "plans_data_chart": get_plans_summary(db),
-            "accomplishments_data_chart": get_activity_accomplishment_summary(db),
-            "total_population": f"{total_population:,}",
-            "readiness_score": readiness_score,
-            "data_relevance": data_relevance,
-            "active_alerts": active_alerts,
-            # Pass raw objects; the template renders them with the |tojson
-            # filter, which HTML-escapes <, >, & so values can't break out of
-            # the inline <script> block (XSS-safe).
-            "disaster_counts": disaster_counts,
-            "yearly_data": yearly_data,
-            "top5": top5,
-            "all_scores": all_scores,
-            "map_markers": map_markers,
-            "recent_logs": recent_logs,
-            "serviceable_count": serviceable,
-            "total_equip": total_equip,
-            "low_stock_count": len(low_stock),
-            "expiring_count": len(expiring),
-            "repair_attention_count": repair_attention_count,
+            "active_nav": "analytics",
+            "today": today,
+            "today_label": pdash.long_date(today),
+            "upcoming_end": today + timedelta(days=pdash.UPCOMING_DAYS - 1),
+            "plan_cards": pdash.admin_plan_cards(latest, total_barangays, today),
+            "plan_pie": plan_pie,
+            "proof_review": proof_review,
+            "progress": pdash.admin_progress_by_barangay(approved, activities),
+            "upcoming": pdash.upcoming(activities, today),
+            "needs_review": pdash.admin_needs_review(latest, activities),
+            "date_changes": pdash.recent_date_changes(db),
+            # rendered with | tojson by shared/_pie_script.html
+            "pies": {"plansPie": plan_pie["pie"], "proofsPie": proof_review["pie"]},
         }
     )
 
@@ -2795,15 +2673,44 @@ async def view_document(
 
     response = download_file(document.file_path)
 
+    # Uploads are stored without a content type; plans are PDFs, so say so —
+    # otherwise the browser downloads the file instead of showing it.
+    media_type = "application/pdf" if document.file_path.lower().endswith(".pdf") \
+        else response.get("ContentType", "application/octet-stream")
+
     return StreamingResponse(
         response["Body"],
-        media_type=response.get(
-            "ContentType",
-            "application/octet-stream"
-        ),
+        media_type=media_type,
         headers={
             "Content-Disposition": "inline"
         }
+    )
+
+@router.get("/planning/{planning_id}/details", response_class=HTMLResponse)
+def planning_details(
+    planning_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """The plan's PDF side by side with its AI summary and recommendations."""
+    user = require_role(request, ["admin"])
+    if isinstance(user, RedirectResponse):
+        return user
+
+    plan = db.query(Planning).filter(Planning.id == planning_id).first()
+    if not plan:
+        return RedirectResponse(url="/admin/planning?error=Plan+not+found", status_code=302)
+
+    status_value = plan.status.value if plan.status else ""
+    return templates.TemplateResponse(
+        request=request,
+        name="admin/planning_view.html",
+        context={
+            "user": user,
+            "active_nav": "planning",
+            "plan": plan,
+            "status_label": PLANNING_STATUS_LABELS.get(status_value, "—"),
+        },
     )
 
 @router.post("/planning/{planning_id}/archive")
@@ -2857,11 +2764,16 @@ def planning_archive_toggle(
     p.status = status
     p.reason = reason
 
-    if new_status == PlanningStatus.approved:
-        ai_json = planning_ai_summary(p.extracted_data or {})
-        if ai_json:
-            p.summary = ai_json.get("summary")
-            p.recommendation = ai_json.get("recommendation")
+    # Plans uploaded through the preview flow already carry a summary; only
+    # generate one if missing. Approval never depends on the AI.
+    if new_status == PlanningStatus.approved and not p.summary:
+        try:
+            ai_json = planning_ai_summary(p.extracted_data or {})
+            if ai_json:
+                p.summary = ai_json.get("summary")
+                p.recommendation = ai_json.get("recommendation")
+        except Exception as e:
+            print(e)
 
     verb = p.status
     log_action(
@@ -2927,33 +2839,8 @@ def get_activities(
     if not plan:
         return RedirectResponse(url="/admin/planning", status_code=302)
 
-    query = (
-        select(Activity)
-        .join(Activity.planning)
-        .options(joinedload(Activity.planning))
-        .where(
-            Activity.planning_id == plan_id,
-            Activity.status == "pending"
-        )
-    )
-
-    activities = db.scalars(query).all()
-
-    view_rows = []
-        
-    for r in activities:
-        view_rows.append({
-            "id": r.id,
-            "title": r.title,
-            "start_date": r.start_date,
-            "status_value": r.status.value if r.status else "",
-            "status_label": ACTIVITY_STATUS_LABELS.get(
-                r.status.value if r.status else "", "—"
-            ),
-            "is_proof_submitted": r.is_proof_submitted,
-            "reason": r.reason,
-        })
-    
+    # All activities (finished ones too), by date with undated last.
+    activities = pdash.activities_for_plans(db, [plan.id])
 
     return templates.TemplateResponse(
         request=request,
@@ -2962,7 +2849,8 @@ def get_activities(
             "user": user,
             "active_nav": "planning",
             "plan": plan,
-            "activities": view_rows
+            "rows": pdash.admin_activity_rows(activities),
+            "error": request.query_params.get("error"),
         },
     )
 
@@ -3040,40 +2928,3 @@ def planning_ai_summary(extracted_data):
         ai_json = ai_summarize(result)
 
     return ai_json
-
-def get_plans_summary(db):
-    stmt = (
-        select(
-            Planning.status,
-            func.count(Planning.id).label("total")
-        )
-        .group_by(Planning.status)
-    )
-
-
-    results = db.execute(stmt).all()
-
-    return {
-        "pending": 0,
-        "approved": 0,
-        "rejected": 0,
-        **{status: total for status, total in results}
-    }
-
-def get_activity_accomplishment_summary(db):
-    stmt = (
-        select(
-            Activity.status,
-            func.count(Activity.id).label("total")
-        )
-        .group_by(Activity.status)
-    )
-
-    results = db.execute(stmt).all()
-
-    return {
-        "pending": 0,
-        "approved": 0,
-        "rejected": 0,
-        **{is_proof_submitted: total for is_proof_submitted, total in results}
-    }

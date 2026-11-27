@@ -1,0 +1,142 @@
+{#
+  Per-activity buttons + modals for the BDRRMO dashboard table and the plan
+  activities page. `row` comes from plan_dashboard.bdrrmo_activity_rows, whose
+  can_* flags mirror what the schedule / proof routes accept.
+
+  {% from "bdrrmo/_activity_actions.html" import activity_actions, activity_modals %}
+#}
+
+{% macro activity_actions(row) -%}
+{% set a = row.activity %}
+<div class="rkd-actions">
+    {% if row.can_set_date %}
+    <button type="button" class="btn btn-outline-secondary btn-sm"
+            data-bs-toggle="modal" data-bs-target="#scheduleModal-{{ a.id }}">
+        {{ "Change date" if a.start_date else "Set date" }}
+    </button>
+    {% endif %}
+    {% if row.can_upload %}
+    <button type="button" class="btn btn-success btn-sm"
+            data-bs-toggle="modal" data-bs-target="#proofModal-{{ a.id }}">
+        Upload proof
+    </button>
+    {% elif row.can_reupload %}
+    <button type="button" class="btn btn-outline-secondary btn-sm"
+            data-bs-toggle="modal" data-bs-target="#reasonModal-{{ a.id }}">
+        View reason
+    </button>
+    <button type="button" class="btn btn-success btn-sm"
+            data-bs-toggle="modal" data-bs-target="#retryProofModal-{{ a.id }}">
+        Re-upload
+    </button>
+    {% elif row.plan_not_approved %}
+    <span class="small text-muted">Proof upload opens once the plan is approved</span>
+    {% endif %}
+</div>
+{%- endmacro %}
+
+{% macro activity_modals(row, today, csrf_token) -%}
+{% set a = row.activity %}
+{% if row.can_set_date %}
+<div class="modal fade" id="scheduleModal-{{ a.id }}" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <form method="POST" action="/bdrrmo/activities/{{ a.id }}/schedule" class="modal-content" data-validate>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="modal-header">
+        <h6 class="modal-title">{{ "Change Activity Date" if a.start_date else "Set Activity Date" }}</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-2">
+          <div class="col-12">
+            <p class="small mb-2"><strong>{{ a.title }}</strong></p>
+            <label class="form-label small fw-semibold mb-1" for="date-{{ a.id }}">Date</label>
+            <input type="date" name="start_date" id="date-{{ a.id }}" class="form-control"
+                   value="{{ a.start_date or '' }}"
+                   min="{{ today.isoformat() }}">
+            <div class="form-text">Leave blank if not yet scheduled.</div>
+          </div>
+          {% if a.start_date %}
+          <div class="col-12">
+            <label class="form-label small fw-semibold mb-1" for="reason-{{ a.id }}">Reason for change</label>
+            <textarea name="reason" id="reason-{{ a.id }}" class="form-control" rows="3" maxlength="500" required></textarea>
+            <div class="form-text">Current date: {{ a.start_date }}</div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" class="btn-rk btn-sm">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+{% if row.can_upload %}
+<div class="modal fade" id="proofModal-{{ a.id }}" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <form method="POST" action="/bdrrmo/activities/{{ a.id }}/submit" enctype="multipart/form-data" class="modal-content" data-validate>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="modal-header">
+        <h6 class="modal-title">Proof Submission</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small mb-2"><strong>{{ a.title }}</strong></p>
+        <label class="form-label small fw-semibold mb-1" for="proof-{{ a.id }}">Proof File</label>
+        <input type="file" name="file" id="proof-{{ a.id }}" class="form-control" accept=".pdf" required>
+        <div class="form-text">Supported: PDF only</div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" class="btn-rk btn-sm">Submit</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+{% if row.can_reupload %}
+<div class="modal fade" id="retryProofModal-{{ a.id }}" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <form method="POST" action="/bdrrmo/activities/{{ a.id }}/retry" enctype="multipart/form-data" class="modal-content" data-validate>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="modal-header">
+        <h6 class="modal-title">Re-upload Proof</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small mb-2"><strong>{{ a.title }}</strong></p>
+        {% if a.reason %}<p class="small text-muted mb-2">Returned: "{{ a.reason }}"</p>{% endif %}
+        <label class="form-label small fw-semibold mb-1" for="retry-{{ a.id }}">Proof File</label>
+        <input type="file" name="file" id="retry-{{ a.id }}" class="form-control" accept=".pdf" required>
+        <div class="form-text">Supported: PDF only</div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" class="btn-rk btn-sm">Submit</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal fade" id="reasonModal-{{ a.id }}" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h6 class="modal-title">Reason</h6>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+            <p class="text-center mb-0">{{ a.reason or "No reason given." }}</p>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+        </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+{%- endmacro %}

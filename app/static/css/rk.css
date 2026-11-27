@@ -171,7 +171,7 @@ body {
 .nav-section {
   margin: 16px 0 8px; /* group top spacing (16px) + label bottom (8px) */
   padding: 0 16px;
-  color: #35a839;
+  color: var(--rk-green); /* #167736 */
   font-size: 14px;
   font-weight: 700;
   letter-spacing: 0.08em;

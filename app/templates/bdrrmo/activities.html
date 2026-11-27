@@ -1,10 +1,13 @@
 {% extends "admin/base.html" %}
+{% from "shared/_dashboard.html" import fmt_date, pill, plan_pill, empty %}
+{% from "bdrrmo/_activity_actions.html" import activity_actions, activity_modals %}
 
-{% block title %}Review Uploaded Report — RisKonek{% endblock %}
+{% block title %}Activities — RisKonek{% endblock %}
 
 {% set active_nav = 'planning' %}
 
 {% block head_extra %}
+<link rel="stylesheet" href="/static/css/rk-dashboard.css">
 <style nonce="{{ request.state.csp_nonce }}">
     #header { margin: 0; color: #167736; font-size: 40px;}
 </style>
@@ -14,7 +17,8 @@
 <div class="d-flex justify-content-between align-items-start page-header">
     <div>
         <h1 id="header">Activities</h1>
-        <p>Activities from <strong>{{ plan.file_name }}</strong>.</p>
+        <p class="mb-1">Activities from <strong>{{ plan.file_name }}</strong>.</p>
+        {{ plan_pill(plan.status.value if plan.status else 'pending') }}
     </div>
     <a href="/bdrrmo/planning" class="btn btn-outline-secondary">
         <i class="bi bi-arrow-left"></i> Back
@@ -28,129 +32,50 @@
 </div>
 {% endif %}
 
-{% if extraction_error %}
-<div class="alert alert-warning">
-    <strong>Extraction failed:</strong> {{ extraction_error }}<br>
-    The file was stored, but no content could be extracted.
+{% if success %}
+<div class="alert alert-success alert-dismissible fade show">
+    <i class="bi bi-check-circle-fill me-1"></i>{{ success | replace('+', ' ') }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
 </div>
 {% endif %}
 
-
-<div id="input-container" class="container">
-    {% for activity in activities %}
-
-    <div class="row mb-2">
-      
-        <div class="form-control col-lg">{{ activity.title }}</div>
-        <div class="form-control col-lg">{{ activity.start_date}}</div>
-
-        <div class="m-1 col-sm-2">
-          {% if plan.status != "approved"%}
-
-            <button type="button" class="remove-btn btn btn-outline-secondary btn-sm" disabled>
-            Plan not approved yet
-            </button> 
-
-          {% elif activity.status == "rejected"%}
-            <button type="button" class="remove-btn btn btn-success btn-sm"
-            data-bs-toggle="modal" data-bs-target="#retryProofModal-{{ activity.id }}">
-            Retry
-            </button> 
-            <button type="button" class="btn btn-outline-primary btn-sm"
-              data-bs-toggle="modal" data-bs-target="#reasonModal-{{ activity.id }}">
-              <i class="bi bi-eye"></i> View Reason
-            </button>
-          {% else %}
-            <button type="button" class="remove-btn btn btn-primary btn-sm"
-            data-bs-toggle="modal" data-bs-target="#proofModal-{{ activity.id }}">
-            Submit Proof
-            </button> 
-          {% endif %}
-        </div>
-
-
+<div class="rkd-card">
+    {% if rows %}
+    <div class="table-responsive">
+        <table class="rkd-table">
+            <thead>
+                <tr>
+                    <th>Activity (PPA)</th>
+                    <th>Date</th>
+                    <th>Proof</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                {% set a = row.activity %}
+                <tr>
+                    <td>
+                        {{ a.title }}
+                        {% if row.rescheduled %}<span class="rkd-pill rkd-pill-muted ms-1">Rescheduled {{ row.rescheduled }}x</span>{% endif %}
+                    </td>
+                    <td>
+                        {% if a.start_date %}{{ fmt_date(a.start_date) }}{% else %}<span class="rkd-unscheduled">Not yet scheduled</span>{% endif %}
+                    </td>
+                    <td>{{ pill(row.state, row.label) }}</td>
+                    <td>{{ activity_actions(row) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
-
-    {% endfor %}
-
+    {% else %}
+    {{ empty('No activities in this plan yet') }}
+    {% endif %}
 </div>
 
-{% for activity in activities %}
-
-<div class="modal fade" id="proofModal-{{ activity.id }}" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog">
-    <form method="POST" action="/bdrrmo/activities/{{ activity.id }}/submit" enctype="multipart/form-data" class="modal-content" data-validate>
-        <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
-      <div class="modal-header">
-        <h6 class="modal-title">Proof Submission</h6>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        <div class="row g-2">
-          <div class="col-12">
-                    
-            <label class="form-label small fw-semibold mb-1">Proof File</label>
-            <input type="file" name="file" class="form-control"
-                   accept=".pdf" required>
-            <div class="form-text">Supported: PDF only</div>
-     
-          </div>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
-        <button type="submit" class="btn-rk btn-sm">Submit</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<div class="modal fade" id="retryProofModal-{{ activity.id }}" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog">
-    <form method="POST" action="/bdrrmo/activities/{{ activity.id }}/retry" enctype="multipart/form-data" class="modal-content" data-validate>
-        <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
-      <div class="modal-header">
-        <h6 class="modal-title">Retry Proof Submission</h6>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        <div class="row g-2">
-          <div class="col-12">
-                    
-            <label class="form-label small fw-semibold mb-1">Proof File</label>
-            <input type="file" name="file" class="form-control"
-                   accept=".pdf" required>
-            <div class="form-text">Supported: PDF only</div>
-     
-          </div>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
-        <button type="submit" class="btn-rk btn-sm">Submit</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<div class="modal fade" id="reasonModal-{{ activity.id }}" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h6 class="modal-title">Reason</h6>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-        <div class="modal-body">
-            <p class="text-center">{{activity.reason}}</p>
-        </div>
-        <div class="modal-footer">
-            <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Close</button>
-        </div>
-    </div>
-    
-  </div>
-</div>
-
+{% for row in rows %}
+{{ activity_modals(row, today, request.session.get('csrf_token', '')) }}
 {% endfor %}
 
 {% endblock %}

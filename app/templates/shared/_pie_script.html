@@ -1,0 +1,43 @@
+{# Draws every two-slice pie in the `pies` context dict ({canvas_id: pie}).
+   Data goes in through | tojson (escaped), never | safe. #}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"
+        integrity="sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4" crossorigin="anonymous"></script>
+<script nonce="{{ request.state.csp_nonce }}">
+(function () {
+    const pies = {{ pies | tojson }};
+    Object.keys(pies).forEach(function (id) {
+        const pie = pies[id];
+        const el = document.getElementById(id);
+        if (!el || !pie || !pie.total || typeof Chart === "undefined") return;
+        new Chart(el, {
+            type: "pie",
+            data: {
+                labels: pie.slices.map(function (s) { return s.label; }),
+                datasets: [{
+                    data: pie.slices.map(function (s) { return s.count; }),
+                    backgroundColor: pie.slices.map(function (s) { return s.color; }),
+                    borderColor: "#ffffff",
+                    // A lone 100% slice would draw its border as a white line
+                    // from the centre; the 0 slice stays in the legend.
+                    borderWidth: pie.slices.some(function (s) { return s.count === 0; }) ? 0 : 2,
+                }],
+            },
+            options: {
+                responsive: false,
+                animation: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function (ctx) {
+                                const s = pie.slices[ctx.dataIndex];
+                                return " " + s.label + ": " + s.count + " (" + s.pct + "%)";
+                            },
+                        },
+                    },
+                },
+            },
+        });
+    });
+})();
+</script>

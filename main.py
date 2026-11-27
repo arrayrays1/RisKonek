@@ -7,6 +7,7 @@ from app.database import engine
 from contextlib import asynccontextmanager
 import app.models as models
 import os
+import re
 import secrets
 from dotenv import load_dotenv
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -124,6 +125,15 @@ CSP_TEMPLATE = (
     "form-action 'self'"
 )
 
+# The only responses that may be framed, and only by our own pages: plan PDFs
+# shown in a same-origin iframe next to their AI summary — the BDRRMO upload
+# preview (temporary draft) and the Admin / BDRRMO "View" page of a saved plan.
+# Everything else keeps X-Frame-Options DENY / frame-ancestors 'none'.
+_SAME_ORIGIN_FRAMEABLE = re.compile(
+    r"^/bdrrmo/planning/draft/[0-9a-fA-F-]{36}/file$"
+    r"|^/(admin|bdrrmo)/planning/\d+/view$"
+)
+
 
 @app.middleware("http")
 async def security_headers(request: Request, call_next):
@@ -153,6 +163,11 @@ async def security_headers(request: Request, call_next):
         "geolocation=(), microphone=(), camera=(), payment=(), usb=()"
     )
     response.headers["Content-Security-Policy"] = CSP_TEMPLATE.format(nonce=nonce)
+    if _SAME_ORIGIN_FRAMEABLE.match(request.url.path):
+        response.headers["X-Frame-Options"] = "SAMEORIGIN"
+        response.headers["Content-Security-Policy"] = CSP_TEMPLATE.format(nonce=nonce).replace(
+            "frame-ancestors 'none'", "frame-ancestors 'self'"
+        )
     # HSTS is only meaningful over HTTPS; sending it on plain HTTP is ignored by
     # browsers and can cause issues, so gate it on the HTTPS/secure-cookie flag.
     if COOKIE_SECURE:

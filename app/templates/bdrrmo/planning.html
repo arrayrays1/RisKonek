@@ -71,6 +71,7 @@
         <h6>Submit Planning</h6>
     </div>
     <form method="POST" action="/bdrrmo/planning" class="row g-3" data-validate
+          data-loading-text="Reading the plan and preparing the summary…"
           data-confirm='Submit this planning for your barangay?' enctype="multipart/form-data">
             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
         <div class="col-12">
@@ -140,9 +141,7 @@
                     <td class="text-end px-3">
                     {% if not planning.is_archived %}
                         <a
-                            href="planning/{{ planning.id }}/view"
-                            target="_blank"
-                            rel="noopener noreferrer"
+                            href="/bdrrmo/planning/{{ planning.id }}/details"
                             class="btn btn-outline-primary btn-sm"
                         >
                             <i class="bi bi-eye"></i>
