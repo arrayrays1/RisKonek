@@ -198,10 +198,10 @@
         <span><span class="rkd-key rkd-key-scheduled"></span>{{ s.scheduled }} scheduled</span>
         <span><span class="rkd-key rkd-key-unscheduled"></span>{{ s.unscheduled }} not yet scheduled</span>
     </div>
-    <div class="table-responsive">
-        <table class="rkd-table">
+    <div class="rk-table-scroll">
+        <table class="rk-table">
             <thead>
-                <tr><th>Activity (PPA)</th><th>Date</th><th>Proof</th><th class="text-end">Actions</th></tr>
+                <tr><th scope="col">Activity (PPA)</th><th scope="col">Date</th><th scope="col">Proof</th><th scope="col">Actions</th></tr>
             </thead>
             <tbody>
                 {% for row in rows[:8] %}

@@ -524,20 +524,6 @@ html.rk-no-anim .main-content {
 }
 
 /* Rounded search bar used in list/filter toolbars */
-.search-bar-rk .input-group-text {
-  background: white;
-  border-right: 0;
-  border-radius: 10px 0 0 10px;
-}
-.search-bar-rk input {
-  border-left: 0;
-  border-radius: 0 10px 10px 0;
-}
-.search-bar-rk input:focus {
-  box-shadow: none;
-  border-color: #ced4da;
-}
-
 /* Reusable alert / insight banner (amber notice strip) */
 .alert-banner {
   background: #fff8e1;
@@ -945,10 +931,6 @@ html.rk-no-anim .main-content {
 }
 
 /* Rounded control (e.g. filter selects) */
-.rk-radius-10 {
-  border-radius: 10px;
-}
-
 /* Scrollable panels (raw-text / preview tables) */
 .rk-mh-260 {
   max-height: 260px;
@@ -2105,3 +2087,6 @@ body.facility-location-picking .map-area .leaflet-container {
 .rk-pagination li > a:focus { background: #eefbe8; color: var(--rk-green); }
 .rk-pagination .rk-page-current { background: var(--rk-green); color: #fff; }
 .rk-pagination .rk-page-off { color: #c3c8cf; }
+/* The shared activity_actions() macro right-aligns its buttons for cards;
+   inside the shared table everything is left-aligned. */
+.rk-table .rkd-actions { justify-content: flex-start; }

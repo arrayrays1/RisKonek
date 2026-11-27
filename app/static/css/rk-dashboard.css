@@ -135,10 +135,6 @@
 .rkd-progress-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ── Tables ─────────────────────────────────────────────────────── */
-.rkd-table { width: 100%; font-size: 13px; }
-.rkd-table th { font-size: 12px; color: var(--rk-muted); font-weight: 600; padding: 8px 6px; border-bottom: 1px solid #eef0f3; }
-.rkd-table td { padding: 10px 6px; border-bottom: 1px solid #f2f4f7; vertical-align: middle; }
-.rkd-table tr:last-child td { border-bottom: none; }
 .rkd-actions { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
 .rkd-unscheduled { color: #7a4f00; font-weight: 600; }
 

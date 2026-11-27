@@ -1592,7 +1592,12 @@ def _facility_map_json(f: Facility, own_barangay_id: int) -> dict:
 
 
 @router.get("/facilities", response_class=HTMLResponse)
-def facilities(request: Request, db: Session = Depends(get_db)):
+def facilities(
+    request: Request,
+    db: Session = Depends(get_db),
+    page: Optional[str] = None,
+    per_page: Optional[str] = None,
+):
     user, barangay = _resolve_scope(request, db)
     if isinstance(user, RedirectResponse):
         return user
@@ -1647,6 +1652,13 @@ def facilities(request: Request, db: Session = Depends(get_db)):
         "archived": archived_count,
     }
 
+    # The table is paginated; `facilities` stays the full list because the
+    # ?edit= modal looks the facility up there (it may be on another page).
+    page_obj = paginate(rows, parse_page(page), parse_per_page(per_page))
+    base_query = build_base_query({
+        "scope": "city" if citywide else "", "archived": "1" if show_archived else "",
+    })
+
     return templates.TemplateResponse(
         request=request,
         name="bdrrmo/facilities.html",
@@ -1655,6 +1667,9 @@ def facilities(request: Request, db: Session = Depends(get_db)):
             "active_nav": "bdrrmo_facilities",
             "barangay": barangay,
             "facilities": rows,
+            "table_rows": page_obj.items,
+            "page_obj": page_obj,
+            "base_query": base_query,
             "map_facilities": [
                 _facility_map_json(f, barangay.id if barangay else None)
                 for f in active_facilities
@@ -4146,6 +4161,8 @@ def get_activities(
     plan_id: int,
     request: Request,
     db: Session = Depends(get_db),
+    page: Optional[str] = None,
+    per_page: Optional[str] = None,
 ):
     user, barangay = _resolve_scope(request, db)
 
@@ -4167,6 +4184,7 @@ def get_activities(
     rows = pdash.bdrrmo_activity_rows(
         activities, plan, pdash.rescheduled_counts(db, [a.id for a in activities])
     )
+    page_obj = paginate(rows, parse_page(page), parse_per_page(per_page))
 
     return templates.TemplateResponse(
         request=request,
@@ -4176,7 +4194,8 @@ def get_activities(
             "active_nav": "planning",
             "barangay": barangay,
             "plan": plan,
-            "rows": rows,
+            "rows": page_obj.items,
+            "page_obj": page_obj,
             "today": date.today(),
             "error": request.query_params.get("error"),
             "success": request.query_params.get("success"),
