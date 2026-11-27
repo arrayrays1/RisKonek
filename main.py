@@ -6,14 +6,9 @@ from starlette.middleware.sessions import SessionMiddleware
 from app.database import engine
 from contextlib import asynccontextmanager
 import app.models as models
-import mimetypes
 import os
 import re
 import secrets
-
-# Self-hosted Inter font: some systems (e.g. the Windows MIME registry) don't
-# map .woff2, so StaticFiles would serve it as text/plain.
-mimetypes.add_type("font/woff2", ".woff2")
 from dotenv import load_dotenv
 from apscheduler.schedulers.background import BackgroundScheduler
 

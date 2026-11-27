@@ -9,16 +9,15 @@
           integrity="sha384-9ndCyUaIbzAi2FUVXJi0CjmCapSmO7SnpJef0486qhLnuZ2cdeRhO02iuK6FUUVM" crossorigin="anonymous">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css"
           integrity="sha384-tViUnnbYAV00FLIhhi3v/dWt3Jxw4gZQcNoSCxCIFNJVCx7/D55/wXsrNIRANwdD" crossorigin="anonymous">
-    <link rel="preload" href="/static/fonts/InterVariable-latin.woff2" as="font" type="font/woff2" crossorigin>
-    {# Shared tokens, font, focus ring and form-control outlines #}
-    <link rel="stylesheet" href="/static/css/rk.css">
     <style nonce="{{ request.state.csp_nonce }}">
         :root {
-            --login-brand-end: #0B481F;
+            --rk-green: #167736;
+            --rk-green-light: #35A839;
+            --rk-green-dark: #0B481F;
         }
         html, body {
             min-height: 100vh;
-            font-family: var(--rk-font);
+            font-family: 'Segoe UI', sans-serif;
         }
         body {
             background: linear-gradient(160deg, #ecfdf5 0%, #f4f6f9 45%, #e8f4fd 100%);
@@ -63,7 +62,7 @@
         /* ── Left brand panel ─────────────────────────────────────── */
         .login-brand {
             flex: 1 1 46%;
-            background: linear-gradient(160deg, var(--rk-green) 0%, var(--login-brand-end) 100%);
+            background: linear-gradient(160deg, var(--rk-green-light) 0%, var(--rk-green-dark) 100%);
             color: white;
             padding: 48px 40px;
             display: flex; flex-direction: column; justify-content: center;
@@ -76,30 +75,30 @@
             margin-bottom: 28px;
         }
         .login-brand .emblem i {
-            font-size: 2.375rem;
-            color: var(--login-brand-end);
+            font-size: 38px;
+            color: var(--rk-green-dark);
         }
         .login-brand .emblem img {
             width: 150px; height: 150px;
             object-fit: contain;
         }
         .login-brand h1 {
-            font-size: 2.5rem; font-weight: 600; margin: 0 0 6px;
+            font-size: 40px; font-weight: 500; margin: 0 0 6px;
             line-height: 1.25;
         }
-        .login-brand .accent { color: #FFE18F; font-size: 1.25rem; }
+        .login-brand .accent { color: #FFE18F; font-size: 20px;}
         .login-brand .tagline {
-            font-size: var(--rk-fs-small); color: #ffffff;
+            font-size: 14px; color: rgba(255,255,255,0.85);
             margin-bottom: 28px;
         }
         .divider {
             border-left: 1px solid rgb(160, 160, 160);
         }
         .login-brand .footer-loc {
-            font-size: var(--rk-fs-small); font-weight: 700;
+            font-size: 13px; font-weight: 700;
         }
         .login-brand .footer-office {
-            font-size: var(--rk-fs-small); color: #ffffff;
+            font-size: 12px; color: rgba(255,255,255,0.7);
         }
 
         /* ── Right form panel ─────────────────────────────────────── */
@@ -111,41 +110,42 @@
         .login-form-panel-texts {
             text-align: center;
         }
-        .login-form-panel h2 {
-            font-size: 2.1875rem; font-weight: 700; margin-bottom: 4px; line-height: 1.2;
+        .login-form-panel h3 {
+            font-size: 35px; font-weight: 700; margin-bottom: 4px;
             color: var(--rk-green);
         }
         .login-form-panel .subtext {
-            font-size: var(--rk-fs-body); color: var(--rk-muted); margin-bottom: 26px;
+            font-size: 13px; color: #6c757d; margin-bottom: 26px;
         }
         .form-label-rk {
-            font-size: var(--rk-fs-small); font-weight: 600; margin-bottom: 6px; display: block;
+            font-size: 13px; font-weight: 600; margin-bottom: 6px; display: block;
         }
         .input-group-rk {
             margin-bottom: 18px;
         }
         .input-group-rk .input-group-text {
-            background: white; color: var(--rk-muted);
+            background: white; color: #9ca3af;
             border-radius: 10px 10px 10px 10px;
         }
         .input-group-rk .form-control {
             border-left: 0; border-radius: 0 10px 10px 0; padding: 11px 12px;
         }
+        .input-group-rk .form-control:focus { box-shadow: none; border-color: #ced4da; }
         .input-group-rk .toggle-pw {
-            background: white; border-left: 0; color: var(--rk-muted); cursor: pointer;
+            background: white; border-left: 0; color: #9ca3af; cursor: pointer;
         }
         .forgot-pw {
-            font-size: var(--rk-fs-small); color: var(--rk-muted); text-decoration: none;
+            font-size: 12.5px; color: #9ca3af; text-decoration: none;
             cursor: default;
         }
         .btn-login {
             background: var(--rk-green);
             color: white; border: none; border-radius: 10px;
-            padding: 12px; font-weight: 600; font-size: 1rem;
+            padding: 12px; font-weight: 600; font-size: 15px;
             box-shadow: 0 4px 14px rgba(4,120,87,0.3);
-            transition: background 0.2s ease;
+            transition: opacity 0.2s ease;
         }
-        .btn-login:hover { color: white; background: var(--rk-green-hover); }
+        .btn-login:hover { color: white; opacity: 0.8; }
         #san-pedro-logo {
             width: 50px; height: 50px;
             object-fit: contain;
@@ -156,20 +156,13 @@
         }
         .san-pedro-text {
             color: #01349A;
-            font-size: var(--rk-fs-small);
+            font-size: 10px; 
             font-weight: 500;
             line-height: 1.3;
         }
         @media (max-width: 760px) {
             .login-shell { flex-direction: column; min-height: auto; }
             .login-brand { padding: 36px 32px; }
-        }
-        @media (max-width: 480px) {
-            body { padding: 12px; }
-            .login-brand { padding: 28px 20px; }
-            .login-brand .emblem img { width: 110px; height: 110px; }
-            .login-form-panel { padding: 28px 20px; }
-            .login-form-panel h2 { font-size: 1.75rem; }
         }
     </style>
 </head>
@@ -186,7 +179,7 @@
                 <div class="d-flex gap-1">
                     <img id="san-pedro-logo" src="/static/img/sanpedro-logo-transparent.png" alt="San Pedro logo">
                     <div class="d-flex align-items-center">
-                        <p class="m-0 san-pedro-text">City of San Pedro <br> Laguna</p>
+                        <p class="m-0 san-pedro-text">City of San Pedro </br> Laguna</p>
                     </div>
                     
                 </div>
@@ -196,34 +189,34 @@
                 </div>
             </div>
             <div class="login-form-panel-texts">
-                <h2>Magandang <br> San Pedro Po!</h2>
+                <h3>Magandang </br> San Pedro Po!</h3>
                 <div class="subtext">Please enter your details.</div> 
             </div>
 
 
             {% if error %}
-            <div class="alert alert-danger alert-dismissible fade show py-2" role="alert">
+            <div class="alert alert-danger alert-dismissible fade show py-2" role="alert rk-fs-13">
                 {{ error }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
             {% endif %}
 
             <form method="POST" action="/login" data-validate>
                 <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
-                <label class="form-label-rk" for="usernameInput">Username</label>
+                <label class="form-label-rk">Username</label>
                 <div class="input-group input-group-rk">
-                    <span class="input-group-text"><i class="bi bi-person-fill" aria-hidden="true"></i></span>
-                    <input type="text" name="username" id="usernameInput" class="form-control"
+                    <span class="input-group-text"><i class="bi bi-person-fill"></i></span>
+                    <input type="text" name="username" class="form-control"
                            placeholder="username" required autofocus autocomplete="username">
                 </div>
 
-                <label class="form-label-rk" for="pwInput">Password</label>
+                <label class="form-label-rk">Password</label>
                 <div class="input-group input-group-rk">
-                    <span class="input-group-text"><i class="bi bi-lock-fill" aria-hidden="true"></i></span>
+                    <span class="input-group-text"><i class="bi bi-lock-fill"></i></span>
                     <input type="password" name="password" id="pwInput" class="form-control"
                            placeholder="••••••••" required autocomplete="current-password">
-                    <button type="button" class="input-group-text toggle-pw" id="togglePw" aria-label="Show password" aria-pressed="false">
-                        <i class="bi bi-eye" id="togglePwIcon" aria-hidden="true"></i>
+                    <button type="button" class="input-group-text toggle-pw" id="togglePw" tabindex="-1" aria-label="Show password">
+                        <i class="bi bi-eye" id="togglePwIcon"></i>
                     </button>
                 </div>
 
@@ -250,8 +243,6 @@
                 var show = input.type === 'password';
                 input.type = show ? 'text' : 'password';
                 icon.className = show ? 'bi bi-eye-slash' : 'bi bi-eye';
-                btn.setAttribute('aria-pressed', show ? 'true' : 'false');
-                btn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
             });
         })();
     </script>
