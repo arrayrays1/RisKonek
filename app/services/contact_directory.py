@@ -4,10 +4,9 @@ Every role sees the same read-only, grouped-per-barangay directory of
 officials and emergency responders. The data is the SAME Barangay record
 each BDRRMO Chairperson maintains at /bdrrmo/contacts (captain_*,
 chairperson_*, emergency_contacts) — a single source of truth, no separate
-contacts table. This module turns those columns into a list of contact
-"cards" (one per barangay), each holding structured name / role / number
-entries, and applies the search + barangay filter + pagination the shared
-template renders.
+contacts table. This module turns those columns into flat contact rows
+(one per person: barangay, name, role, number), and applies the search +
+barangay filter + pagination the shared template renders.
 """
 import re
 
@@ -73,15 +72,46 @@ def _barangay_entries(b):
     return entries
 
 
+# The directory table shows 15 contact rows per page (roughly the height of the
+# hotline panel beside it) unless ?per_page= says otherwise.
+DIRECTORY_PER_PAGE = 15
+
+
+def page_window(current, total_pages, radius=1):
+    """Page numbers for a numbered pager: the first and last page, the current
+    page and its neighbours, with None where a run of pages is skipped (an
+    ellipsis). e.g. page 5 of 10 -> [1, None, 4, 5, 6, None, 10]."""
+    if total_pages <= 1:
+        return [1] if total_pages == 1 else []
+    keep = {1, total_pages}
+    keep.update(range(max(1, current - radius), min(total_pages, current + radius) + 1))
+    # Near either end show a few more pages instead of a lone ellipsis gap.
+    if current <= 2 + radius:
+        keep.update(range(1, min(total_pages, 3 + radius) + 1))
+    if current >= total_pages - 1 - radius:
+        keep.update(range(max(1, total_pages - 2 - radius), total_pages + 1))
+    out, prev = [], 0
+    for n in sorted(keep):
+        if n - prev > 1:
+            out.append(None)
+        out.append(n)
+        prev = n
+    return out
+
+
 def build_directory_context(db, *, q, brgy, page, per_page,
                             directory_url, active_nav):
     """Assemble the full template context for the shared directory page.
 
-    ``q``    — free-text search across barangay name and every entry's
-               role / name / number.
+    The table is flat: one row per contact person (captain, chairperson,
+    each parsed responder), ordered by barangay name and paginated by row.
+
+    ``q``    — free-text search across each row's barangay name, role,
+               name and number.
     ``brgy`` — exact barangay-name filter (dropdown).
     Returns everything ``shared/contact_directory.html`` needs except the
-    ``user`` — each route adds that after its RBAC check.
+    ``user`` — each route adds that (and any role-specific extras) after its
+    RBAC check.
     """
     q = (q or "").strip()
     brgy = (brgy or "").strip()
@@ -90,41 +120,35 @@ def build_directory_context(db, *, q, brgy, page, per_page,
     barangay_names = [b.name for b in all_barangays]
 
     q_lower = q.lower()
-    cards = []
-    total_contacts = 0
+    contact_rows = []
     for b in all_barangays:
         if brgy and b.name != brgy:
             continue
-        entries = _barangay_entries(b)
-        if q:
-            haystack = " ".join(
-                [b.name] + [f"{e['role']} {e['name']} {e['number']}" for e in entries]
-            ).lower()
-            if q_lower not in haystack:
-                continue
-        total_contacts += len(entries)
-        cards.append({
-            "id": b.id,
-            "name": b.name,
-            "entries": entries,
-            "has_contacts": bool(entries),
-        })
+        for e in _barangay_entries(b):
+            if q:
+                haystack = f"{b.name} {e['role']} {e['name']} {e['number']}".lower()
+                if q_lower not in haystack:
+                    continue
+            contact_rows.append({"barangay": b.name, **e})
 
-    total = len(cards)
-    with_contacts = sum(1 for c in cards if c["has_contacts"])
-    page_obj = paginate(cards, parse_page(page), parse_per_page(per_page))
-    base_query = build_base_query({"q": q, "brgy": brgy})
+    page_obj = paginate(
+        contact_rows, parse_page(page), parse_per_page(per_page, DIRECTORY_PER_PAGE)
+    )
+    # Keep a non-default page size on every pager link.
+    page_query = build_base_query({"q": q, "brgy": brgy})
+    if page_obj.size_value != str(DIRECTORY_PER_PAGE):
+        page_query = (page_query + "&" if page_query else "") + "per_page=" + page_obj.size_value
 
     return {
         "active_nav": active_nav,
         "directory_url": directory_url,
         "rows": page_obj.items,
         "page_obj": page_obj,
-        "base_query": base_query,
-        "total": total,
-        "with_contacts": with_contacts,
-        "total_contacts": total_contacts,
+        "page_numbers": page_window(page_obj.page, page_obj.total_pages),
+        "page_query": page_query,
         "barangay_names": barangay_names,
         "f_q": q,
         "f_brgy": brgy,
+        # Only the BDRRMO route turns this on (Edit Contact modal).
+        "can_edit_contacts": False,
     }

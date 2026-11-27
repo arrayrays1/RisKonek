@@ -2391,6 +2391,8 @@ def contact_directory(
     )
     context["user"] = user
     context["barangay"] = barangay
+    # Edit Contact modal: pre-filled from the user's OWN barangay only.
+    context["can_edit_contacts"] = barangay is not None
     return templates.TemplateResponse(
         request=request, name="shared/contact_directory.html", context=context,
     )
@@ -2422,6 +2424,9 @@ def contacts(request: Request, db: Session = Depends(get_db)):
     )
 
 
+_CONTACTS_RETURN_PAGES = ("/bdrrmo/directory", "/bdrrmo/contacts")
+
+
 @router.post("/contacts")
 def contacts_update(
     request: Request,
@@ -2431,13 +2436,16 @@ def contacts_update(
     chairperson_name: str = Form(""),
     chairperson_contact: str = Form(""),
     emergency_contacts: str = Form(""),
+    next: str = Form(""),
 ):
     user, barangay = _resolve_scope(request, db)
     if isinstance(user, RedirectResponse):
         return user
+    # Where to land afterwards: only these two pages; anything else is ignored.
+    back = next if next in _CONTACTS_RETURN_PAGES else "/bdrrmo/contacts"
     if not barangay:
         return RedirectResponse(
-            url="/bdrrmo/contacts?error=No+barangay+is+assigned+to+your+account",
+            url=f"{back}?error=No+barangay+is+assigned+to+your+account",
             status_code=302,
         )
 
@@ -2453,7 +2461,7 @@ def contacts_update(
         f"BDRRMO updated contact details for {barangay.name}",
     )
     return RedirectResponse(
-        url="/bdrrmo/contacts?success=Contact+details+updated", status_code=302
+        url=f"{back}?success=Contact+details+updated", status_code=302
     )
 
 FOOD_TYPE_LABELS = {

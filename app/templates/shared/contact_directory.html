@@ -1,237 +1,313 @@
 {% extends "admin/base.html" %}
-{% from "shared/_pagination.html" import pager %}
 
 {% block title %}Contact Directory — RisKonek{% endblock %}
 
-{# active_nav is supplied by each role's route so the sidebar highlights. #}
+{# Shared by Admin, CDRRMO Staff and BDRRMO. active_nav is supplied by each
+   role's route; can_edit_contacts (+ barangay) only by the BDRRMO route. #}
 
 {% block head_extra %}
 <style nonce="{{ request.state.csp_nonce }}">
-    #header { margin: 0; color: #167736; font-size: 40px;}
-    h2 {color: #167736; font-size: 30px;}
-    h3 {color: #167736; font-size: 25px;}
-    #san-pedro-logo {
-        width: 100px; height: 100px;
-        object-fit: contain;
+    #header { margin: 0; color: #167736; font-size: 40px; }
+    #header .bi { font-size: .8em; margin-right: 8px; }
+
+    /* One white card with a light green border, two columns. */
+    .cd-card {
+        background: #fff; border: 1px solid #cfe8c4; border-radius: 14px;
+        padding: 16px;
     }
-    .hotline-number-container{
-        color: white;
-        background: #167736;
-        border-radius: 10px;
-        text-align: center;
+    .cd-hotlines {
+        background: #eefbe8; border-radius: 12px; padding: 18px 16px; height: 100%;
     }
-    .hotline-number-container p{
-        margin: 0;
-        font-size: 30px;
-        font-weight: 700;
+    .cd-hotlines-head { display: flex; align-items: center; gap: 12px; }
+    .cd-hotlines-head img { width: 72px; height: 72px; object-fit: contain; flex: 0 0 72px; }
+    .cd-hotlines-head h2 {
+        margin: 0; color: #167736; font-size: 20px; font-weight: 800;
+        text-transform: uppercase; line-height: 1.2;
     }
-    .hotline-container{
-        margin-top: 20px;
-        text-align: center;
+    .cd-hotlines hr { border-color: #167736; opacity: .35; margin: 14px 0; }
+    .cd-hotline { text-align: center; margin-bottom: 14px; }
+    .cd-hotline h3 {
+        color: #167736; font-size: 14px; font-weight: 800; text-transform: uppercase;
+        margin: 0 0 6px;
     }
+    .cd-hotline-box {
+        background: #167736; color: #fff; border-radius: 8px; padding: 6px 10px;
+        font-weight: 700; font-size: 18px; line-height: 1.35;
+    }
+    .cd-hotline-box.cd-big { font-size: 30px; }
+    .cd-hotline-box a { color: #fff; text-decoration: none; }
+    .cd-hotline-box a:hover, .cd-hotline-box a:focus { text-decoration: underline; }
+
+    /* Search row */
+    .cd-search { position: relative; }
+    .cd-search .bi-search {
+        position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+        color: #167736; pointer-events: none;
+    }
+    .cd-search input { border-radius: 999px; padding-left: 34px; border-color: #b9dcae; }
+
+    /* Flat table */
+    .cd-table { margin: 0; }
+    .cd-table thead th {
+        font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em;
+        color: #374151; border-bottom: 2px solid #167736; white-space: nowrap;
+        background: transparent; padding-top: 10px; padding-bottom: 8px;
+    }
+    .cd-table td { font-size: 13px; vertical-align: middle; }
+    .cd-role { display: block; font-size: 12px; color: #6b7280; }
+    .cd-number { white-space: nowrap; }
+
+    /* Numbered pager */
+    .cd-pager { display: flex; align-items: center; gap: 4px; list-style: none; margin: 0; padding: 0; }
+    .cd-pager a, .cd-pager span {
+        display: inline-flex; align-items: center; justify-content: center;
+        min-width: 30px; height: 30px; border-radius: 999px; padding: 0 6px;
+        font-size: 13px; font-weight: 600; color: #374151; text-decoration: none;
+    }
+    .cd-pager a:hover, .cd-pager a:focus { background: #eefbe8; color: #167736; }
+    .cd-pager .cd-current { background: #167736; color: #fff; }
+    .cd-pager .cd-off { color: #c3c8cf; }
 </style>
 {% endblock %}
 
 {% macro number_cell(number) -%}
     {% if number %}
-    <span class="d-inline-flex align-items-center gap-1">
-        <a href="tel:{{ number }}" class="text-decoration-none">{{ number }}</a>
+    <span class="cd-number d-inline-flex align-items-center gap-1">
+        <a href="tel:{{ number | replace(' ', '') }}" class="text-decoration-none">{{ number }}</a>
         <button type="button" class="btn-soft py-0 px-1" data-copy="{{ number }}"
-                title="Copy number">
-            <i class="bi bi-clipboard"></i>
+                title="Copy number" aria-label="Copy number {{ number }}">
+            <i class="bi bi-clipboard" aria-hidden="true"></i>
         </button>
     </span>
     {% else %}<span class="text-muted">—</span>{% endif %}
 {%- endmacro %}
 
+{% macro page_url(n) -%}
+{{ directory_url }}?{% if page_query %}{{ page_query }}&{% endif %}page={{ n }}
+{%- endmacro %}
+
+{# City hotlines: (title, [(display, tel)]). Numbers unchanged from before. #}
+{% set city_hotlines = [
+    ("San Pedro CDRRMO", [("(02) 8403-2648", "0284032648"), ("0998 594 1743", "09985941743")]),
+    ("City Fire Auxiliary Unit", [("(02) 8363-9392", "0283639392")]),
+    ("Meralco", [("0920 971 6211", "09209716211"), ("0917 551 6211", "09175516211"), ("16211", "16211")]),
+    ("Bureau of Fire Protection", [("(02) 8808-0617", "0288080617"), ("0936 470 2158", "09364702158")]),
+    ("Jose L. Amante Emergency Hospital", [("(02) 8868-5284", "0288685284"), ("(02) 8478-5709", "0284785709")]),
+    ("City Police Station", [("(02) 8567-3381", "0285673381"), ("(02) 8541-1548", "0285411548")]),
+    ("Gavino Alvarez Lying-in Clinic", [("(02) 8519-0249", "0285190249"), ("(02) 8478-6270", "0284786270")]),
+] %}
+
 {% block content %}
-<div class="d-flex justify-content-between align-items-start page-header">
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 page-header">
     <div>
-        <h1 id="header">Contact Directory</h1>
-        <p>Barangay officials and emergency responder hotlines across San Pedro,
-           grouped per barangay. Maintained by each BDRRMO Chairperson; read-only here.</p>
+        <h1 id="header"><i class="bi bi-telephone-fill" aria-hidden="true"></i>Contact Directory</h1>
+        <p>Barangay officials and emergency responder hotlines across San Pedro.
+           Each BDRRMO keeps their own barangay's contacts up to date.</p>
     </div>
-    <div class="d-flex align-items-center gap-2 flex-wrap">
+    {% if can_edit_contacts and barangay %}
+    <button type="button" class="btn-rk" data-bs-toggle="modal" data-bs-target="#editContactModal">
+        <i class="bi bi-pencil" aria-hidden="true"></i> Edit Contact
+    </button>
+    {% endif %}
+</div>
 
-        <a href="/bdrrmo/contacts"
-            class="btn-rk text-decoration-none">
-            <i class="bi bi-plus-lg"></i> <span class="d-sm-inline">Add Contact</span>
-        </a>
+{% if request.query_params.get('success') %}
+<div class="alert alert-success alert-dismissible fade show" role="status">
+    <i class="bi bi-check-circle-fill me-1" aria-hidden="true"></i>{{ request.query_params.get('success') }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+</div>
+{% endif %}
+{% if request.query_params.get('error') %}
+<div class="alert alert-danger alert-dismissible fade show" role="alert">
+    <i class="bi bi-exclamation-triangle-fill me-1" aria-hidden="true"></i>{{ request.query_params.get('error') }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+</div>
+{% endif %}
 
+<div class="cd-card">
+    <div class="row g-3">
+        <!-- ── Left: city emergency hotlines ───────────────────────── -->
+        <div class="col-lg-4">
+            <section class="cd-hotlines" aria-labelledby="cd-hotlines-title">
+                <div class="cd-hotlines-head">
+                    <img src="/static/img/sanpedro-logo-transparent.png" alt="City of San Pedro seal">
+                    <h2 id="cd-hotlines-title">City of San Pedro Emergency Hotlines</h2>
+                </div>
+                <hr>
+                <div class="cd-hotline">
+                    <h3>National Emergency Hotline</h3>
+                    <div class="cd-hotline-box cd-big"><a href="tel:911">911</a></div>
+                </div>
+                {% for title, numbers in city_hotlines %}
+                <div class="cd-hotline">
+                    <h3>{{ title }}</h3>
+                    <div class="cd-hotline-box">
+                        {% for display, tel in numbers %}
+                        <a href="tel:{{ tel }}">{{ display }}</a>{% if not loop.last %}<br>{% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+            </section>
+        </div>
+
+        <!-- ── Right: search + flat contact table ──────────────────── -->
+        <div class="col-lg-8 d-flex flex-column">
+            <form method="GET" action="{{ directory_url }}" class="row g-2 align-items-center mb-2 js-live-filter"
+                  role="search">
+                <div class="col-sm">
+                    <label for="cd-q" class="visually-hidden">Search contacts</label>
+                    <div class="cd-search">
+                        <i class="bi bi-search" aria-hidden="true"></i>
+                        <input type="search" id="cd-q" name="q" value="{{ f_q }}" class="form-control form-control-sm"
+                               placeholder="Search barangay, name, role, or number…" autocomplete="off">
+                    </div>
+                </div>
+                <div class="col-sm-auto">
+                    <label for="cd-brgy" class="visually-hidden">Barangay</label>
+                    <select id="cd-brgy" name="brgy" class="form-select form-select-sm">
+                        <option value="">All barangays</option>
+                        {% for name in barangay_names %}
+                        <option value="{{ name }}" {% if f_brgy == name %}selected{% endif %}>{{ name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-auto">
+                    <a href="{{ directory_url }}" class="btn btn-outline-secondary btn-sm"
+                       title="Reset filters" aria-label="Reset filters">
+                        <i class="bi bi-x-circle" aria-hidden="true"></i>
+                    </a>
+                </div>
+            </form>
+
+            <div class="table-responsive flex-grow-1">
+                <table class="table cd-table">
+                    <thead>
+                        <tr>
+                            <th scope="col">Barangay</th>
+                            <th scope="col">Name</th>
+                            <th scope="col">Contact No.</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for r in rows %}
+                        <tr>
+                            <td>{{ r.barangay }}</td>
+                            <td>
+                                <span class="fw-semibold">{{ r.name or '—' }}</span>
+                                <span class="cd-role">{{ r.role }}</span>
+                            </td>
+                            <td>{{ number_cell(r.number) }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="3" class="text-center text-muted py-5">
+                            {% if f_q or f_brgy %}
+                            No contacts match your search.
+                            <a href="{{ directory_url }}" class="ms-1">Clear filters</a>
+                            {% else %}
+                            No barangay contacts are on file yet.
+                            {% endif %}
+                        </td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% if page_obj.total %}
+            <nav class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-2"
+                 aria-label="Contact directory pages">
+                <span class="text-muted small">
+                    Showing {{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ page_obj.total }}
+                </span>
+                {% if page_obj.total_pages > 1 %}
+                <ul class="cd-pager">
+                    <li>
+                        {% if page_obj.has_prev %}
+                        <a href="{{ page_url(page_obj.page - 1) }}" aria-label="Previous page"><i class="bi bi-chevron-left" aria-hidden="true"></i></a>
+                        {% else %}
+                        <span class="cd-off" aria-disabled="true"><i class="bi bi-chevron-left" aria-hidden="true"></i></span>
+                        {% endif %}
+                    </li>
+                    {% for n in page_numbers %}
+                    <li>
+                        {% if n is none %}
+                        <span aria-hidden="true">…</span>
+                        {% elif n == page_obj.page %}
+                        <span class="cd-current" aria-current="page">{{ n }}</span>
+                        {% else %}
+                        <a href="{{ page_url(n) }}" aria-label="Page {{ n }}">{{ n }}</a>
+                        {% endif %}
+                    </li>
+                    {% endfor %}
+                    <li>
+                        {% if page_obj.has_next %}
+                        <a href="{{ page_url(page_obj.page + 1) }}" aria-label="Next page"><i class="bi bi-chevron-right" aria-hidden="true"></i></a>
+                        {% else %}
+                        <span class="cd-off" aria-disabled="true"><i class="bi bi-chevron-right" aria-hidden="true"></i></span>
+                        {% endif %}
+                    </li>
+                </ul>
+                {% endif %}
+            </nav>
+            {% endif %}
+        </div>
     </div>
 </div>
 
-<div class="row g-3 mb-3">
-    <div class="col-md-4">
-        <div class="stat-card d-flex justify-content-between align-items-center">
-            <div>
-                <div class="stat-label">Barangays</div>
-                <div class="stat-value">{{ total }}</div>
-            </div>
-            <div class="stat-icon rk-tint-green-rk"><i class="bi bi-geo-alt"></i></div>
+{% if can_edit_contacts and barangay %}
+<!-- ── Edit Contact (BDRRMO, own barangay only) ───────────────────── -->
+<div class="modal fade" id="editContactModal" tabindex="-1" aria-labelledby="editContactTitle" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <form method="POST" action="/bdrrmo/contacts" data-validate>
+        <div class="modal-header">
+            <h5 class="modal-title" id="editContactTitle">Edit Contact — Barangay {{ barangay.name }}</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
-    </div>
-    <div class="col-md-4">
-        <div class="stat-card d-flex justify-content-between align-items-center">
-            <div>
-                <div class="stat-label">With Contacts on File</div>
-                <div class="stat-value">{{ with_contacts }}</div>
-            </div>
-            <div class="stat-icon rk-tint-green-alt"><i class="bi bi-person-vcard"></i></div>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="stat-card d-flex justify-content-between align-items-center">
-            <div>
-                <div class="stat-label">Contact Persons</div>
-                <div class="stat-value">{{ total_contacts }}</div>
-            </div>
-            <div class="stat-icon rk-tint-amber"><i class="bi bi-telephone"></i></div>
-        </div>
-    </div>
-</div>
-
-<div class="container-fluid m-0">
-    <div class="row gap-2">
-        <div class="dash-card col-4">
-            <div class="d-flex gap-1">
-                <img id="san-pedro-logo" src="/static/img/sanpedro-logo-transparent.png" alt="San Pedro logo">
-                <div class="d-flex align-items-center">
-                    <h2 class="m-0">City of San Pedro Laguna </br> Emergency Hotlines</h2>
-                </div>
-            </div>
-            <div class="hotline-container">
-                <h3>National Emergency Hotline</h3>
-                <div class="hotline-number-container">
-                    <p>911</p>
-                </div>
-            </div>
-            <div class="hotline-container">
-                <h3>San Pedro CDRRMO</h3>
-                <div class="hotline-number-container">
-                    <p>(02) 8403-2648 </br> 0998 594 1743</p>
-                </div>
-            </div>
-            <div class="hotline-container">
-                <h3>City Fire Auxiliary Unit</h3>
-                <div class="hotline-number-container">
-                    <p>(02) 8363-9392 </p>
-                </div>
-            </div>
-            <div class="hotline-container">
-                <h3>Meralco</h3>
-                <div class="hotline-number-container">
-                    <p>0920 971 6211 </br> 0917 551 6211 or 16211</p>
-                </div>
-            </div>
-            <div class="hotline-container">
-                <h3>Bureau of Fire Protection</h3>
-                <div class="hotline-number-container">
-                    <p>(02) 8808-0617 </br> 0936 470 2158</p>
-                </div>
-            </div>
-            <div class="hotline-container">
-                <h3>Jose L. Amante Emergency Hospital</h3>
-                <div class="hotline-number-container">
-                    <p>(02) 8868-5284 </br> (02) 8478-5709</p>
-                </div>
-            </div>
-            <div class="hotline-container">
-                <h3>City Police Station</h3>
-                <div class="hotline-number-container">
-                    <p>(02) 8567-3381 </br> (02) 8541-1548</p>
-                </div>
-            </div>
-            <div class="hotline-container">
-                <h3>Gavino Alvarez Lying-in Clinic</h3>
-                <div class="hotline-number-container">
-                    <p>(02) 8519-0249 </br> (02) 8478-6270</p>
-                </div>
-            </div>
-        </div>
-        <div class="col">
-
-
-            <!-- ── Filters (auto-apply) ───────────────────────────────────── -->
-            <div class="h-auto dash-card mb-3">
-                <form method="GET" action="{{ directory_url }}" class="row g-2 align-items-end js-live-filter">
-                    <div class="col-md-8">
-                        <label class="form-label small fw-semibold mb-1">Search</label>
-                        <input type="search" name="q" value="{{ f_q }}" class="form-control form-control-sm"
-                            placeholder="Search barangay, name, role, or number…" autocomplete="off">
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label small fw-semibold mb-1">Barangay</label>
-                        <select name="brgy" class="form-select form-select-sm">
-                            <option value="">All barangays</option>
-                            {% for name in barangay_names %}
-                            <option value="{{ name }}" {% if f_brgy == name %}selected{% endif %}>{{ name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="col-md-1 d-grid">
-                        <a href="{{ directory_url }}" class="btn btn-outline-secondary btn-sm" title="Reset filters">
-                            <i class="bi bi-x-circle"></i>
-                        </a>
-                    </div>
-                </form>
-            </div>
-
-            <!-- ── Directory — grouped per barangay, two cards per row ─────── -->
+        <div class="modal-body">
+            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+            <input type="hidden" name="next" value="/bdrrmo/directory">
             <div class="row g-3">
-            {% for b in rows %}
-                <div class="col-lg-12">
-                <div class="dash-card h-100 p-3">
-                    <div class="card-title-row justify-content-between mb-2">
-                        <div class="d-flex align-items-center gap-2">
-                            <i class="bi bi-geo-alt-fill rk-text-green"></i>
-                            <h6 class="mb-0">Barangay {{ b.name }}</h6>
-                        </div>
-                        <span class="badge rk-bg-soft text-muted">
-                            {{ b.entries | length }} contact{{ '' if b.entries | length == 1 else 's' }}
-                        </span>
-                    </div>
-
-                    {% if b.entries %}
-                    <div class="table-responsive">
-                        <table class="table table-sm table-hover align-middle mb-0 rk-fs-13">
-                            <tbody>
-                                {% for e in b.entries %}
-                                <tr>
-                                    <td class="ps-0 pe-2">
-                                        <span class="badge rk-bg-soft text-muted fw-semibold">{{ e.role }}</span>
-                                    </td>
-                                    <td class="fw-semibold">{{ e.name or '—' }}</td>
-                                    <td class="text-end pe-0">{{ number_cell(e.number) }}</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                    {% else %}
-                    <p class="small text-muted mb-0">
-                        <i class="bi bi-info-circle me-1"></i>No contacts on file for this barangay yet.
-                    </p>
-                    {% endif %}
+                <div class="col-md-6">
+                    <label for="ec-captain-name" class="form-label small fw-semibold mb-1">Barangay Captain</label>
+                    <input type="text" id="ec-captain-name" name="captain_name" maxlength="100"
+                           class="form-control form-control-sm" value="{{ barangay.captain_name or '' }}">
                 </div>
+                <div class="col-md-6">
+                    <label for="ec-captain-contact" class="form-label small fw-semibold mb-1">Captain Contact</label>
+                    <input type="text" id="ec-captain-contact" name="captain_contact" maxlength="20"
+                           class="form-control form-control-sm" data-rule="phone-ph"
+                           value="{{ barangay.captain_contact or '' }}">
                 </div>
-            {% else %}
+                <div class="col-md-6">
+                    <label for="ec-chair-name" class="form-label small fw-semibold mb-1">BDRRMO Chairperson</label>
+                    <input type="text" id="ec-chair-name" name="chairperson_name" maxlength="100"
+                           class="form-control form-control-sm" value="{{ barangay.chairperson_name or '' }}">
+                </div>
+                <div class="col-md-6">
+                    <label for="ec-chair-contact" class="form-label small fw-semibold mb-1">Chairperson Contact</label>
+                    <input type="text" id="ec-chair-contact" name="chairperson_contact" maxlength="20"
+                           class="form-control form-control-sm" data-rule="phone-ph"
+                           value="{{ barangay.chairperson_contact or '' }}">
+                </div>
                 <div class="col-12">
-                <div class="dash-card text-center text-muted py-5">
-                    No barangays match your filters.
-                    {% if f_q or f_brgy %}
-                    <a href="{{ directory_url }}" class="ms-2">Clear filters</a>
-                    {% endif %}
+                    <label for="ec-responders" class="form-label small fw-semibold mb-1">Emergency Responders</label>
+                    <textarea id="ec-responders" name="emergency_contacts" rows="4" class="form-control form-control-sm"
+                              aria-describedby="ec-responders-help"
+                              placeholder="One per line — name, role, and contact number (e.g. Juan Dela Cruz — Rescue Team Lead — 0917…)">{{ barangay.emergency_contacts or '' }}</textarea>
+                    <div id="ec-responders-help" class="form-text">Free-text list of responders and their contact numbers.</div>
                 </div>
-                </div>
-            {% endfor %}
             </div>
-
-            {{ pager(page_obj, directory_url, base_query) }} 
         </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn-rk btn-sm">
+                <i class="bi bi-save" aria-hidden="true"></i> Save Contact Details
+            </button>
+        </div>
+      </form>
     </div>
-  
+  </div>
 </div>
-
-
+{% endif %}
 {% endblock %}
