@@ -1,11 +1,13 @@
 {% extends "admin/base.html" %}
 {% from "shared/_pagination.html" import pager %}
+{% from "bdrrmo/_plan_banner.html" import plan_status_banner %}
 
 {% block title %}Planning — RisKonek{% endblock %}
 
 {% set active_nav = 'planning' %}
 
 {% block head_extra %}
+<link rel="stylesheet" href="/static/css/rk-dashboard.css">
 <style nonce="{{ request.state.csp_nonce }}">
     #header { margin: 0; color: #167736; font-size: 40px;}
 </style>
@@ -46,17 +48,6 @@
 </div>
 {% endif %}
 
-{% if not_submitted %}
-<div class="alert alert-warning alert-dismissible fade show">
-    <i class="bi bi-exclamation-triangle-fill me-1"></i>
-    Your bdrrm plan              
-        <b>{{not_submitted}}</b>
-        is approved, you may now proceed to the cdrrm research and planning office to submit your hardcopy
-    
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-</div>
-{% endif %}
-
 {% if not barangay %}
 <div class="alert alert-warning">
     <i class="bi bi-exclamation-triangle-fill me-1"></i>
@@ -64,24 +55,37 @@
 </div>
 {% else %}
 
-<!-- ── Submit a disaster / risk report (TR-BDR-01/02) ──────────── -->
+<!-- ── Submit the BDRRM Plan (one plan per barangay) ──────────── -->
+{# A returned plan's notice sits above the card, which stays enabled. #}
+{% if plan_banner and not upload_blocked %}
+{{ plan_status_banner(plan_banner) }}
+{% endif %}
 <div class="dash-card mb-4">
     <div class="card-title-row">
         <i class="bi bi-plus-circle rk-text-green"></i>
-        <h6>Submit Planning</h6>
+        <h6 id="submit-planning-title">Submit Planning</h6>
     </div>
-    <form method="POST" action="/bdrrmo/planning" class="row g-3" data-validate
+    {# Pending/approved: the server refuses uploads too; this only mirrors it. #}
+    {% if upload_blocked %}
+    {{ plan_status_banner(plan_banner) }}
+    {% endif %}
+    <form method="POST" action="/bdrrmo/planning" class="row g-3{% if upload_blocked %} rkd-upload-locked{% endif %}"
+          {% if not upload_blocked %}data-validate
           data-loading-text="Reading the plan and preparing the summary…"
-          data-confirm='Submit this planning for your barangay?' enctype="multipart/form-data">
+          data-confirm='Submit this planning for your barangay?'{% endif %}
+          {% if upload_blocked %}aria-disabled="true"{% endif %}
+          enctype="multipart/form-data">
             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
         <div class="col-12">
-            <label class="form-label small fw-semibold mb-1">Planning File</label>
-            <input type="file" name="file" class="form-control"
-                   accept=".pdf" required>
+            <label class="form-label small fw-semibold mb-1" for="planning-file">Planning File</label>
+            <input type="file" name="file" id="planning-file" class="form-control"
+                   accept=".pdf" required
+                   {% if upload_blocked %}disabled aria-disabled="true"{% endif %}>
             <div class="form-text">Supported: PDF only</div>
         </div>
         <div class="col-12">
-            <button type="submit" class="btn-rk btn-sm">
+            <button type="submit" class="btn-rk btn-sm"
+                    {% if upload_blocked %}disabled aria-disabled="true"{% endif %}>
                 <i class="bi bi-send"></i> Submit Planning
             </button>
             <span class="text-muted small ms-2">
@@ -169,13 +173,17 @@
                             <i class="bi bi-eye"></i> View Reason
                         </button>
                         {% endif %}
+                        {# Only returned plans can be archived (enforced server-side). #}
+                        {% if planning.status_value == "rejected" %}
                         <form method="POST" action="/bdrrmo/planning/{{ planning.id }}/archive" class="d-inline"
-                              data-confirm='Archive {{ planning.name }}?'>
+                              data-confirm='Archive {{ planning.file_name }}?'>
                             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
-                            <button type="submit" class="btn btn-outline-warning btn-sm">
-                                <i class="bi bi-archive"></i>
+                            <button type="submit" class="btn btn-outline-warning btn-sm"
+                                    aria-label="Archive {{ planning.file_name }}">
+                                <i class="bi bi-archive" aria-hidden="true"></i>
                             </button>
                         </form>
+                        {% endif %}
                     {% else %}
                         {% if planning.status_value == "rejected" %}
                         <button type="button" class="btn btn-outline-primary btn-sm"

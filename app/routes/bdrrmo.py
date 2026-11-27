@@ -185,6 +185,7 @@ def profile(request: Request, db: Session = Depends(get_db)):
         "today": today,
         "today_label": pdash.long_date(today),
         "plan": None,
+        "plan_banner": None,
     }
 
     plan = pdash.latest_plan_for_barangay(db, barangay.id) if barangay else None
@@ -200,6 +201,7 @@ def profile(request: Request, db: Session = Depends(get_db)):
         context.update({
             "plan": plan,
             "plan_status": pdash.plan_status(plan),
+            "plan_banner": plan_banner(plan),
             "cards": pdash.activity_cards(activities),
             "upcoming": upcoming,
             "upcoming_end": today + timedelta(days=pdash.UPCOMING_DAYS - 1),
@@ -3426,6 +3428,62 @@ PLANNING_STATUS_LABELS = {
 
 PLANNING_STATUS_CHOICES = ["pending", "approved", "rejected"]
 
+# ── One BDRRM Plan per barangay ──────────────────────────────────────
+# A barangay's "current plan" is its latest non-archived Planning row
+# (pdash.latest_plan_for_barangay). A pending or approved current plan blocks
+# any new upload; no plan, or a returned (rejected) one, allows it.
+UPLOAD_BLOCKING_STATUSES = ("pending", "approved")
+
+
+def barangay_upload_block(db, barangay_id):
+    """The plan that blocks a new upload for this barangay, or None."""
+    if not barangay_id:
+        return None
+    plan = pdash.latest_plan_for_barangay(db, barangay_id)
+    if plan and pdash.plan_status(plan) in UPLOAD_BLOCKING_STATUSES:
+        return plan
+    return None
+
+
+def _upload_block_message(plan) -> str:
+    if pdash.plan_status(plan) == "approved":
+        return (f"Your BDRRM Plan '{plan.file_name}' is already approved. "
+                "A new plan cannot be uploaded.")
+    return ("Your BDRRM Plan is already submitted for review by the Research and "
+            "Planning Office. A new plan cannot be uploaded while it is pending.")
+
+
+def _upload_blocked_redirect(plan, draft_id: Optional[str] = None):
+    """Refuse an upload step: drop the (now unusable) draft and go back to
+    the Planning page with the blocking reason."""
+    if draft_id:
+        delete_temporary_draft(draft_id)
+    return RedirectResponse(
+        url="/bdrrmo/planning?error=" + quote_plus(_upload_block_message(plan)),
+        status_code=302,
+    )
+
+
+def _plan_date_label(d) -> str:
+    return f"{d:%B} {d.day}, {d.year}" if d else ""
+
+
+def plan_banner(plan):
+    """What the Planning page and dashboard say about the current plan:
+    None (no plan) or a dict the bdrrmo/_plan_banner.html macro renders."""
+    if not plan:
+        return None
+    status = pdash.plan_status(plan)
+    banner = {"file_name": plan.file_name, "kind": status}
+    if status == "approved":
+        if plan.is_hardcopy_received:
+            banner["kind"] = "received"
+            banner["received_on"] = _plan_date_label(plan.hardcopy_received_date)
+    elif status == "rejected":
+        banner["kind"] = "returned"
+        banner["reason"] = (plan.reason or "").strip()
+    return banner
+
 @router.get("/planning", response_class=HTMLResponse)
 def planning(
     request: Request,              
@@ -3467,12 +3525,8 @@ def planning(
             "created_at": r.created_at,
         })
 
-    rows_not_submitted = []
-    for r in query.filter(Planning.is_hardcopy_received == False, Planning.status == "approved"):
-        rows_not_submitted.append({
-            "id": r.id,
-            "file_name": r.file_name,
-        })
+    current_plan = pdash.latest_plan_for_barangay(db, barangay.id) if barangay else None
+    banner = plan_banner(current_plan)
 
     page_obj = paginate(rows, parse_page(page), parse_per_page(per_page))
     base_query = build_base_query({"q": q or "", "status": status or ""})
@@ -3488,7 +3542,8 @@ def planning(
             "plannings": page_obj.items,
             "page_obj": page_obj,
             "base_query": base_query,
-            "not_submitted": filenames_to_paragraph(rows_not_submitted),
+            "plan_banner": banner,
+            "upload_blocked": bool(banner) and banner["kind"] != "returned",
             "status_choices": [(v, PLANNING_STATUS_LABELS[v]) for v in PLANNING_STATUS_CHOICES],
             "f_q": q or "",
             "f_status": status,
@@ -3521,6 +3576,9 @@ async def planning_upload_submit(
             status_code=302,
         )
 
+    blocking = barangay_upload_block(db, barangay.id)
+    if blocking:
+        return _upload_blocked_redirect(blocking)
 
     draft_id = str(uuid.uuid4())
 
@@ -3592,6 +3650,10 @@ def planning_preview(
     if isinstance(user, RedirectResponse):
         return user
 
+    blocking = barangay_upload_block(db, barangay.id)
+    if blocking:
+        return _upload_blocked_redirect(blocking, draft_id)
+
     return templates.TemplateResponse(
         request=request,
         name="bdrrmo/planning_preview.html",
@@ -3642,9 +3704,13 @@ def planning_preview_extract(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    user, _, draft = _resolve_draft(request, db, draft_id)
+    user, barangay, draft = _resolve_draft(request, db, draft_id)
     if isinstance(user, RedirectResponse):
         return user
+
+    blocking = barangay_upload_block(db, barangay.id)
+    if blocking:
+        return _upload_blocked_redirect(blocking, draft_id)
 
     review_url = f"/bdrrmo/planning/review/{draft_id}"
 
@@ -3758,6 +3824,34 @@ def planning_archive_toggle(
     p = _get_planning_owned_upload(db, planning_id, barangay)
     if not p:
         return RedirectResponse(url="/bdrrmo/planning?error=Plan+not+found", status_code=302)
+
+    status = pdash.plan_status(p)
+    if not p.is_archived:
+        # Archiving a pending/approved plan would hide it and unblock a
+        # second upload, so only returned plans can be archived.
+        if status != "rejected":
+            return RedirectResponse(
+                url="/bdrrmo/planning?error=" + quote_plus(
+                    "Only returned plans can be archived. A pending or approved "
+                    "BDRRM Plan stays active."
+                ),
+                status_code=302,
+            )
+    else:
+        # Restoring must not leave the barangay with two active plans, nor put
+        # a returned plan ahead of the pending/approved one.
+        blocking = barangay_upload_block(db, barangay.id)
+        if blocking and (
+            status in UPLOAD_BLOCKING_STATUSES
+            or (p.created_at and blocking.created_at and p.created_at > blocking.created_at)
+        ):
+            return RedirectResponse(
+                url="/bdrrmo/planning?archived=1&error=" + quote_plus(
+                    f"This plan cannot be restored while your BDRRM Plan "
+                    f"'{blocking.file_name}' is {pdash.plan_status(blocking)}."
+                ),
+                status_code=302,
+            )
 
     p.is_archived = not bool(p.is_archived)
     db.commit()
@@ -3878,6 +3972,10 @@ def review_activities(
             status_code=302,
         )
 
+    blocking = barangay_upload_block(db, barangay.id)
+    if blocking:
+        return _upload_blocked_redirect(blocking, draft_id)
+
     return templates.TemplateResponse(
         request=request,
         name="bdrrmo/planning_activities_review.html",
@@ -3937,6 +4035,12 @@ async def save_confirmed_activities(
             url="/bdrrmo/planning?error=Draft+not+found",
             status_code=302,
         )
+
+    # Checked again here: the draft may have been started before another
+    # plan of this barangay was submitted.
+    blocking = barangay_upload_block(db, barangay.id)
+    if blocking:
+        return _upload_blocked_redirect(blocking, draft_id)
 
     permanent_path = None
 
