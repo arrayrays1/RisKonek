@@ -1,9 +1,14 @@
 {% extends "admin/base.html" %}
-{% from "shared/_pagination.html" import pager %}
+{% from "shared/_pagination.html" import rk_pager %}
+{% from "shared/_table.html" import clear_filters %}
 
 {% block title %}Vehicle & Equipment — RisKonek{% endblock %}
 
 {% set active_nav = 'equipment' %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="/static/css/rk-dashboard.css">
+{% endblock %}
 
 {% macro status_pill(v, label) -%}
     {% if v in ('available', 'serviceable') %}
@@ -43,98 +48,91 @@
 {% endif %}
 
 <!-- ── Summary cards ──────────────────────────────────────────── -->
-<div class="row g-3 mb-3">
-
-    {% for vehicle in vehicles %}
-        <div class="col-md-3">
-            <div class="stat-card d-flex justify-content-between align-items-center">
-                <div>
-                    <div class="stat-label">{{ vehicle.equipment_name }}</div>
-                    <div class="stat-value">{{ vehicle.total }}</div>
-                </div>
+<div class="row row-cols-1 row-cols-sm-3 g-3 mb-3">
+    {% for v in vehicles %}
+    <div class="col">
+        <a href="{{ v.href }}" class="rk-stat-card rk-stat-neutral rk-stat-link{% if v.selected %} is-selected{% endif %}"
+           aria-label="Show {{ v.plural }} ({{ v.total }})"{% if v.selected %} aria-current="true"{% endif %}>
+            <i class="bi bi-{{ v.icon }} rk-stat-icon" aria-hidden="true"></i>
+            <div class="rk-stat-text">
+                <div class="rk-stat-label">{{ v.label }}</div>
+                <div class="rk-stat-value">{{ v.total }}</div>
+                <div class="rk-stat-sub">{{ 'unit' if v.total == 1 else 'units' }} across all barangays</div>
+                {% if v.selected %}<div class="rk-stat-selected"><i class="bi bi-check-circle-fill" aria-hidden="true"></i> Showing in table</div>{% endif %}
             </div>
-        </div>
+        </a>
+    </div>
     {% endfor %}
 </div>
 
-<!-- ── Filters ────────────────────────────────────────────────── -->
-<div class="dash-card mb-3">
-    <form method="GET" action="/admin/equipment" class="row g-2 align-items-end js-live-filter">
-        <div class="col-md-3">
-            <label class="form-label small fw-semibold mb-1">Search</label>
-            <input type="text" name="q" value="{{ f_q }}" class="form-control form-control-sm"
-                   placeholder="Search name or plate/serial…" autocomplete="off">
-        </div>
-        <div class="col-md-2">
-            <label class="form-label small fw-semibold mb-1">Barangay</label>
-            <select name="barangay_id" class="form-select form-select-sm">
-                
-                <option value=0>All Barangay</option>
-                {% for b in barangays %}
-                <option value="{{ b.id }}" {% if f_barangay_id == b.id %}selected{% endif %}>{{ b.name }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="col-md-2">
-            <label class="form-label small fw-semibold mb-1">Type</label>
-            <select name="equipment_type" class="form-select form-select-sm">
-                <option value="">All types</option>
-                {% for v, label in types %}
-                <option value="{{ v }}" {% if f_type == v %}selected{% endif %}>{{ label }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="col-md-2">
-            <label class="form-label small fw-semibold mb-1">View</label>
-            <select name="archived" class="form-select form-select-sm">
-                <option value=""  {% if not show_archived %}selected{% endif %}>Active</option>
-                <option value="1" {% if show_archived %}selected{% endif %}>Archived</option>
-            </select>
-        </div>
-        <div class="col-md-1 d-grid">
-            <a href="/admin/equipment" class="btn btn-outline-secondary btn-sm" title="Reset filters">
-                <i class="bi bi-x-circle"></i>
-            </a>
-        </div>
-    </form>
-</div>
+<!-- ── Filters (auto-apply) ───────────────────────────────────── -->
+<form method="GET" action="/admin/equipment" class="rk-filter-bar js-live-filter" role="search">
+    <div class="rk-filter-search">
+        <label for="eq-q" class="visually-hidden">Search name or plate/serial</label>
+        <i class="bi bi-search" aria-hidden="true"></i>
+        <input type="text" id="eq-q" name="q" value="{{ f_q }}" class="form-control"
+               placeholder="Search name or plate/serial…" autocomplete="off">
+    </div>
+    <div class="rk-filter-select">
+        <label for="eq-brgy" class="visually-hidden">Barangay</label>
+        <select id="eq-brgy" name="barangay_id" class="form-select">
+            <option value=0>All Barangay</option>
+            {% for b in barangays %}
+            <option value="{{ b.id }}" {% if f_barangay_id == b.id %}selected{% endif %}>{{ b.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="rk-filter-select">
+        <label for="eq-type" class="visually-hidden">Type</label>
+        <select id="eq-type" name="equipment_type" class="form-select">
+            <option value="">All types</option>
+            {% for v, label in types %}
+            <option value="{{ v }}" {% if f_type == v %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="rk-filter-select">
+        <label for="eq-view" class="visually-hidden">View</label>
+        <select id="eq-view" name="archived" class="form-select">
+            <option value=""  {% if not show_archived %}selected{% endif %}>Active</option>
+            <option value="1" {% if show_archived %}selected{% endif %}>Archived</option>
+        </select>
+    </div>
+    {{ clear_filters("/admin/equipment") }}
+</form>
 
 <!-- ── Table ──────────────────────────────────────────────────── -->
-<div class="dash-card overflow-hidden p-0">
-    <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
-            <thead class="rk-bg-soft">
-                <tr class="rk-th-soft">
-                    <th class="px-3 py-3">Barangay</th>
-                    <th class="px-3 py-3">Equipment</th>
-                    <th class="py-3">Type</th>
-                    <th class="py-3">Plate / Serial</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for e in rows %}
-                <tr class="rk-fs-13">
-                    <td class="px-3 fw-semibold">{{ e.barangay }}</td>
-                    <td class="px-3 fw-semibold">{{ e.name }}</td>
-                    <td>{{ e.type_label }}</td>
-                    <td class="text-muted">{{ e.plate_or_serial }}</td>
-                </tr>
-                {% else %}
-                <tr>
-                    <td colspan="7" class="text-center text-muted py-4">
-                        No equipment matches your filters.
-                        {% if f_q or f_type or f_status or f_archived %}
-                        <a href="/admin/equipment" class="ms-2">Clear filters</a>
-                        {% endif %}
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+<div class="rk-table-card">
+    <table class="rk-table">
+        <thead>
+            <tr>
+                <th scope="col">Barangay</th>
+                <th scope="col">Equipment</th>
+                <th scope="col">Type</th>
+                <th scope="col">Plate / Serial</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for e in rows %}
+            <tr>
+                <td class="fw-semibold">{{ e.barangay }}</td>
+                <td class="fw-semibold">{{ e.name }}</td>
+                <td>{{ e.type_label }}</td>
+                <td class="text-muted">{{ e.plate_or_serial }}</td>
+            </tr>
+            {% else %}
+            <tr class="rk-table-empty"><td colspan="4">
+                No records found.
+                {% if f_q or f_barangay_id or f_type or show_archived %}
+                <a href="/admin/equipment" class="ms-1">Clear filters</a>
+                {% endif %}
+            </td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
 </div>
 
-{{ pager(page_obj, "/admin/equipment", base_query) }}
+{{ rk_pager(page_obj, "/admin/equipment", base_query, "Equipment pages") }}
 
 <!-- ── Status change modals ───────────────────────────────────── -->
 {% for e in rows %}

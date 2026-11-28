@@ -1,5 +1,6 @@
 {% extends "admin/base.html" %}
-{% from "shared/_pagination.html" import pager %}
+{% from "shared/_pagination.html" import rk_pager %}
+{% from "shared/_table.html" import clear_filters %}
 
 {% block title %}User Management — RisKonek{% endblock %}
 
@@ -39,56 +40,50 @@
 {% endif %}
 
 <!-- ── Filters (auto-apply) ───────────────────────────────────── -->
-<div class="dash-card mb-3">
-    <form method="GET" action="/admin/users" class="row g-2 align-items-end js-live-filter">
-        <div class="col-md-5">
-            <label class="form-label small fw-semibold mb-1">Search</label>
-            <input type="text" name="q" value="{{ f_q }}" class="form-control form-control-sm"
-                   placeholder="Search username or email…" autocomplete="off">
-        </div>
-        <div class="col-md-3">
-            <label class="form-label small fw-semibold mb-1">Role</label>
-            <select name="role" class="form-select form-select-sm">
-                <option value="">All roles</option>
-                {% for r in roles %}
-                <option value="{{ r }}" {% if f_role == r %}selected{% endif %}>{{ role_labels.get(r, r) }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="col-md-3">
-            <label class="form-label small fw-semibold mb-1">Status</label>
-            <select name="status" class="form-select form-select-sm">
-                <option value="">Any</option>
-                <option value="active"   {% if f_status == 'active'   %}selected{% endif %}>Active</option>
-                <option value="inactive" {% if f_status == 'inactive' %}selected{% endif %}>Inactive</option>
-            </select>
-        </div>
-        <div class="col-md-1 d-grid">
-            <a href="/admin/users" class="btn btn-outline-secondary btn-sm" title="Reset filters">
-                <i class="bi bi-x-circle"></i>
-            </a>
-        </div>
-    </form>
-</div>
+<form method="GET" action="/admin/users" class="rk-filter-bar js-live-filter" role="search">
+    <div class="rk-filter-search">
+        <label for="us-q" class="visually-hidden">Search username or email</label>
+        <i class="bi bi-search" aria-hidden="true"></i>
+        <input type="text" id="us-q" name="q" value="{{ f_q }}" class="form-control"
+               placeholder="Search username or email…" autocomplete="off">
+    </div>
+    <div class="rk-filter-select">
+        <label for="us-role" class="visually-hidden">Role</label>
+        <select id="us-role" name="role" class="form-select">
+            <option value="">All roles</option>
+            {% for r in roles %}
+            <option value="{{ r }}" {% if f_role == r %}selected{% endif %}>{{ role_labels.get(r, r) }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="rk-filter-select">
+        <label for="us-status" class="visually-hidden">Status</label>
+        <select id="us-status" name="status" class="form-select">
+            <option value="">Any status</option>
+            <option value="active"   {% if f_status == 'active'   %}selected{% endif %}>Active</option>
+            <option value="inactive" {% if f_status == 'inactive' %}selected{% endif %}>Inactive</option>
+        </select>
+    </div>
+    {{ clear_filters("/admin/users") }}
+</form>
 
-<div class="dash-card overflow-hidden p-0">
-    <div class="table-responsive">
-        <table class="table table-hover mb-0 align-middle">
-            <thead class="rk-bg-soft">
-                <tr class="rk-th-soft">
-                    <th class="px-3 py-3">Username</th>
-                    <th class="py-3">Email</th>
-                    <th class="py-3">Role</th>
-                    <th class="py-3">Barangay</th>
-                    <th class="py-3">Contact</th>
-                    <th class="py-3">Status</th>
-                    <th class="py-3 text-end px-3">Actions</th>
+<div class="rk-table-card">
+    <table class="rk-table">
+            <thead>
+                <tr>
+                    <th scope="col">Username</th>
+                    <th scope="col">Email</th>
+                    <th scope="col">Role</th>
+                    <th scope="col">Barangay</th>
+                    <th scope="col">Contact</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Actions</th>
                 </tr>
             </thead>
             <tbody>
                 {% for u in all_users %}
-                <tr class="rk-fs-13">
-                    <td class="px-3 fw-semibold">{{ u.username }}</td>
+                <tr>
+                    <td class="fw-semibold">{{ u.username }}</td>
                     <td>{{ u.email or '—' }}</td>
                     <td>
                         {% if u.role.value == 'admin' %}
@@ -110,18 +105,18 @@
                             <span class="status-pill status-maintenance">Inactive</span>
                         {% endif %}
                     </td>
-                    <td class="text-end px-3">
+                    <td>
+                    <div class="rk-table-actions">
                         <a href="/admin/users/{{ u.id }}/edit"
-                           class="btn btn-outline-secondary btn-sm me-1">
+                           class="btn btn-outline-secondary btn-sm">
                             <i class="bi bi-pencil"></i> Edit
                         </a>
                         <a href="/admin/audit?user_id={{ u.id }}"
-                           class="btn btn-outline-secondary btn-sm me-1" title="View this user's audit trail">
+                           class="btn btn-outline-secondary btn-sm" title="View this user's audit trail">
                             <i class="bi bi-clock-history"></i> Audit
                         </a>
                         {% if u.id != user.id %}
                         <form method="POST" action="/admin/users/{{ u.id }}/toggle"
-                              class="d-inline"
                               data-confirm='Are you sure?'>
             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                             <button type="submit"
@@ -134,22 +129,22 @@
                             </button>
                         </form>
                         {% endif %}
+                    </div>
                     </td>
                 </tr>
                 {% else %}
-                <tr>
-                    <td colspan="7" class="text-center text-muted py-4">
-                        No users match your filters.
+                <tr class="rk-table-empty">
+                    <td colspan="7">
+                        No records found.
                         {% if f_q or f_role or f_status %}
-                        <a href="/admin/users" class="ms-2">Clear filters</a>
+                        <a href="/admin/users" class="ms-1">Clear filters</a>
                         {% endif %}
                     </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
-    </div>
 </div>
 
-{{ pager(page_obj, "/admin/users", base_query) }}
+{{ rk_pager(page_obj, "/admin/users", base_query, "User pages") }}
 {% endblock %}

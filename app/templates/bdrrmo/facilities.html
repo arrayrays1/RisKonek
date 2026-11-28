@@ -1,15 +1,13 @@
 {% extends "admin/base.html" %}
 
+{% from "shared/_pagination.html" import rk_pager %}
+
 {% block title %}Critical Facilities — RisKonek{% endblock %}
 
 {% block head_extra %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
       integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous"/>
 
-<style nonce="{{ request.state.csp_nonce }}">
-
-    #header { margin: 0; color: #167736; font-size: 40px;}
-</style>
 {% endblock %}
 
 {% set active_nav = 'bdrrmo_facilities' %}
@@ -266,113 +264,111 @@
 {% endif %}
 
 <!-- ── Facility list ──────────────────────────────────────────── -->
-<div class="dash-card overflow-hidden p-0">
-    <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
-            <thead class="rk-bg-soft">
-                <tr class="rk-th-soft">
-                    <th class="px-3 py-3">Facility Name</th>
-                    {% if citywide %}<th class="py-3">Barangay</th>{% endif %}
-                    <th class="py-3">Type</th>
-                    <th class="py-3">Capacity</th>
-                    <th class="py-3">Hazard Support</th>
-                    <th class="py-3">Coordinates</th>
-                    <th class="py-3">Status</th>
-                    <th class="py-3 px-3 text-end">Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for f in facilities %}
-                {% set sval = f.operational_status.value %}
-                {% set is_own = barangay and f.barangay_id == barangay.id %}
-                <tr class="rk-fs-13">
-                    <td class="px-3 fw-semibold">
-                        {{ f.name }}
-                        {% if f.address %}<div class="text-muted rk-fs-11">{{ f.address }}</div>{% endif %}
-                    </td>
-                    {% if citywide %}
-                    <td class="small">
-                        {{ f.barangay.name if f.barangay else '—' }}
-                        {% if is_own %}<span class="badge bg-success-subtle text-success-emphasis rk-fs-11">Yours</span>{% endif %}
-                    </td>
-                    {% endif %}
-                    <td>
-                        {{ f.facility_type.value.replace('_', ' ').title() }}
-                        {% if f.status %}<div class="text-muted rk-fs-11">{{ f.status }}</div>{% endif %}
-                    </td>
-                    <td class="text-muted small">
-                        {% if f.capacity_individuals %}{{ f.capacity_individuals }} indiv.
-                        {% elif f.capacity %}{{ "{:,}".format(f.capacity) }}
-                        {% else %}—{% endif %}
-                        {% if f.capacity_families %}<div class="rk-fs-11">{{ f.capacity_families }} families</div>{% endif %}
-                    </td>
-                    <td class="small">
-                        {% set any_hazard = f.supports_flooding or f.supports_tropical_cyclone or f.supports_landslide or f.supports_fire %}
-                        {% if any_hazard %}
-                        {% if f.supports_flooding %}<i class="bi bi-water text-primary me-1" title="Flooding"></i>{% endif %}
-                        {% if f.supports_tropical_cyclone %}<i class="bi bi-tropical-storm text-info me-1" title="Tropical Cyclone"></i>{% endif %}
-                        {% if f.supports_landslide %}<i class="bi bi-triangle-fill text-warning me-1" title="Landslide"></i>{% endif %}
-                        {% if f.supports_fire %}<i class="bi bi-fire text-danger me-1" title="Fire"></i>{% endif %}
-                        {% else %}<span class="text-muted">—</span>{% endif %}
-                    </td>
-                    <td class="text-muted">{{ "%.5f"|format(f.latitude) }}, {{ "%.5f"|format(f.longitude) }}</td>
-                    <td>
-                        <span class="status-pill {{ status_classes[sval] }}">{{ status_labels[sval] }}</span>
-                    </td>
-                    <td class="px-3 text-end">
-                        {% if show_archived %}
-                        <form method="POST" action="/bdrrmo/facilities/{{ f.id }}/archive" class="d-inline">
-            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
-                            <button type="submit" class="btn btn-outline-secondary btn-sm" title="Restore" aria-label="Restore {{ f.name }}">
-                                <i class="bi bi-arrow-counterclockwise"></i> Restore
-                            </button>
-                        </form>
-                        {% elif is_own %}
-                        <form method="POST" action="/bdrrmo/facilities/{{ f.id }}/status"
-                              class="d-inline">
-            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
-                            <div class="input-group input-group-sm d-inline-flex w-auto align-middle">
-                                <select name="operational_status" class="form-select form-select-sm w-auto"
-                                        data-submit-on-change aria-label="Change status for {{ f.name }}">
-                                    {% for s in facility_statuses %}
-                                    <option value="{{ s }}" {{ 'selected' if s == sval else '' }}>{{ status_labels[s] }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                        </form>
-                        <a href="/bdrrmo/facilities?edit={{ f.id }}" class="btn btn-outline-secondary btn-sm" title="Edit" aria-label="Edit {{ f.name }}">
-                            <i class="bi bi-pencil"></i>
-                        </a>
-                        <form method="POST" action="/bdrrmo/facilities/{{ f.id }}/archive"
-                              class="d-inline"
-                              data-confirm='Archive {{ f.name }}? It will be hidden from the active list but kept on record.'>
-            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
-                            <button type="submit" class="btn btn-outline-secondary btn-sm" title="Archive" aria-label="Archive {{ f.name }}">
-                                <i class="bi bi-archive"></i>
-                            </button>
-                        </form>
-                        {% else %}
-                        <span class="text-muted rk-fs-11">
-                            <i class="bi bi-eye"></i> View only
-                        </span>
-                        {% endif %}
-                    </td>
-                </tr>
-                {% else %}
-                <tr><td colspan="{{ 8 if citywide else 7 }}" class="text-center text-muted py-4">
+<div class="rk-table-card">
+    <table class="rk-table">
+        <thead>
+            <tr>
+                <th scope="col">Facility Name</th>
+                {% if citywide %}<th scope="col">Barangay</th>{% endif %}
+                <th scope="col">Type</th>
+                <th scope="col">Capacity</th>
+                <th scope="col">Hazard Support</th>
+                <th scope="col">Coordinates</th>
+                <th scope="col">Status</th>
+                <th scope="col">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for f in table_rows %}
+            {% set sval = f.operational_status.value %}
+            {% set is_own = barangay and f.barangay_id == barangay.id %}
+            <tr>
+                <td class="fw-semibold">
+                    {{ f.name }}
+                    {% if f.address %}<div class="text-muted rk-fs-11 fw-normal">{{ f.address }}</div>{% endif %}
+                </td>
+                {% if citywide %}
+                <td class="small">
+                    {{ f.barangay.name if f.barangay else '—' }}
+                    {% if is_own %}<span class="badge bg-success-subtle text-success-emphasis rk-fs-11">Yours</span>{% endif %}
+                </td>
+                {% endif %}
+                <td>
+                    {{ f.facility_type.value.replace('_', ' ').title() }}
+                    {% if f.status %}<div class="text-muted rk-fs-11">{{ f.status }}</div>{% endif %}
+                </td>
+                <td class="text-muted small">
+                    {% if f.capacity_individuals %}{{ f.capacity_individuals }} indiv.
+                    {% elif f.capacity %}{{ "{:,}".format(f.capacity) }}
+                    {% else %}—{% endif %}
+                    {% if f.capacity_families %}<div class="rk-fs-11">{{ f.capacity_families }} families</div>{% endif %}
+                </td>
+                <td class="small">
+                    {% set any_hazard = f.supports_flooding or f.supports_tropical_cyclone or f.supports_landslide or f.supports_fire %}
+                    {% if any_hazard %}
+                    {% if f.supports_flooding %}<i class="bi bi-water text-primary me-1" title="Flooding"></i>{% endif %}
+                    {% if f.supports_tropical_cyclone %}<i class="bi bi-tropical-storm text-info me-1" title="Tropical Cyclone"></i>{% endif %}
+                    {% if f.supports_landslide %}<i class="bi bi-triangle-fill text-warning me-1" title="Landslide"></i>{% endif %}
+                    {% if f.supports_fire %}<i class="bi bi-fire text-danger me-1" title="Fire"></i>{% endif %}
+                    {% else %}<span class="text-muted">—</span>{% endif %}
+                </td>
+                <td class="text-muted">{{ "%.5f"|format(f.latitude) }}, {{ "%.5f"|format(f.longitude) }}</td>
+                <td>
+                    <span class="status-pill {{ status_classes[sval] }}">{{ status_labels[sval] }}</span>
+                </td>
+                <td>
+                <div class="rk-table-actions">
                     {% if show_archived %}
-                    No archived facilities.
-                    {% elif citywide %}
-                    No critical facilities recorded in San Pedro yet.
+                    <form method="POST" action="/bdrrmo/facilities/{{ f.id }}/archive">
+                        <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+                        <button type="submit" class="btn btn-outline-secondary btn-sm" title="Restore" aria-label="Restore {{ f.name }}">
+                            <i class="bi bi-arrow-counterclockwise"></i> Restore
+                        </button>
+                    </form>
+                    {% elif is_own %}
+                    <form method="POST" action="/bdrrmo/facilities/{{ f.id }}/status">
+                        <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+                        <select name="operational_status" class="form-select form-select-sm w-auto"
+                                data-submit-on-change aria-label="Change status for {{ f.name }}">
+                            {% for s in facility_statuses %}
+                            <option value="{{ s }}" {{ 'selected' if s == sval else '' }}>{{ status_labels[s] }}</option>
+                            {% endfor %}
+                        </select>
+                    </form>
+                    <a href="/bdrrmo/facilities?edit={{ f.id }}" class="btn btn-outline-secondary btn-sm" title="Edit" aria-label="Edit {{ f.name }}">
+                        <i class="bi bi-pencil"></i>
+                    </a>
+                    <form method="POST" action="/bdrrmo/facilities/{{ f.id }}/archive"
+                          data-confirm='Archive {{ f.name }}? It will be hidden from the active list but kept on record.'>
+                        <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+                        <button type="submit" class="btn btn-outline-secondary btn-sm" title="Archive" aria-label="Archive {{ f.name }}">
+                            <i class="bi bi-archive"></i>
+                        </button>
+                    </form>
                     {% else %}
-                    No critical facilities recorded for this barangay yet. Use "Add Facility" above to add one.
+                    <span class="text-muted rk-fs-11">
+                        <i class="bi bi-eye"></i> View only
+                    </span>
                     {% endif %}
-                </td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+                </div>
+                </td>
+            </tr>
+            {% else %}
+            <tr class="rk-table-empty"><td colspan="{{ 8 if citywide else 7 }}">
+                {% if show_archived %}
+                No archived facilities.
+                {% elif citywide %}
+                No critical facilities recorded in San Pedro yet.
+                {% else %}
+                No critical facilities recorded for this barangay yet. Use "Add Facility" above to add one.
+                {% endif %}
+            </td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
 </div>
+
+{{ rk_pager(page_obj, "/bdrrmo/facilities", base_query, "Facility pages") }}
 
 <!-- ── Add / Edit Facility modal (shared partial) ──────────────── -->
 {% include "shared/_facility_form_modal.html" with context %}

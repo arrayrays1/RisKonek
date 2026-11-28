@@ -1,18 +1,19 @@
 {% extends "admin/base.html" %}
+{% from "shared/_plan_preview.html" import plan_preview_styles, plan_preview %}
+{% from "shared/_dashboard.html" import fmt_date, pill, plan_pill, stat %}
 
 {% block title %}{{ barangay.name }} — Barangay Profile{% endblock %}
 
 {% set active_nav = 'barangays' %}
 
 {% block head_extra %}
+<link rel="stylesheet" href="/static/css/rk-dashboard.css">
 <style nonce="{{ request.state.csp_nonce }}">
     .profile-header {
         display: flex; align-items: center; gap: 14px;
         flex-wrap: wrap;
     }
     .profile-header h1 { margin: 0; }
-    .trend-up    { color: #c0392b; }
-    .trend-stable { color: #6c757d; }
 
     .nav-tabs-clean { border-bottom: 1px solid #e5e7eb; gap: 4px; }
     .nav-tabs-clean .nav-link {
@@ -25,20 +26,6 @@
         box-shadow: 0 1px 3px rgba(0,0,0,0.08);
     }
 
-    .info-section h6 {
-        font-size: 13px; font-weight: 600;
-        color: var(--rk-text); margin-bottom: 8px;
-        display: flex; align-items: center; gap: 8px;
-    }
-
-    .hist-card {
-        border-radius: 10px; padding: 18px;
-        text-align: left;
-    }
-    .hist-card .hist-label { font-size: 12px; color: var(--rk-muted); }
-    .hist-card .hist-value { font-size: 28px; font-weight: 700; margin: 4px 0; }
-    .hist-card .hist-sub   { font-size: 11px; color: var(--rk-muted); }
-
     .group-card {
         background: #fafbfc; border-radius: 10px;
         padding: 18px;
@@ -46,111 +33,68 @@
     .group-card .group-label { font-size: 12px; color: var(--rk-muted); }
     .group-card .group-value { font-size: 28px; font-weight: 700; color: var(--rk-text); margin: 4px 0; }
     .group-card .group-pct   { font-size: 11px; color: var(--rk-green); font-weight: 600; }
+
+    /* BDRRM Plan tab: info row above the PDF / AI summary preview. */
+    .plan-info-row {
+        display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px;
+        font-size: 13px; margin-bottom: 14px;
+    }
+    .plan-info-row .plan-info-label { color: var(--rk-muted); margin-right: 4px; }
+    .plan-info-row .plan-info-name { font-weight: 600; word-break: break-all; }
+    .plan-info-row .plan-info-link { margin-left: auto; }
+    .activity-summary { font-size: 13px; color: var(--rk-muted); margin-bottom: 10px; }
 </style>
+{{ plan_preview_styles(request.state.csp_nonce) }}
 {% endblock %}
 
 {% block content %}
 <!-- ── Header ─────────────────────────────────────────────────── -->
-<div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
-    <div class="d-flex align-items-start gap-3 flex-wrap">
-        <a href="/admin/barangays" class="btn-soft">
-            <i class="bi bi-arrow-left"></i> Back to List
-        </a>
-        <div>
-            <div class="profile-header">
-                <h1 id="header">{{ barangay.name }}</h1>
-                <span class="risk-badge risk-{{ risk_level }}">
-                    {{ risk_level.title() }} Planning Priority
-                </span>
-            </div>
-            <p class="text-muted mb-0 rk-fs-13">
-                Comprehensive barangay disaster profile and preparedness data
-            </p>
-        </div>
-    </div>
-    <a class="btn btn-rk" href="/admin/simulator/setup?barangay_id={{ barangay.id }}"
-       title="Open the Resource Simulator with this barangay pre-selected">
-        <i class="bi bi-clipboard-check"></i> Use for Planning
+<div class="d-flex align-items-start gap-3 flex-wrap mb-3">
+    <a href="/admin/barangays" class="btn-soft">
+        <i class="bi bi-arrow-left"></i> Back to List
     </a>
+    <div class="profile-header">
+        <h1 id="header">{{ barangay.name }}</h1>
+        {% if plan %}{{ plan_pill(plan_status) }}{% else %}{{ pill('none', 'Not submitted') }}{% endif %}
+    </div>
 </div>
 
-<!-- ── Headline cards ─────────────────────────────────────────── -->
-<div class="row g-3 mb-4">
-
-    <div class="col-md-3">
-        <div class="stat-card">
-            <div class="d-flex justify-content-between align-items-start">
-                <div class="stat-label">Total Population</div>
-                <div class="stat-icon rk-tint-blue">
-                    <i class="bi bi-people-fill"></i>
-                </div>
-            </div>
-            <div class="stat-value">{{ "{:,}".format(total_population) }}</div>
-            <div class="stat-change text-muted">
-                {{ "{:,}".format(households) }} households
-            </div>
-        </div>
-    </div>
-
-    <div class="col-md-3">
-        <div class="stat-card">
-            <div class="d-flex justify-content-between align-items-start">
-                <div class="stat-label">Vulnerable %</div>
-                <div class="stat-icon rk-tint-orange">
-                    <i class="bi bi-exclamation-triangle-fill"></i>
-                </div>
-            </div>
-            <div class="stat-value">{{ vulnerable_pct }}%</div>
-            <div class="stat-change text-muted">Elderly, PWDs, Children</div>
-        </div>
-    </div>
-
-    <div class="col-md-3">
-        <div class="stat-card">
-            <div class="d-flex justify-content-between align-items-start">
-                <div class="stat-label">Flood Risk Trend</div>
-                <div class="stat-icon rk-tint-red">
-                    <i class="bi bi-graph-up-arrow"></i>
-                </div>
-            </div>
-            <div class="stat-value {{ 'trend-up' if flood_trend == 'Increasing' else 'trend-stable' }}">
-                {{ flood_trend }}
-            </div>
-            <div class="stat-change text-muted">Last 12 months vs prior</div>
-        </div>
-    </div>
-
-    <div class="col-md-3">
-        <div class="stat-card">
-            <div class="d-flex justify-content-between align-items-start">
-                <div class="stat-label">Fire Risk Trend</div>
-                <div class="stat-icon rk-tint-amber">
-                    <i class="bi bi-fire"></i>
-                </div>
-            </div>
-            <div class="stat-value {{ 'trend-up' if fire_trend == 'Increasing' else 'trend-stable' }}">
-                {{ fire_trend }}
-            </div>
-            <div class="stat-change text-muted">Last 12 months vs prior</div>
-        </div>
-    </div>
-
+<!-- ── Headline cards (shared dashboard stat style) ─────────── -->
+{% set T = activity_cards.total %}
+<div class="row row-cols-1 row-cols-md-2 row-cols-lg-4 g-3 mb-4">
+    <div class="col">{{ stat('Total Population', "{:,}".format(total_population), 'neutral', 'people-fill',
+                             "{:,}".format(households) ~ (' household' if households == 1 else ' households')) }}</div>
+    <div class="col">{{ stat('Vulnerable %', "%.1f" | format(vulnerable_pct) ~ '%', 'amber', 'exclamation-triangle',
+                             'Elderly, PWDs, Children') }}</div>
+    <div class="col">{{ stat('Activities', T, 'neutral', 'list-ul',
+                             'total in this plan' if plan else 'no plan submitted yet') }}</div>
+    <div class="col">{{ stat('Accomplishment Report', proofs.submitted, 'green', 'clipboard-check',
+                             (proofs.submitted ~ ' of ' ~ T ~ ' uploaded') if plan else 'no plan submitted yet') }}</div>
 </div>
 
-<!-- ── Tabs ───────────────────────────────────────────────────── -->
-<ul class="nav nav-tabs-clean mb-3" role="tablist">
-    <li class="nav-item">
-        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-infra" type="button">
+<!-- ── Tabs (open tab kept in the URL hash) ───────────────────── -->
+<ul class="nav nav-tabs-clean mb-3" role="tablist" id="profileTabs">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="tabbtn-plan" data-bs-toggle="tab" data-bs-target="#tab-plan"
+                data-hash="plan" type="button" role="tab" aria-controls="tab-plan" aria-selected="true">
+            BDRRM Plan
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="tabbtn-activities" data-bs-toggle="tab" data-bs-target="#tab-activities"
+                data-hash="activities" type="button" role="tab" aria-controls="tab-activities" aria-selected="false">
+            Activities
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="tabbtn-infra" data-bs-toggle="tab" data-bs-target="#tab-infra"
+                data-hash="infrastructure" type="button" role="tab" aria-controls="tab-infra" aria-selected="false">
             Key Infrastructure
         </button>
     </li>
-    <li class="nav-item">
-        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-profile" type="button">
-            Disaster Profile
-        </button>
-    </li>
-    <li class="nav-item">
-        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-vuln" type="button">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="tabbtn-vuln" data-bs-toggle="tab" data-bs-target="#tab-vuln"
+                data-hash="vulnerable" type="button" role="tab" aria-controls="tab-vuln" aria-selected="false">
             Vulnerable Groups
         </button>
     </li>
@@ -158,8 +102,105 @@
 
 <div class="tab-content">
 
+    <!-- ── BDRRM Plan ─────────────────────────────────────────── -->
+    <div class="tab-pane fade show active" id="tab-plan" role="tabpanel" aria-labelledby="tabbtn-plan">
+        {% if plan %}
+        <div class="dash-card plan-info-row">
+            <span class="plan-info-name" title="File name">
+                <i class="bi bi-file-earmark-pdf rk-text-green me-1" aria-hidden="true"></i>{{ plan.file_name }}
+            </span>
+            {{ plan_pill(plan_status) }}
+            <span><span class="plan-info-label">Uploaded</span>{{ plan.created_at | pht if plan.created_at else '—' }}</span>
+            <span>
+                {% if plan.is_hardcopy_received and plan.hardcopy_received_date %}
+                <span class="plan-info-label">Hard copy received</span>{{ fmt_date(plan.hardcopy_received_date) }}
+                {% else %}
+                <span class="text-muted">Hard copy not yet received</span>
+                {% endif %}
+            </span>
+            <a class="plan-info-link rkd-link"
+               href="/admin/planning?barangay_id={{ barangay.id }}&q={{ plan.file_name | urlencode }}">
+                Open in Planning <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i>
+            </a>
+        </div>
+
+        {{ plan_preview("/admin/planning/" ~ plan.id ~ "/view", plan.file_name,
+                        plan.summary, plan.recommendation, "No AI summary yet.") }}
+        {% else %}
+        <div class="dash-card text-center text-muted py-5">
+            <i class="bi bi-file-earmark-x fs-3 d-block mb-2" aria-hidden="true"></i>
+            This barangay has not submitted a BDRRM Plan yet.
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- ── Activities (view-only) ─────────────────────────────── -->
+    <div class="tab-pane fade" id="tab-activities" role="tabpanel" aria-labelledby="tabbtn-activities">
+        {% if not plan %}
+        <div class="dash-card text-center text-muted py-5">
+            <i class="bi bi-list-check fs-3 d-block mb-2" aria-hidden="true"></i>
+            No activities yet: this barangay has not submitted a BDRRM Plan.
+        </div>
+        {% else %}
+        {% set c = activity_cards %}
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <p class="activity-summary">
+                {{ c.total }} activit{{ 'y' if c.total == 1 else 'ies' }}
+                · {{ c.scheduled }} scheduled
+                · {{ c.unscheduled }} not yet scheduled
+                · {{ c.approved }} proof{{ '' if c.approved == 1 else 's' }} approved
+            </p>
+            <a href="/admin/planning/activities/{{ plan.id }}" class="rkd-link mb-2">
+                Review in Planning <i class="bi bi-arrow-right" aria-hidden="true"></i>
+            </a>
+        </div>
+        <div class="rk-table-card">
+            <table class="rk-table">
+                <thead>
+                    <tr>
+                        <th scope="col">Activity</th>
+                        <th scope="col">Date</th>
+                        <th scope="col">Proof</th>
+                        <th scope="col"><span class="visually-hidden">Proof file</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in activity_rows %}
+                    {% set a = row.activity %}
+                    <tr>
+                        <td>
+                            {{ a.title }}
+                            {% if row.rescheduled %}<span class="rkd-pill rkd-pill-muted ms-1">Rescheduled {{ row.rescheduled }}x</span>{% endif %}
+                        </td>
+                        <td>
+                            {% if a.start_date %}{{ fmt_date(a.start_date) }}{% else %}<span class="rkd-unscheduled">Not yet scheduled</span>{% endif %}
+                        </td>
+                        <td>
+                            {{ pill(row.state, row.label) }}
+                            {% if row.state == 'returned' and a.reason %}
+                            <div class="small text-muted mt-1">"{{ a.reason }}"</div>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if row.has_proof %}
+                            <a href="/admin/activities/{{ a.id }}/proof" target="_blank" rel="noopener noreferrer"
+                               class="btn btn-outline-primary btn-sm">
+                                <i class="bi bi-eye" aria-hidden="true"></i> View proof
+                            </a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr class="rk-table-empty"><td colspan="4">No activities in this plan yet.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+    </div>
+
     <!-- ── Key Infrastructure ─────────────────────────────────── -->
-    <div class="tab-pane fade show active" id="tab-infra">
+    <div class="tab-pane fade" id="tab-infra" role="tabpanel" aria-labelledby="tabbtn-infra">
         <div class="dash-card overflow-hidden">
             <div class="card-title-row">
                 <i class="bi bi-building rk-text-green"></i>
@@ -167,22 +208,22 @@
             </div>
 
             {% if facility_rows %}
-            <div class="table-responsive">
-                <table class="table align-middle mb-0">
+            <div class="rk-table-scroll">
+                <table class="rk-table">
                     <thead>
-                        <tr class="rk-th-soft">
-                            <th>Facility Name</th>
-                            <th>Type</th>
-                            <th class="text-end">Capacity</th>
-                            <th>Status</th>
+                        <tr>
+                            <th scope="col">Facility Name</th>
+                            <th scope="col">Type</th>
+                            <th scope="col">Capacity</th>
+                            <th scope="col">Status</th>
                         </tr>
                     </thead>
-                    <tbody class="rk-fs-13">
+                    <tbody>
                         {% for f in facility_rows %}
                         <tr>
                             <td>{{ f.name }}</td>
                             <td>{{ f.type }}</td>
-                            <td class="text-end">{{ f.capacity }}</td>
+                            <td>{{ f.capacity }}</td>
                             <td>
                                 <span class="status-pill {{ f.status_class }}">
                                     {{ f.status_label }}
@@ -194,128 +235,15 @@
                 </table>
             </div>
             {% else %}
-            <div class="text-center text-muted py-4 rk-fs-13">
+            <div class="text-muted py-3 rk-fs-13">
                 No critical facilities recorded for this barangay yet.
             </div>
             {% endif %}
         </div>
     </div>
 
-    <!-- ── Disaster Profile ───────────────────────────────────── -->
-    <div class="tab-pane fade" id="tab-profile">
-        <div class="dash-card">
-            <div class="card-title-row">
-                <i class="bi bi-clock-history rk-text-info"></i>
-                <h6>Historical Disaster Incidents</h6>
-            </div>
-
-            <div class="row g-3 mb-3">
-                <div class="col-md-4">
-                    <div class="hist-card rk-bg-info-soft">
-                        <div class="hist-label">Flood Incidents</div>
-                        <div class="hist-value rk-text-info">
-                            {{ incident_counts['flood'] }}
-                        </div>
-                        <div class="hist-sub">Last 5 years</div>
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="hist-card rk-bg-orange-soft">
-                        <div class="hist-label">Fire Incidents</div>
-                        <div class="hist-value rk-text-high">
-                            {{ incident_counts['fire'] }}
-                        </div>
-                        <div class="hist-sub">Last 5 years</div>
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="hist-card rk-bg-purple-soft">
-                        <div class="hist-label">Earthquake Related</div>
-                        <div class="hist-value rk-text-purple">
-                            {{ incident_counts['earthquake'] }}
-                        </div>
-                        <div class="hist-sub">Last 5 years</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="info-section mb-3">
-                <h6><i class="bi bi-shield-exclamation"></i> Known Hazard Types</h6>
-                {% if hazard_types %}
-                    {% for h in hazard_types %}
-                    <span class="badge bg-light text-dark border me-1 rk-fs-12">
-                        {{ h.title() }}
-                    </span>
-                    {% endfor %}
-                {% else %}
-                    <span class="text-muted rk-fs-13">No hazards recorded.</span>
-                {% endif %}
-            </div>
-
-            <div class="info-section mb-3">
-                <h6><i class="bi bi-person-vcard"></i> Officials &amp; Emergency Contacts</h6>
-                <div class="row g-2 rk-fs-13">
-                    <div class="col-md-6">
-                        <div class="text-muted rk-fs-12">Barangay Captain</div>
-                        <div>{{ barangay.captain_name or '—' }}
-                            {% if barangay.captain_contact %}<span class="text-muted">· {{ barangay.captain_contact }}</span>{% endif %}
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="text-muted rk-fs-12">BDRRMO Chairperson</div>
-                        <div>{{ barangay.chairperson_name or '—' }}
-                            {% if barangay.chairperson_contact %}<span class="text-muted">· {{ barangay.chairperson_contact }}</span>{% endif %}
-                        </div>
-                    </div>
-                    <div class="col-12">
-                        <div class="text-muted rk-fs-12">Emergency Responders</div>
-                        {% if barangay.emergency_contacts %}
-                        <div class="rk-pre-line">{{ barangay.emergency_contacts }}</div>
-                        {% else %}
-                        <div class="text-muted">—</div>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-
-            <div class="info-section">
-                <h6><i class="bi bi-journal-text"></i> Recent Incidents</h6>
-                {% if recent_incidents %}
-                <div class="table-responsive">
-                    <table class="table align-middle mb-0">
-                        <thead>
-                            <tr class="rk-th-soft">
-                                <th>Date</th>
-                                <th>Type</th>
-                                <th>Severity</th>
-                                <th class="text-end">Affected Families</th>
-                                <th class="text-end">Casualties</th>
-                            </tr>
-                        </thead>
-                        <tbody class="rk-fs-13">
-                            {% for inc in recent_incidents %}
-                            <tr>
-                                <td>{{ inc.date_occurred.strftime('%b %d, %Y') }}</td>
-                                <td>{{ inc.disaster_type.value.title() }}</td>
-                                <td>{{ inc.severity.value.title() }}</td>
-                                <td class="text-end">{{ "{:,}".format(inc.affected_families) }}</td>
-                                <td class="text-end">{{ inc.casualties }}</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-                {% else %}
-                <div class="text-muted py-3 rk-fs-13">
-                    No incidents recorded in the last 5 years.
-                </div>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-
     <!-- ── Vulnerable Groups ──────────────────────────────────── -->
-    <div class="tab-pane fade" id="tab-vuln">
+    <div class="tab-pane fade" id="tab-vuln" role="tabpanel" aria-labelledby="tabbtn-vuln">
         <div class="dash-card">
             <div class="card-title-row">
                 <i class="bi bi-people rk-text-high"></i>
@@ -355,37 +283,32 @@
     </div>
 
 </div>
+{% endblock %}
 
-<!-- ── Footer: planning priority breakdown ─────────────────────── -->
-<div class="dash-card mt-4">
-    <div class="card-title-row">
-        <i class="bi bi-speedometer2 rk-text-green"></i>
-        <h6>Planning Priority Breakdown</h6>
-    </div>
-    <div class="row g-3 rk-fs-13">
-        <div class="col-md-3">
-            <div class="text-muted">Overall Score</div>
-            <div class="fw-bold rk-fs-22">{{ risk_score }}<span class="text-muted rk-fs-13"> / 100</span></div>
-        </div>
-        <div class="col-md-3">
-            <div class="text-muted">Hazard Exposure (40%)</div>
-            <div class="fw-semibold">{{ risk_breakdown['hazard_score'] }}</div>
-        </div>
-        <div class="col-md-3">
-            <div class="text-muted">Incident History (40%)</div>
-            <div class="fw-semibold">{{ risk_breakdown['incident_score'] }}</div>
-        </div>
-        <div class="col-md-3">
-            <div class="text-muted">Population Size (20%)</div>
-            <div class="fw-semibold">{{ risk_breakdown['population_score'] }}</div>
-        </div>
-    </div>
-    <div class="text-muted mt-3 rk-fs-11">
-        <i class="bi bi-info-circle"></i>
-        This score is system-generated for planning support only and is not an
-        official hazard or risk classification. Official hazard and risk levels
-        are based on valid external sources (e.g. HazardHunter, CLUP / CDRA /
-        CIDRA maps, technical-agency data).
-    </div>
-</div>
+{% block scripts %}
+<script nonce="{{ request.state.csp_nonce }}">
+// Keep the open tab in the URL hash (#plan, #activities, #infrastructure,
+// #vulnerable) so a link can open a tab and Back returns to the previous one.
+(function () {
+    var buttons = document.querySelectorAll('#profileTabs [data-hash]');
+    if (!buttons.length || !window.bootstrap) return;
+
+    function show(hash) {
+        var name = (hash || '').replace(/^#/, '') || 'plan';
+        var btn = document.querySelector('#profileTabs [data-hash="' + name + '"]');
+        if (btn) bootstrap.Tab.getOrCreateInstance(btn).show();
+    }
+
+    buttons.forEach(function (btn) {
+        btn.addEventListener('shown.bs.tab', function () {
+            var hash = '#' + btn.dataset.hash;
+            // pushState: adds a history entry without jumping the page.
+            if (location.hash !== hash) history.pushState(null, '', hash);
+        });
+    });
+    window.addEventListener('hashchange', function () { show(location.hash); });
+    window.addEventListener('popstate', function () { show(location.hash); });
+    show(location.hash);
+})();
+</script>
 {% endblock %}

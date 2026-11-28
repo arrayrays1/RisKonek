@@ -1,6 +1,7 @@
 {% extends "admin/base.html" %}
 {% from "shared/_dashboard.html" import fmt_date, pill, plan_pill, stat, empty, pie_block, date_badge, stacked_bar %}
 {% from "bdrrmo/_activity_actions.html" import activity_actions, activity_modals %}
+{% from "bdrrmo/_plan_banner.html" import plan_status_banner %}
 
 {# "Barangay X", without doubling "Barangay" when the stored name already has it. #}
 {% macro brgy_label(b) -%}
@@ -38,6 +39,8 @@
     </div>
     {% endif %}
 </div>
+
+{{ plan_status_banner(plan_banner, link=True) }}
 
 {% if not plan %}
 <div class="rkd-card">
@@ -101,7 +104,7 @@
     <div class="col-lg-6">
         <div class="rkd-card">
             <h2 class="rkd-card-title">Accomplishment reports</h2>
-            <p class="rkd-card-note">All {{ c.total }} activities of this plan · submitted = proof sent and not returned</p>
+            <p class="rkd-card-note">All {{ c.total }} activities of this plan · submitted = awaiting review or approved · rejected = returned, not re-uploaded yet</p>
             {{ pie_block('proofPie', proofs.pie, 'activities', 'No activities yet') }}
             <div class="rkd-rows">
                 <div class="rkd-row">
@@ -195,10 +198,10 @@
         <span><span class="rkd-key rkd-key-scheduled"></span>{{ s.scheduled }} scheduled</span>
         <span><span class="rkd-key rkd-key-unscheduled"></span>{{ s.unscheduled }} not yet scheduled</span>
     </div>
-    <div class="table-responsive">
-        <table class="rkd-table">
+    <div class="rk-table-scroll">
+        <table class="rk-table">
             <thead>
-                <tr><th>Activity (PPA)</th><th>Date</th><th>Proof</th><th class="text-end">Actions</th></tr>
+                <tr><th scope="col">Activity (PPA)</th><th scope="col">Date</th><th scope="col">Proof</th><th scope="col">Actions</th></tr>
             </thead>
             <tbody>
                 {% for row in rows[:8] %}

@@ -47,7 +47,7 @@
     <ul class="rkd-legend">
         {% for s in p.slices %}
         <li>
-            <span class="rkd-swatch {{ 'rkd-swatch-green' if loop.first else 'rkd-swatch-yellow' }}" aria-hidden="true"></span>
+            <span class="rkd-swatch rkd-swatch-{{ s.tone }}" aria-hidden="true"></span>
             <span>
                 <span class="rkd-legend-label">{{ s.label }}</span><br>
                 <span class="rkd-legend-sub">{{ s.count }}{% if unit %} {{ unit }}{% endif %} · {{ s.pct }}%</span>

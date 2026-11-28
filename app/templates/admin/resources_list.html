@@ -1,9 +1,15 @@
 {% extends "admin/base.html" %}
-{% from "shared/_pagination.html" import pager %}
+{% from "shared/_pagination.html" import rk_pager %}
+{% from "shared/_table.html" import clear_filters %}
+{% from "shared/_dashboard.html" import stat %}
 
 {% block title %}Resources Module — RisKonek{% endblock %}
 
 {% set active_nav = 'resources' %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="/static/css/rk-dashboard.css">
+{% endblock %}
 
 {% macro alert_pill(a) -%}
     {% if a == 'expired' %}
@@ -40,52 +46,16 @@
 </div>
 {% endif %}
 
-<!-- ── Summary cards ──────────────────────────────────────────── -->
-<div class="row g-3 mb-3">
-    <div class="col-md-3">
-        <div class="stat-card d-flex justify-content-between align-items-center">
-            <div>
-                <div class="stat-label">Total Active Items</div>
-                <div class="stat-value">{{ summary.total }}</div>
-            </div>
-            <div class="stat-icon rk-tint-green-rk">
-                <i class="bi bi-box-seam"></i>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="stat-card d-flex justify-content-between align-items-center">
-            <div>
-                <div class="stat-label">Low Stock</div>
-                <div class="stat-value">{{ summary.low_stock }}</div>
-            </div>
-            <div class="stat-icon rk-tint-amber">
-                <i class="bi bi-exclamation-triangle"></i>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="stat-card d-flex justify-content-between align-items-center">
-            <div>
-                <div class="stat-label">Near Expiry (≤ 30d)</div>
-                <div class="stat-value">{{ summary.near_expiry }}</div>
-            </div>
-            <div class="stat-icon rk-tint-amber">
-                <i class="bi bi-clock-history"></i>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="stat-card d-flex justify-content-between align-items-center">
-            <div>
-                <div class="stat-label">Expired</div>
-                <div class="stat-value">{{ summary.expired }}</div>
-            </div>
-            <div class="stat-icon rk-tint-red">
-                <i class="bi bi-x-octagon"></i>
-            </div>
-        </div>
-    </div>
+<!-- ── Summary cards (shared dashboard stat cards; whole active inventory) ── -->
+<div class="row row-cols-1 row-cols-sm-2 row-cols-lg-4 g-3 mb-3">
+    <div class="col">{{ stat('Total Active Items', summary.total, 'neutral', 'box-seam',
+                             ('item' if summary.total == 1 else 'items') ~ ' in the inventory') }}</div>
+    <div class="col">{{ stat('Low Stock', summary.low_stock, 'neutral', 'exclamation-triangle',
+                             'at or below restock level') }}</div>
+    <div class="col">{{ stat('Near Expiry', summary.near_expiry, 'neutral', 'clock-history',
+                             'expiring within 30 days') }}</div>
+    <div class="col">{{ stat('Expired', summary.expired, 'neutral', 'x-octagon',
+                             'past their expiry date') }}</div>
 </div>
 
 {% set alert_total = summary.low_stock + summary.near_expiry + summary.expired %}
@@ -100,120 +70,110 @@
 </div>
 {% endif %}
 
-<!-- ── Filters ────────────────────────────────────────────────── -->
-<div class="dash-card mb-3">
-    <form method="GET" action="/admin/resources" class="row g-2 align-items-end js-live-filter">
-        <div class="col-md-2">
-            <label class="form-label small fw-semibold mb-1">Search</label>
-            <input type="text" name="q" value="{{ f_q }}" class="form-control form-control-sm"
-                   placeholder="Search name or location…" autocomplete="off">
-        </div>
-        <div class="col-md-2">
-            <label class="form-label small fw-semibold mb-1">Barangay</label>
-            <select name="barangay_id" class="form-select form-select-sm">
-                
-                <option value=0>All Barangay</option>
-                {% for b in barangays %}
-                <option value="{{ b.id }}" {% if f_barangay_id == b.id %}selected{% endif %}>{{ b.name }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="col-md-2">
-            <label class="form-label small fw-semibold mb-1">Category</label>
-            <select name="category" class="form-select form-select-sm">
-                <option value="">All categories</option>
-                {% for c in categories %}
-                <option value="{{ c }}" {% if f_category == c %}selected{% endif %}>{{ c.title() }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="col-md-2">
-            <label class="form-label small fw-semibold mb-1">Food Type</label>
-            <select name="food_type" class="form-select form-select-sm">
-                <option value="">All food</option>
-                {% for v, label in food_types %}
-                <option value="{{ v }}" {% if f_food_type == v %}selected{% endif %}>{{ label }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="col-md-2">
-            <label class="form-label small fw-semibold mb-1">Alert</label>
-            <select name="alert" class="form-select form-select-sm">
-                <option value="">Any</option>
-                <option value="low_stock"   {% if f_alert == 'low_stock'   %}selected{% endif %}>Low Stock</option>
-                <option value="near_expiry" {% if f_alert == 'near_expiry' %}selected{% endif %}>Near Expiry</option>
-                <option value="expired"     {% if f_alert == 'expired'     %}selected{% endif %}>Expired</option>
-            </select>
-        </div>
-        <div class="col-md-1">
-            <label class="form-label small fw-semibold mb-1">View</label>
-            <select name="archived" class="form-select form-select-sm">
-                <option value=""  {% if not show_archived %}selected{% endif %}>Active</option>
-                <option value="1" {% if show_archived %}selected{% endif %}>Archived</option>
-            </select>
-        </div>
-        <div class="col-md-1 d-grid">
-            <a href="/admin/resources" class="btn btn-outline-secondary btn-sm" title="Reset filters">
-                <i class="bi bi-x-circle"></i>
-            </a>
-        </div>
-    </form>
-</div>
+<!-- ── Filters (auto-apply) ───────────────────────────────────── -->
+<form method="GET" action="/admin/resources" class="rk-filter-bar js-live-filter" role="search">
+    <div class="rk-filter-search">
+        <label for="rs-q" class="visually-hidden">Search name or location</label>
+        <i class="bi bi-search" aria-hidden="true"></i>
+        <input type="text" id="rs-q" name="q" value="{{ f_q }}" class="form-control"
+               placeholder="Search name or location…" autocomplete="off">
+    </div>
+    <div class="rk-filter-select">
+        <label for="rs-brgy" class="visually-hidden">Barangay</label>
+        <select id="rs-brgy" name="barangay_id" class="form-select">
+            <option value=0>All Barangay</option>
+            {% for b in barangays %}
+            <option value="{{ b.id }}" {% if f_barangay_id == b.id %}selected{% endif %}>{{ b.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="rk-filter-select">
+        <label for="rs-category" class="visually-hidden">Category</label>
+        <select id="rs-category" name="category" class="form-select">
+            <option value="">All categories</option>
+            {% for c in categories %}
+            <option value="{{ c }}" {% if f_category == c %}selected{% endif %}>{{ c.title() }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="rk-filter-select">
+        <label for="rs-food" class="visually-hidden">Food type</label>
+        <select id="rs-food" name="food_type" class="form-select">
+            <option value="">All food</option>
+            {% for v, label in food_types %}
+            <option value="{{ v }}" {% if f_food_type == v %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="rk-filter-select">
+        <label for="rs-alert" class="visually-hidden">Alert</label>
+        <select id="rs-alert" name="alert" class="form-select">
+            <option value="">Any alert</option>
+            <option value="low_stock"   {% if f_alert == 'low_stock'   %}selected{% endif %}>Low Stock</option>
+            <option value="near_expiry" {% if f_alert == 'near_expiry' %}selected{% endif %}>Near Expiry</option>
+            <option value="expired"     {% if f_alert == 'expired'     %}selected{% endif %}>Expired</option>
+        </select>
+    </div>
+    <div class="rk-filter-select">
+        <label for="rs-view" class="visually-hidden">View</label>
+        <select id="rs-view" name="archived" class="form-select">
+            <option value=""  {% if not show_archived %}selected{% endif %}>Active</option>
+            <option value="1" {% if show_archived %}selected{% endif %}>Archived</option>
+        </select>
+    </div>
+    {{ clear_filters("/admin/resources") }}
+</form>
 
 <!-- ── Table ──────────────────────────────────────────────────── -->
-<div class="dash-card overflow-hidden p-0">
-    <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
-            <thead class="rk-bg-soft">
-                <tr class="rk-th-soft">
-                    <th class="px-3 py-3">Barangay</th>
-                    <th class="px-3 py-3">Item</th>
-                    <th class="py-3">Category</th>
-                    <th class="py-3 text-end">Qty</th>
-                    <th class="py-3">Unit</th>
-                    <th class="py-3">Location</th>
-                    <th class="py-3 text-end">Threshold</th>
-                    <th class="py-3">Expiry</th>
-                    <th class="py-3">Alert</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for r in rows %}
-                <tr class="rk-fs-13">
-                    <td class="px-3 fw-semibold">{{ r.barangay }}</td>
-                    <td class="px-3">
-                        <div class="fw-semibold">{{ r.name }}</div>
-                        <div class="text-muted small">
-                            {% if r.is_perishable %}<i class="bi bi-droplet-half me-1"></i>perishable{% else %}non-perishable{% endif %}
-                        </div>
-                    </td>
-                    <td>
-                        {{ r.category_label }}
-                        {% if r.food_type_label %}<div class="text-muted rk-fs-11">{{ r.food_type_label }}</div>{% endif %}
-                    </td>
-                    <td class="text-end fw-semibold">{{ r.quantity }}</td>
-                    <td class="text-muted">{{ r.unit or '—' }}</td>
-                    <td>{{ r.storage_location }}</td>
-                    <td class="text-end text-muted">{{ r.restock_threshold }}</td>
-                    <td>{{ r.expiry_date.strftime('%Y-%m-%d') if r.expiry_date else '—' }}</td>
-                    <td>{{ alert_pill(r.alert) }}</td>
-                </tr>
-                {% else %}
-                <tr>
-                    <td colspan="9" class="text-center text-muted py-4">
-                        No resources match your filters.
-                        {% if f_q or f_category or f_alert or f_archived %}
-                        <a href="/admin/resources" class="ms-2">Clear filters</a>
-                        {% endif %}
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+<div class="rk-table-card">
+    <table class="rk-table">
+        <thead>
+            <tr>
+                <th scope="col">Barangay</th>
+                <th scope="col">Item</th>
+                <th scope="col">Category</th>
+                <th scope="col">Qty</th>
+                <th scope="col">Unit</th>
+                <th scope="col">Location</th>
+                <th scope="col">Threshold</th>
+                <th scope="col">Expiry</th>
+                <th scope="col">Alert</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in rows %}
+            <tr>
+                <td class="fw-semibold">{{ r.barangay }}</td>
+                <td>
+                    <div class="fw-semibold">{{ r.name }}</div>
+                    <div class="text-muted small">
+                        {% if r.is_perishable %}<i class="bi bi-droplet-half me-1"></i>perishable{% else %}non-perishable{% endif %}
+                    </div>
+                </td>
+                <td>
+                    {{ r.category_label }}
+                    {% if r.food_type_label %}<div class="text-muted rk-fs-11">{{ r.food_type_label }}</div>{% endif %}
+                </td>
+                <td class="fw-semibold">{{ r.quantity }}</td>
+                <td class="text-muted">{{ r.unit or '—' }}</td>
+                <td>{{ r.storage_location }}</td>
+                <td class="text-muted">{{ r.restock_threshold }}</td>
+                <td>{{ r.expiry_date.strftime('%Y-%m-%d') if r.expiry_date else '—' }}</td>
+                <td>{{ alert_pill(r.alert) }}</td>
+            </tr>
+            {% else %}
+            <tr class="rk-table-empty"><td colspan="9">
+                No records found.
+                {% if f_q or f_barangay_id or f_category or f_food_type or f_alert or show_archived %}
+                <a href="/admin/resources" class="ms-1">Clear filters</a>
+                {% endif %}
+            </td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
 </div>
 
-{{ pager(page_obj, "/admin/resources", base_query) }}
+{{ rk_pager(page_obj, "/admin/resources", base_query, "Resource pages") }}
 
 <!-- ── Stock modals (one per active row) ──────────────────────── -->
 {% for r in rows %}

@@ -12,13 +12,33 @@
 {{ plan_preview_styles(request.state.csp_nonce) }}
 {% endblock %}
 
+{# 4-step BDRRM Plan progress (same macro in planning_preview.html and
+   planning_activities_review.html). current: 1-4, or 5 = all completed. #}
+{% macro plan_stepper(current) -%}
+<ol class="rk-stepper" aria-label="BDRRM Plan submission progress">
+{% for icon, label in [('bi-cloud-arrow-up', 'Upload your BDRRM Plan'), ('bi-file-earmark-text', 'Review plan'), ('bi-file-earmark-check', 'Submit'), ('bi-clock-history', 'Wait for CDRRMO approval')] %}
+{% set state = 'done' if loop.index < current else ('current' if loop.index == current else 'todo') %}
+    <li class="rk-step rk-step-{{ state }}"{% if state == 'current' %} aria-current="step"{% endif %}>
+        <span class="rk-step-dot" aria-hidden="true"><i class="bi {{ icon }}"></i></span>
+        <span class="rk-step-label">{{ label }}{% if state == 'done' %}<span class="visually-hidden"> (completed)</span>{% endif %}</span>
+    </li>
+{% endfor %}
+</ol>
+{%- endmacro %}
+
 {% block content %}
-<div class="d-flex justify-content-between align-items-start page-header">
+<div class="rk-plan-page">
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 page-header">
     <div>
         <h1 id="header">Preview Plan</h1>
         <p>Check <strong>{{ filename }}</strong> and its AI summary before extracting the activities.</p>
     </div>
 </div>
+
+<div class="rk-plan-card rk-plan-card-compact">
+    {{ plan_stepper(2) }}
+</div>
+
 
 {% if error %}
 <div class="alert alert-danger alert-dismissible fade show">
@@ -34,6 +54,7 @@
 </div>
 {% endif %}
 
+<div class="rk-plan-preview">
 {% call plan_preview("/bdrrmo/planning/draft/" ~ draft_id ~ "/file", filename, ai_summary, ai_recommendation) %}
     <form method="POST" action="/bdrrmo/planning/preview/{{ draft_id }}/cancel" class="d-inline"
           data-confirm="Cancel this upload? The file will be discarded.">
@@ -50,4 +71,6 @@
         </button>
     </form>
 {% endcall %}
+</div>
+</div>
 {% endblock %}

@@ -47,6 +47,12 @@
 .rk-stat-amber { background: #fff6e3; }
 .rk-stat-amber .rk-stat-value { color: #7a5410; }
 .rk-stat-amber .rk-stat-icon { color: #f9dca0; }
+/* A stat card that is a link (Vehicle & Equipment type filter). */
+a.rk-stat-link { display: block; color: inherit; text-decoration: none; transition: border-color .15s, box-shadow .15s; }
+a.rk-stat-link:hover { border-color: #167736; box-shadow: 0 2px 8px rgba(22, 119, 54, .12); }
+a.rk-stat-link:focus-visible { outline: 3px solid #167736; outline-offset: 2px; }
+a.rk-stat-link.is-selected { border: 2px solid #167736; background: #eefbe8; box-shadow: 0 0 0 3px rgba(22, 119, 54, .15); }
+.rk-stat-card .rk-stat-selected { font-size: 13px; font-weight: 600; color: #167736; margin-top: 4px; }
 @media (max-width: 575.98px) {
     .rk-stat-card { min-height: 104px; padding-right: 52px; }
     .rk-stat-card .rk-stat-icon { font-size: 64px; right: -21px; }
@@ -81,6 +87,7 @@
 .rkd-swatch { width: 14px; height: 14px; border-radius: 4px; flex: 0 0 14px; margin-top: 3px; }
 .rkd-swatch-green { background: #167736; }
 .rkd-swatch-yellow { background: #f5b800; }
+.rkd-swatch-red { background: #b42318; }
 .rkd-legend-label { font-size: 14px; font-weight: 600; color: var(--rk-text); }
 .rkd-legend-sub { font-size: 12px; color: var(--rk-muted); }
 
@@ -135,10 +142,6 @@
 .rkd-progress-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ── Tables ─────────────────────────────────────────────────────── */
-.rkd-table { width: 100%; font-size: 13px; }
-.rkd-table th { font-size: 12px; color: var(--rk-muted); font-weight: 600; padding: 8px 6px; border-bottom: 1px solid #eef0f3; }
-.rkd-table td { padding: 10px 6px; border-bottom: 1px solid #f2f4f7; vertical-align: middle; }
-.rkd-table tr:last-child td { border-bottom: none; }
 .rkd-actions { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
 .rkd-unscheduled { color: #7a4f00; font-weight: 600; }
 
@@ -151,3 +154,23 @@
 /* ── Empty state ────────────────────────────────────────────────── */
 .rkd-empty { text-align: center; color: var(--rk-muted); font-size: 13px; padding: 22px 8px; }
 .rkd-empty i { display: block; font-size: 22px; margin-bottom: 4px; color: #b6bcc6; }
+
+/* ── BDRRM Plan status banner (bdrrmo/_plan_banner.html) ───────────── */
+.rkd-plan-banner {
+    display: flex; gap: 10px; align-items: flex-start;
+    border-radius: 10px; padding: 12px 16px; margin-bottom: 16px; font-size: 14px;
+}
+.rkd-plan-banner > i { font-size: 18px; line-height: 1.3; }
+.rkd-plan-banner-approved { background: #e6f4ea; color: #0f5a28; }
+.rkd-plan-banner-pending  { background: #fff4d6; color: #7a4f00; }
+.rkd-plan-banner-returned { background: #fde8e6; color: #9b1c14; }
+.rkd-plan-banner-link {
+    display: inline-block; margin-top: 6px; font-weight: 600;
+    color: inherit; text-decoration: underline;
+}
+.rkd-plan-banner-link:hover, .rkd-plan-banner-link:focus { color: inherit; }
+
+/* Submit Planning card while a pending/approved plan blocks uploads */
+.rkd-upload-locked { opacity: .6; }
+.rkd-upload-locked .form-control:disabled,
+.rkd-upload-locked .btn-rk:disabled { cursor: not-allowed; }

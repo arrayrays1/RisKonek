@@ -1,6 +1,7 @@
 {% extends "admin/base.html" %}
 {% from "shared/_dashboard.html" import fmt_date, pill, plan_pill, empty %}
 {% from "bdrrmo/_activity_actions.html" import activity_actions, activity_modals %}
+{% from "shared/_pagination.html" import rk_pager %}
 
 {% block title %}Activities — RisKonek{% endblock %}
 
@@ -8,9 +9,6 @@
 
 {% block head_extra %}
 <link rel="stylesheet" href="/static/css/rk-dashboard.css">
-<style nonce="{{ request.state.csp_nonce }}">
-    #header { margin: 0; color: #167736; font-size: 40px;}
-</style>
 {% endblock %}
 
 {% block content %}
@@ -26,56 +24,54 @@
 </div>
 
 {% if error %}
-<div class="alert alert-danger alert-dismissible fade show">
-    <i class="bi bi-exclamation-triangle-fill me-1"></i>{{ error | replace('+', ' ') }}
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+<div class="alert alert-danger alert-dismissible fade show" role="alert">
+    <i class="bi bi-exclamation-triangle-fill me-1" aria-hidden="true"></i>{{ error }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
 </div>
 {% endif %}
 
 {% if success %}
-<div class="alert alert-success alert-dismissible fade show">
-    <i class="bi bi-check-circle-fill me-1"></i>{{ success | replace('+', ' ') }}
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+<div class="alert alert-success alert-dismissible fade show" role="status">
+    <i class="bi bi-check-circle-fill me-1" aria-hidden="true"></i>{{ success }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
 </div>
 {% endif %}
 
-<div class="rkd-card">
-    {% if rows %}
-    <div class="table-responsive">
-        <table class="rkd-table">
-            <thead>
-                <tr>
-                    <th>Activity (PPA)</th>
-                    <th>Date</th>
-                    <th>Proof</th>
-                    <th class="text-end">Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for row in rows %}
-                {% set a = row.activity %}
-                <tr>
-                    <td>
-                        {{ a.title }}
-                        {% if row.rescheduled %}<span class="rkd-pill rkd-pill-muted ms-1">Rescheduled {{ row.rescheduled }}x</span>{% endif %}
-                    </td>
-                    <td>
-                        {% if a.start_date %}{{ fmt_date(a.start_date) }}{% else %}<span class="rkd-unscheduled">Not yet scheduled</span>{% endif %}
-                    </td>
-                    <td>{{ pill(row.state, row.label) }}</td>
-                    <td>{{ activity_actions(row) }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-    {% else %}
-    {{ empty('No activities in this plan yet') }}
-    {% endif %}
+<div class="rk-table-card">
+    <table class="rk-table">
+        <thead>
+            <tr>
+                <th scope="col">Activity (PPA)</th>
+                <th scope="col">Date</th>
+                <th scope="col">Proof</th>
+                <th scope="col">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in rows %}
+            {% set a = row.activity %}
+            <tr id="activity-{{ a.id }}">
+                <td>
+                    {{ a.title }}
+                    {% if row.rescheduled %}<span class="rkd-pill rkd-pill-muted ms-1">Rescheduled {{ row.rescheduled }}x</span>{% endif %}
+                </td>
+                <td>
+                    {% if a.start_date %}{{ fmt_date(a.start_date) }}{% else %}<span class="rkd-unscheduled">Not yet scheduled</span>{% endif %}
+                </td>
+                <td>{{ pill(row.state, row.label) }}</td>
+                <td>{{ activity_actions(row) }}</td>
+            </tr>
+            {% else %}
+            <tr class="rk-table-empty"><td colspan="4">No activities in this plan yet.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
 </div>
 
+{{ rk_pager(page_obj, "/bdrrmo/planning/activities/" ~ plan.id, "", "Activity pages") }}
+
 {% for row in rows %}
-{{ activity_modals(row, today, request.session.get('csrf_token', '')) }}
+{{ activity_modals(row, today, request.session.get('csrf_token', ''), page_obj) }}
 {% endfor %}
 
 {% endblock %}

@@ -1,0 +1,29 @@
+{# Status banner for the barangay's current BDRRM Plan (one plan per barangay).
+   `b` is the dict built by plan_banner() in app/routes/bdrrmo.py, or None.
+   Not dismissible. With link=True (dashboard) it points to the Planning page.
+   Styles: .rkd-plan-banner* in /static/css/rk-dashboard.css. #}
+{% macro plan_status_banner(b, link=False) -%}
+{% if b %}
+{% set tone = {'pending': 'pending', 'approved': 'approved', 'received': 'approved', 'returned': 'returned'}[b.kind] %}
+{% set icon = {'pending': 'hourglass-split', 'approved': 'check-circle-fill', 'received': 'check-circle-fill', 'returned': 'arrow-return-left'}[b.kind] %}
+<div class="rkd-plan-banner rkd-plan-banner-{{ tone }}" role="status">
+    <i class="bi bi-{{ icon }}" aria-hidden="true"></i>
+    <div>
+        {% if b.kind == 'pending' %}
+        <p class="mb-0">Your BDRRM Plan is submitted for review by the Research and Planning Office. Please wait for the review results.</p>
+        {% elif b.kind == 'approved' %}
+        <p class="mb-0">Your BDRRM Plan <strong>{{ b.file_name }}</strong> is approved. You may now proceed to the CDRRMO Research and Planning Office to submit your hard copy. Thank you.</p>
+        {% elif b.kind == 'received' %}
+        <p class="mb-0">Your BDRRM Plan <strong>{{ b.file_name }}</strong> is approved, and your hard copy was received on {{ b.received_on or '—' }}. Thank you.</p>
+        {% else %}
+        <p class="mb-1">Your BDRRM Plan <strong>{{ b.file_name }}</strong> was returned by the Research and Planning Office.</p>
+        <p class="mb-1">Reason: {{ b.reason or 'No reason was given.' }}</p>
+        <p class="mb-0">Please revise your plan and upload a new PDF.</p>
+        {% endif %}
+        {% if link %}
+        <a href="/bdrrmo/planning" class="rkd-plan-banner-link">Go to the Planning page <i class="bi bi-arrow-right" aria-hidden="true"></i></a>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+{%- endmacro %}

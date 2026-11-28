@@ -1,5 +1,6 @@
 {% extends "admin/base.html" %}
-{% from "shared/_pagination.html" import pager %}
+{% from "shared/_pagination.html" import rk_pager %}
+{% from "shared/_table.html" import clear_filters %}
 
 {% block title %}Audit Trail — RisKonek{% endblock %}
 
@@ -57,112 +58,107 @@
 {% endif %}
 
 <!-- ── Filter bar (auto-applies — no submit button needed) ────────── -->
-<div class="dash-card mb-3">
-    <form method="GET" action="/admin/audit" id="auditFilterForm" class="row g-2 align-items-end">
-        <div class="col-md-6">
-            <label class="form-label small fw-semibold mb-1">Search</label>
-            <input type="text" name="q" value="{{ f_q }}" class="form-control form-control-sm"
-                   placeholder="Search description or username…" autocomplete="off">
-        </div>
-        <div class="col-md-3">
-            <label class="form-label small fw-semibold mb-1">User</label>
-            <select name="user_id" class="form-select form-select-sm">
-                <option value="">All users</option>
-                {% for u in users %}
-                <option value="{{ u.id }}" {% if f_user_id|string == u.id|string %}selected{% endif %}>{{ u.username }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="col-md-3">
-            <label class="form-label small fw-semibold mb-1">Category / Module</label>
-            <select name="category" class="form-select form-select-sm">
-                <option value="">All categories</option>
-                {% for c in categories %}
-                <option value="{{ c }}" {% if f_category == c %}selected{% endif %}>{{ c }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="col-md-3">
-            <label class="form-label small fw-semibold mb-1">Action</label>
-            <select name="action" class="form-select form-select-sm">
-                <option value="">All actions</option>
-                {% for a in actions %}
-                <option value="{{ a }}" {% if f_action == a %}selected{% endif %}>{{ a }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="col-md-3">
-            <label class="form-label small fw-semibold mb-1">From</label>
-            <input type="date" name="date_from" value="{{ f_date_from }}" class="form-control form-control-sm">
-        </div>
-        <div class="col-md-3">
-            <label class="form-label small fw-semibold mb-1">To</label>
-            <input type="date" name="date_to" value="{{ f_date_to }}" class="form-control form-control-sm">
-        </div>
-        <div class="col-md-3 d-flex align-items-end">
-            <a href="/admin/audit" class="btn-soft w-100 justify-content-center">
-                <i class="bi bi-x-circle"></i> Reset
-            </a>
-        </div>
-    </form>
-</div>
+{# Not .js-live-filter: this form has its own live-filter script below. #}
+<form method="GET" action="/admin/audit" id="auditFilterForm" class="rk-filter-bar" role="search">
+    <div class="rk-filter-search">
+        <label for="au-q" class="visually-hidden">Search description or username</label>
+        <i class="bi bi-search" aria-hidden="true"></i>
+        <input type="text" id="au-q" name="q" value="{{ f_q }}" class="form-control"
+               placeholder="Search description or username…" autocomplete="off">
+    </div>
+    <div class="rk-filter-select">
+        <label for="au-user" class="visually-hidden">User</label>
+        <select id="au-user" name="user_id" class="form-select">
+            <option value="">All users</option>
+            {% for u in users %}
+            <option value="{{ u.id }}" {% if f_user_id|string == u.id|string %}selected{% endif %}>{{ u.username }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="rk-filter-select">
+        <label for="au-category" class="visually-hidden">Category / Module</label>
+        <select id="au-category" name="category" class="form-select">
+            <option value="">All categories</option>
+            {% for c in categories %}
+            <option value="{{ c }}" {% if f_category == c %}selected{% endif %}>{{ c }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="rk-filter-select">
+        <label for="au-action" class="visually-hidden">Action</label>
+        <select id="au-action" name="action" class="form-select">
+            <option value="">All actions</option>
+            {% for a in actions %}
+            <option value="{{ a }}" {% if f_action == a %}selected{% endif %}>{{ a }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="rk-filter-date">
+        <label for="au-from">From</label>
+        <input type="date" id="au-from" name="date_from" value="{{ f_date_from }}" class="form-control">
+    </div>
+    <div class="rk-filter-date">
+        <label for="au-to">To</label>
+        <input type="date" id="au-to" name="date_to" value="{{ f_date_to }}" class="form-control">
+    </div>
+    {{ clear_filters("/admin/audit") }}
+</form>
 
 <!-- ── Results ────────────────────────────────────────────────────── -->
-<div class="dash-card p-0">
-    <div class="table-responsive">
-        <table class="table table-hover mb-0 align-middle">
-            <thead class="rk-bg-soft">
-                <tr class="rk-th-soft">
-                    <th class="px-3 py-3">Time</th>
-                    <th class="py-3">User</th>
-                    <th class="py-3">Category</th>
-                    <th class="py-3">Action</th>
-                    <th class="py-3">Entity</th>
-                    <th class="py-3">Description</th>
-                    <th class="py-3 text-end px-3">Detail</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for day_label, items in grouped %}
-                <tr><td colspan="7" class="bg-light text-muted small fw-semibold px-3 py-2">
-                    <i class="bi bi-calendar3 me-1"></i>{{ day_label }}
-                </td></tr>
-                {% for it in items %}
-                <tr class="rk-fs-13">
-                    <td class="px-3 text-nowrap">{{ it.timestamp | pht }}</td>
-                    <td>{{ it.username }}</td>
-                    <td>{{ category_badge(it.category) }}</td>
-                    <td><span class="badge bg-light text-dark border">{{ it.action }}</span></td>
-                    <td class="small text-muted">
-                        {{ it.target_table or '—' }}{% if it.target_id %} #{{ it.target_id }}{% endif %}
-                    </td>
-                    <td class="small rk-maxw-340">
-                        <span class="d-inline-block text-truncate rk-maxw-340" title="{{ it.description }}">
-                            {{ it.description or '—' }}
-                        </span>
-                    </td>
-                    <td class="text-end px-3">
-                        <a href="/admin/audit/{{ it.id }}" class="btn-soft" title="View detail">
-                            <i class="bi bi-eye"></i>
-                        </a>
-                    </td>
-                </tr>
-                {% endfor %}
-                {% else %}
-                <tr>
-                    <td colspan="7" class="text-center text-muted py-5">
-                        <i class="bi bi-search fs-3 d-block mb-2"></i>
-                        No audit entries match your filters.
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+<div class="rk-table-card">
+    <table class="rk-table">
+        <thead>
+            <tr>
+                <th scope="col">Time</th>
+                <th scope="col">User</th>
+                <th scope="col">Category</th>
+                <th scope="col">Action</th>
+                <th scope="col">Entity</th>
+                <th scope="col">Description</th>
+                <th scope="col">Detail</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for day_label, items in grouped %}
+            <tr class="rk-table-group"><td colspan="7">
+                <i class="bi bi-calendar3 me-1" aria-hidden="true"></i>{{ day_label }}
+            </td></tr>
+            {% for it in items %}
+            <tr>
+                <td class="text-nowrap">{{ it.timestamp | pht }}</td>
+                <td>{{ it.username }}</td>
+                <td>{{ category_badge(it.category) }}</td>
+                <td><span class="badge bg-light text-dark border">{{ it.action }}</span></td>
+                <td class="small text-muted">
+                    {{ it.target_table or '—' }}{% if it.target_id %} #{{ it.target_id }}{% endif %}
+                </td>
+                <td class="small rk-maxw-340">
+                    <span class="d-inline-block text-truncate rk-maxw-340" title="{{ it.description }}">
+                        {{ it.description or '—' }}
+                    </span>
+                </td>
+                <td>
+                    <a href="/admin/audit/{{ it.id }}" class="btn-soft" title="View detail"
+                       aria-label="View detail">
+                        <i class="bi bi-eye" aria-hidden="true"></i>
+                    </a>
+                </td>
+            </tr>
+            {% endfor %}
+            {% else %}
+            <tr class="rk-table-empty"><td colspan="7">
+                No records found.
+                {% if f_q or f_user_id or f_category or f_action or f_date_from or f_date_to %}
+                <a href="/admin/audit" class="ms-1">Clear filters</a>
+                {% endif %}
+            </td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
 </div>
 
 <!-- ── Pagination ─────────────────────────────────────────────────── -->
-{{ pager(page_obj, "/admin/audit", base_query) }}
+{{ rk_pager(page_obj, "/admin/audit", base_query, "Audit trail pages") }}
 {% endblock %}
 
 {% block scripts %}

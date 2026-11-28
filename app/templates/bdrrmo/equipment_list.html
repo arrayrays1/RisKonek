@@ -1,5 +1,6 @@
 {% extends "admin/base.html" %}
-{% from "shared/_pagination.html" import pager %}
+{% from "shared/_pagination.html" import rk_pager %}
+{% from "shared/_table.html" import clear_filters %}
 
 {% block title %}Vehicle & Equipment — RisKonek{% endblock %}
 
@@ -7,11 +8,6 @@
 
 {% set equipment_route = '/bdrrmo/equipment_bdrrmo' %}
 
-{% block head_extra %}
-<style nonce="{{ request.state.csp_nonce }}">
-    #header { margin: 0; color: #167736; font-size: 40px;}
-</style>
-{% endblock %}
 
 {% macro status_pill(v, label) -%}
     {% if v in ('available', 'serviceable') %}
@@ -33,9 +29,11 @@
         <h1 id="header">Vehicle &amp; Equipment Monitoring</h1>
         <p>Operational disaster-response equipment (vehicles, generators, chainsaws, rescue boats, radios, flashlights, life vests).</p>
     </div>
-    <a href="/bdrrmo/equipment_bdrrmo/new" class="btn-rk text-decoration-none">
-        <i class="bi bi-plus-lg"></i> Add Equipment
-    </a>
+    {% if barangay %}
+    <button type="button" class="btn-rk" id="equipmentAddBtn">
+        <i class="bi bi-plus-lg" aria-hidden="true"></i> Add Equipment
+    </button>
+    {% endif %}
 </div>
 
 {% if request.query_params.get('success') %}
@@ -45,115 +43,105 @@
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
 </div>
 {% endif %}
-{% if request.query_params.get('error') %}
+{% set top_error = page_error or request.query_params.get('error') %}
+{% if top_error %}
 <div class="alert alert-danger alert-dismissible fade show">
     <i class="bi bi-exclamation-triangle-fill me-1"></i>
-    {{ request.query_params.get('error') }}
+    {{ top_error }}
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
 </div>
 {% endif %}
 
-<!-- ── Filters ────────────────────────────────────────────────── -->
-<div class="dash-card mb-3">
-    <form method="GET" action={{equipment_route}} class="row g-2 align-items-end js-live-filter">
-        <div class="col-md-4">
-            <label class="form-label small fw-semibold mb-1">Search</label>
-            <input type="text" name="q" value="{{ f_q }}" class="form-control form-control-sm"
-                   placeholder="Search name or plate/serial…" autocomplete="off">
-        </div>
-        <div class="col-md-3">
-            <label class="form-label small fw-semibold mb-1">Type</label>
-            <select name="equipment_type" class="form-select form-select-sm">
-                <option value="">All types</option>
-                {% for v, label in types %}
-                <option value="{{ v }}" {% if f_type == v %}selected{% endif %}>{{ label }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="col-md-2">
-            <label class="form-label small fw-semibold mb-1">View</label>
-            <select name="archived" class="form-select form-select-sm">
-                <option value=""  {% if not show_archived %}selected{% endif %}>Active</option>
-                <option value="1" {% if show_archived %}selected{% endif %}>Archived</option>
-            </select>
-        </div>
-        <div class="col-md-1 d-grid">
-            <a href={{equipment_route}} class="btn btn-outline-secondary btn-sm" title="Reset filters">
-                <i class="bi bi-x-circle"></i>
-            </a>
-        </div>
-    </form>
-</div>
+<!-- ── Filters (auto-apply) ───────────────────────────────────── -->
+<form method="GET" action="{{ equipment_route }}" class="rk-filter-bar js-live-filter" role="search">
+    <div class="rk-filter-search">
+        <label for="eq-q" class="visually-hidden">Search name or plate/serial</label>
+        <i class="bi bi-search" aria-hidden="true"></i>
+        <input type="text" id="eq-q" name="q" value="{{ f_q }}" class="form-control"
+               placeholder="Search name or plate/serial…" autocomplete="off">
+    </div>
+    <div class="rk-filter-select">
+        <label for="eq-type" class="visually-hidden">Type</label>
+        <select id="eq-type" name="equipment_type" class="form-select">
+            <option value="">All types</option>
+            {% for v, label in types %}
+            <option value="{{ v }}" {% if f_type == v %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="rk-filter-select">
+        <label for="eq-view" class="visually-hidden">View</label>
+        <select id="eq-view" name="archived" class="form-select">
+            <option value=""  {% if not show_archived %}selected{% endif %}>Active</option>
+            <option value="1" {% if show_archived %}selected{% endif %}>Archived</option>
+        </select>
+    </div>
+    {{ clear_filters(equipment_route) }}
+</form>
 
 <!-- ── Table ──────────────────────────────────────────────────── -->
-<div class="dash-card overflow-hidden p-0">
-    <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
-            <thead class="rk-bg-soft">
-                <tr class="rk-th-soft">
-                    <th class="px-3 py-3">Equipment</th>
-                    <th class="py-3">Type</th>
-                    <th class="py-3">Assigned</th>
-                    <th class="py-3">Plate / Serial</th>
-                    <th class="py-3">Last Inspected</th>
-                    <th class="py-3 text-end px-3">Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for e in rows %}
-                <tr class="rk-fs-13">
-                    <td class="px-3 fw-semibold">{{ e.name }}</td>
-                    <td>{{ e.type_label }}</td>
-                    <td class="text-muted">{{ e.assigned }}</td>
-                    <td class="text-muted">{{ e.plate_or_serial }}</td>
-                    <td class="text-muted">{{ e.last_inspected.strftime('%Y-%m-%d') if e.last_inspected else '—' }}</td>
-                    <td class="text-end px-3">
-                        {# History stays available for archived units too. #}
-                        {% if user.role in ('cfau_oic', 'admin') %}
-                        <a href="/cfau/equipment-audit?equipment_id={{ e.id }}"
-                           class="btn btn-outline-secondary btn-sm"
-                           title="View this unit's audit log">
-                            <i class="bi bi-clock-history"></i>
-                        </a>
-                        {% endif %}
-                        {% if not e.is_archived %}
-                        <a href="/bdrrmo/equipment_bdrrmo/{{ e.id }}/edit"
-                           class="btn btn-outline-secondary btn-sm">
-                            <i class="bi bi-pencil"></i>
-                        </a>
-                        <form method="POST" action="/bdrrmo/equipment_bdrrmo/{{ e.id }}/archive" class="d-inline"
-                              data-confirm='Archive {{ e.name }}?'>
-                            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
-                            <button type="submit" class="btn btn-outline-warning btn-sm">
-                                <i class="bi bi-archive"></i>
-                            </button>
-                        </form>
-                        {% else %}
-                        <form method="POST" action="/bdrrmo/equipment_bdrrmo/{{ e.id }}/archive" class="d-inline">
-                            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
-                            <button type="submit" class="btn btn-outline-success btn-sm">
-                                <i class="bi bi-arrow-counterclockwise"></i> Restore
-                            </button>
-                        </form>
-                        {% endif %}
-                    </td>
-                </tr>
-                {% else %}
-                <tr>
-                    <td colspan="7" class="text-center text-muted py-4">
-                        No equipment matches your filters.
-                        {% if f_q or f_type or f_status or f_archived %}
-                        <a href={{equipment_route}} class="ms-2">Clear filters</a>
-                        {% endif %}
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+<div class="rk-table-card">
+    <table class="rk-table">
+        <thead>
+            <tr>
+                <th scope="col">Equipment</th>
+                <th scope="col">Type</th>
+                <th scope="col">Plate / Serial</th>
+                <th scope="col">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for e in rows %}
+            <tr>
+                <td class="fw-semibold">{{ e.name }}</td>
+                <td>{{ e.type_label }}</td>
+                <td class="text-muted">{{ e.plate_or_serial }}</td>
+                <td>
+                <div class="rk-table-actions">
+                    {# History stays available for archived units too. #}
+                    {% if user.role in ('cfau_oic', 'admin') %}
+                    <a href="/cfau/equipment-audit?equipment_id={{ e.id }}"
+                       class="btn btn-outline-secondary btn-sm"
+                       title="View this unit's audit log">
+                        <i class="bi bi-clock-history"></i>
+                    </a>
+                    {% endif %}
+                    {% if not e.is_archived %}
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-equipment-edit="{{ e.id }}"
+                            title="Edit" aria-label="Edit {{ e.name }}">
+                        <i class="bi bi-pencil" aria-hidden="true"></i>
+                    </button>
+                    <form method="POST" action="/bdrrmo/equipment_bdrrmo/{{ e.id }}/archive"
+                          data-confirm='Archive {{ e.name }}?'>
+                        <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+                        <button type="submit" class="btn btn-outline-warning btn-sm" aria-label="Archive {{ e.name }}">
+                            <i class="bi bi-archive"></i>
+                        </button>
+                    </form>
+                    {% else %}
+                    <form method="POST" action="/bdrrmo/equipment_bdrrmo/{{ e.id }}/archive">
+                        <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+                        <button type="submit" class="btn btn-outline-success btn-sm">
+                            <i class="bi bi-arrow-counterclockwise"></i> Restore
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+                </td>
+            </tr>
+            {% else %}
+            <tr class="rk-table-empty"><td colspan="4">
+                No records found.
+                {% if f_q or f_type or f_status or show_archived %}
+                <a href="{{ equipment_route }}" class="ms-1">Clear filters</a>
+                {% endif %}
+            </td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
 </div>
 
-{{ pager(page_obj, equipment_route, base_query) }}
+{{ rk_pager(page_obj, equipment_route, base_query, "Equipment pages") }}
 
 <!-- ── Status change modals ───────────────────────────────────── -->
 {% for e in rows %}
@@ -211,4 +199,138 @@
 {% endif %}
 {% endfor %}
 
+{% if barangay %}
+<!-- ── Add / Edit Equipment modal (one for both) ──────────────── -->
+<div class="modal fade" id="equipmentModal" tabindex="-1" aria-labelledby="equipmentModalTitle" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable modal-fullscreen-sm-down">
+    <form method="POST" action="/bdrrmo/equipment_bdrrmo/new" id="equipmentForm" class="modal-content" data-validate>
+      <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title" id="equipmentModalTitle">Add Equipment</h5>
+          <p class="text-muted small mb-0" id="equipmentModalIntro">Register a new equipment unit.</p>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-danger d-none" id="equipmentModalError" role="alert"></div>
+        <div class="row g-3">
+          <div class="col-md-8">
+            <label class="form-label small fw-semibold" for="ef-name">Equipment Name *</label>
+            <input type="text" name="name" id="ef-name" required class="form-control"
+                   placeholder="e.g. Rescue Truck 02">
+          </div>
+
+          <div class="col-md-4">
+            <label class="form-label small fw-semibold" for="ef-type">Type *</label>
+            <select name="equipment_type" id="ef-type" required class="form-select">
+              {% for v, label in types %}
+              <option value="{{ v }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="col-md-4">
+            <label class="form-label small fw-semibold" for="ef-plate">Plate / Serial Number *</label>
+            <input type="text" name="plate_or_serial" id="ef-plate" class="form-control" required
+                   data-rule="plate-serial" placeholder="e.g. ABC-1234">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" class="btn-rk">
+          <i class="bi bi-check2" aria-hidden="true"></i> <span id="equipmentModalSubmit">Create Equipment</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# Data for the modal script: current values of this page's rows, and the
+   state to open with (after ?open=add / ?edit=<id> or a failed save). #}
+<script type="application/json" id="equipmentEditData">{{ equipment_edit_data | tojson }}</script>
+<script type="application/json" id="equipmentModalState">{{ equipment_modal | tojson }}</script>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script nonce="{{ request.state.csp_nonce }}">
+// Add / Edit Equipment modal: one form for both modes. CSP-safe (nonce'd,
+// no inline handlers). Posts to the existing /bdrrmo/equipment_bdrrmo routes.
+(function () {
+    var modalEl = document.getElementById('equipmentModal');
+    if (!modalEl || !window.bootstrap) return;
+    var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+    var form = document.getElementById('equipmentForm');
+    var addBtn = document.getElementById('equipmentAddBtn');
+    var rows = JSON.parse(document.getElementById('equipmentEditData').textContent || '{}');
+    var state = JSON.parse(document.getElementById('equipmentModalState').textContent || 'null');
+    var el = function (id) { return document.getElementById(id); };
+    var type = el('ef-type');
+    var opener = null;
+
+    var TEXT = {
+        add:  { title: 'Add Equipment', submit: 'Create Equipment',
+                intro: 'Register a new equipment unit.' },
+        edit: { title: 'Edit Equipment', submit: 'Save changes',
+                intro: 'Update equipment details. Use Status from the list view to log status changes individually.' }
+    };
+
+    function setMode(mode, id, values, error) {
+        values = values || {};
+        form.action = mode === 'edit'
+            ? '/bdrrmo/equipment_bdrrmo/' + id + '/edit'
+            : '/bdrrmo/equipment_bdrrmo/new';
+        el('equipmentModalTitle').textContent = TEXT[mode].title;
+        el('equipmentModalIntro').textContent = TEXT[mode].intro;
+        el('equipmentModalSubmit').textContent = TEXT[mode].submit;
+
+        el('ef-name').value = values.name || '';
+        type.value = values.equipment_type || type.options[0].value;
+        el('ef-plate').value = values.plate_or_serial || '';
+
+        form.querySelectorAll('.is-invalid').forEach(function (f) { f.classList.remove('is-invalid'); });
+        var err = el('equipmentModalError');
+        err.textContent = error || '';
+        err.classList.toggle('d-none', !error);
+    }
+
+    function openWith(button, mode, id, values, error) {
+        opener = button;
+        setMode(mode, id, values, error);
+        modal.show();
+    }
+
+    if (addBtn) addBtn.addEventListener('click', function () { openWith(addBtn, 'add'); });
+    document.querySelectorAll('[data-equipment-edit]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var id = btn.getAttribute('data-equipment-edit');
+            openWith(btn, 'edit', id, rows[id]);
+        });
+    });
+
+    // Focus the first field on open; give focus back to the opener on close.
+    modalEl.addEventListener('shown.bs.modal', function () { el('ef-name').focus(); });
+    modalEl.addEventListener('hidden.bs.modal', function () {
+        if (opener && document.body.contains(opener)) opener.focus();
+    });
+
+    // Open on load after ?open=add / ?edit=<id> (old form URLs) or a failed
+    // save. Drop those params so a refresh does not reopen the modal.
+    if (state) {
+        var btn = state.mode === 'edit'
+            ? document.querySelector('[data-equipment-edit="' + state.id + '"]') || addBtn
+            : addBtn;
+        openWith(btn, state.mode, state.id, state.values, state.error);
+        var url = new URL(window.location.href);
+        if (url.searchParams.has('open') || url.searchParams.has('edit')) {
+            url.searchParams.delete('open');
+            url.searchParams.delete('edit');
+            history.replaceState(null, '', url.pathname + (url.search || ''));
+        }
+    }
+})();
+</script>
 {% endblock %}

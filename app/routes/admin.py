@@ -11,13 +11,12 @@ from app.models import (
     UploadedReport, UploadHistory, UploadEvent,
     ResourceCategory, EquipmentType, log_action,
     EquipmentReport, IncidentReport, ServiceabilityStatus, Urgency, Planning, PlanningStatus,
-    Activity, ActivityProof
+    Activity, ActivityProof, ActivityStatus
 )
 from app.etl.extract_pdf import extract_pdf
 from app.services import plan_dashboard as pdash
 from app.etl.ai_pipeline import summarize_planning as ai_summarize
 from app.auth import require_role, hash_password
-from app.analytics.simulator import compute_risk_score
 from app.utils.geo import BARANGAY_COORDS
 from app.services.geocoding import (
     nearby_landmarks, search_locations, reverse_geocode_san_pedro,
@@ -38,7 +37,7 @@ from app.utils.pagination import (
 )
 from typing import Optional
 from datetime import date, datetime, timedelta, timezone
-from urllib.parse import quote_plus
+from urllib.parse import quote, quote_plus, urlencode
 from app.storage import download_file
 from sqlalchemy import extract
 import csv
@@ -890,27 +889,6 @@ def _vulnerable_percent(pop: Population) -> float:
     return round((vulnerable / pop.total_population) * 100, 1)
 
 
-def _risk_trend(incidents, disaster_type: DisasterType) -> str:
-    """Rule-based trend: last 12 months count > previous 12 months → Increasing,
-    else Stable. Operates on the in-memory incident list to avoid extra queries.
-    """
-    today = date.today()
-    last_year_start = today - timedelta(days=365)
-    prev_year_start = today - timedelta(days=730)
-
-    last_12 = sum(
-        1 for inc in incidents
-        if inc.disaster_type == disaster_type
-        and inc.date_occurred >= last_year_start
-    )
-    prev_12 = sum(
-        1 for inc in incidents
-        if inc.disaster_type == disaster_type
-        and prev_year_start <= inc.date_occurred < last_year_start
-    )
-    return "Increasing" if last_12 > prev_12 else "Stable"
-
-
 @router.get("/barangays", response_class=HTMLResponse)
 def barangay_list(
     request: Request,
@@ -1016,35 +994,18 @@ def barangay_list(
 
 
 def barangay_profile_context(db, brgy: Barangay) -> dict:
-    """Build the full barangay-profile context for `brgy`.
-
-    Shared by the admin barangay profile (TR-ADM-23) and the
-    barangay-scoped BDRRMO profile (Week 9) so both render identical
-    population / incident / facility / planning-priority data without
-    duplicating the logic. Does NOT include `user` — the caller adds it.
+    """Build the Admin barangay-profile context for `brgy`: headline cards,
+    the current BDRRM Plan with its activities, key infrastructure and
+    vulnerable groups. Does NOT include `user` — the caller adds it.
     """
     population = db.query(Population).filter(
         Population.barangay_id == brgy.id
     ).order_by(Population.recorded_at.desc()).first()
 
-    incidents = db.query(Incident).filter(
-        Incident.barangay_id == brgy.id
-    ).order_by(Incident.date_occurred.desc()).all()
-
     facilities = db.query(Facility).filter(
         Facility.barangay_id == brgy.id,
         Facility.is_archived == False,
     ).order_by(Facility.facility_type, Facility.name).all()
-
-    # ── Risk score (reuse existing formula) ──────────────────────────
-    risk_result = compute_risk_score(brgy, incidents, population)
-
-    # ── Historical disaster counts (last 5 years) ────────────────────
-    five_years_ago = date.today() - timedelta(days=365 * 5)
-    recent_incidents = [i for i in incidents if i.date_occurred >= five_years_ago]
-    incident_counts_by_type = {dt.value: 0 for dt in DisasterType}
-    for inc in recent_incidents:
-        incident_counts_by_type[inc.disaster_type.value] += 1
 
     # ── Vulnerable group breakdown ───────────────────────────────────
     total_pop = population.total_population if population else 0
@@ -1071,11 +1032,22 @@ def barangay_profile_context(db, brgy: Barangay) -> dict:
             "status_class": status_class,
         })
 
+    # ── Current BDRRM Plan (latest non-archived, as on the dashboards) ─
+    plan = pdash.latest_plan_for_barangay(db, brgy.id)
+    activities = pdash.activities_for_plans(db, [plan.id]) if plan else []
+    activity_rows = pdash.admin_activity_rows(activities)
+    rescheduled = pdash.rescheduled_counts(db, [a.id for a in activities])
+    for row in activity_rows:
+        row["rescheduled"] = rescheduled.get(row["activity"].id, 0)
+
     return {
         "barangay": brgy,
-        "risk_level": brgy.risk_level.value if brgy.risk_level else "low",
-        "risk_score": risk_result["score"],
-        "risk_breakdown": risk_result["breakdown"],
+        "plan": plan,
+        "plan_status": pdash.plan_status(plan) if plan else None,
+        "activity_rows": activity_rows,
+        "activity_cards": pdash.activity_cards(activities),
+        # same helper as the BDRRMO dashboard's "Accomplishment Report" card
+        "proofs": pdash.bdrrmo_proof_pie(activities),
         "total_population": total_pop,
         "households": households,
         "vulnerable_pct": _vulnerable_percent(population),
@@ -1085,12 +1057,7 @@ def barangay_profile_context(db, brgy: Barangay) -> dict:
         "elderly_pct": pct(elderly),
         "pwd_pct": pct(pwd),
         "children_pct": pct(children),
-        "flood_trend": _risk_trend(incidents, DisasterType.flood),
-        "fire_trend": _risk_trend(incidents, DisasterType.fire),
         "facility_rows": facility_rows,
-        "incident_counts": incident_counts_by_type,
-        "recent_incidents": recent_incidents[:10],
-        "hazard_types": [h.strip() for h in (brgy.hazard_types or "").split(",") if h.strip()],
     }
 
 
@@ -1835,27 +1802,34 @@ def equipment_list(
     # by the helper). Reused as-is for both the badges and the count.
     reminders = equipment_repair_reminders(db)
 
-    stmt_vehicles = (
-        select(
-            Equipment.equipment_type,
-            func.count(Equipment.id).label("total")
-        )
-        .where(Equipment.equipment_type.isnot(None))
+    # Three fixed vehicle cards: non-archived units per type, all barangays.
+    # Each card links to the table filtered by that type, other filters kept.
+    type_counts = dict(
+        db.query(Equipment.equipment_type, func.count(Equipment.id))
+        .filter(Equipment.is_archived == False)
         .group_by(Equipment.equipment_type)
-        .order_by(func.count(Equipment.id).desc())
+        .all()
     )
-
-    vehicles = db.execute(stmt_vehicles).all()
-
-    print(vehicles)
-
+    keep = {
+        "q": q or "", "barangay_id": barangay_id or "", "status": status or "",
+        "archived": "1" if show_archived else "", "per_page": per_page or "",
+    }
     vehicles_data = []
-    for v in vehicles:
+    for t, icon, plural in (
+        (EquipmentType.ambulance, "heart-pulse", "ambulances"),
+        (EquipmentType.fire_truck, "fire", "fire trucks"),
+        (EquipmentType.rescue_vehicle, "truck-front", "rescue vehicles"),
+    ):
+        params = {k: v for k, v in keep.items() if v not in ("", None)}
+        params["equipment_type"] = t.value
+        total = type_counts.get(t, 0)
         vehicles_data.append({
-            "equipment_name": EQUIPMENT_TYPE_LABELS.get(
-                v.equipment_type.value if v.equipment_type else "", "—"
-            ),
-            "total": v.total,
+            "label": EQUIPMENT_TYPE_LABELS.get(t.value, t.value.title()),
+            "total": total,
+            "icon": icon,
+            "plural": plural,
+            "href": "/admin/equipment?" + urlencode(params),
+            "selected": equipment_type == t.value,
         })
 
     view_rows = []
@@ -2575,9 +2549,32 @@ PLANNING_STATUS_LABELS = {
 
 PLANNING_STATUS_CHOICES = ["pending", "approved", "rejected"]
 
+def _plan_review_times(db, plan_ids) -> dict:
+    """{plan_id: datetime} of the latest audit entry approving or returning
+    each plan (log_action(..., "approved"/"rejected", "Plan", id))."""
+    if not plan_ids:
+        return {}
+    rows = (
+        db.query(AuditLog.target_id, func.max(AuditLog.timestamp))
+        .filter(
+            AuditLog.target_table == "Plan",
+            AuditLog.target_id.in_(plan_ids),
+            AuditLog.action.in_(("approved", "rejected")),
+        )
+        .group_by(AuditLog.target_id)
+        .all()
+    )
+    return {pid: ts for pid, ts in rows}
+
+
+def _short_pht_date(dt) -> str:
+    d = pdash.pht_date(dt)
+    return f"{d:%b} {d.day}, {d.year}" if d else "—"
+
+
 @router.get("/planning", response_class=HTMLResponse)
 def planning(
-    request: Request,              
+    request: Request,
     db: Session = Depends(get_db),
     q: Optional[str] = None,
     status: Optional[str] = None,
@@ -2585,53 +2582,94 @@ def planning(
     barangay_id: Optional[int] = None,
     page: Optional[str] = None,
     per_page: Optional[str] = None,):
+    """One row per barangay with at least one plan. The row shows the
+    barangay's current plan: its latest non-archived plan, or its latest
+    plan when every plan is archived (same rule as the dashboards). All of
+    its plans go into the row's review history."""
     user = require_role(request, ["admin"])
     if isinstance(user, RedirectResponse):
         return user
 
-    stmt = (
-        select(Planning)
-        .options(joinedload(Planning.barangay))
-    )
-    
     show_archived = (archived == "1")
-    
-    stmt = stmt.where(Planning.is_archived == show_archived)
-    
-    if q:
-        like = f"%{q.strip()}%"
-        stmt = stmt.where(Planning.file_name.ilike(like))
-    if barangay_id:
-        stmt = stmt.where(Planning.barangay_id == barangay_id)
-    if status and status in {s.value for s in PlanningStatus}:
-        stmt = stmt.where(Planning.status == PlanningStatus(status))
-    
-    stmt = stmt.order_by(Planning.file_name)
-    
-    result = db.execute(stmt)
-    
-    rows = result.scalars().all()
+    status_filter = status if status in PLANNING_STATUS_CHOICES else None
+    needle = (q or "").strip().lower()
 
-    view_rows = []
-    
-    for r in rows:
+    plans = (
+        db.query(Planning)
+        .options(joinedload(Planning.barangay))
+        .filter(Planning.barangay_id.isnot(None))
+        .order_by(Planning.created_at.desc(), Planning.id.desc())
+        .all()
+    )
+    by_barangay = {}  # barangay_id -> [plan, ...] newest first
+    for p in plans:
+        by_barangay.setdefault(p.barangay_id, []).append(p)
+
+    groups = []
+    for bid, history in by_barangay.items():
+        current = next((p for p in history if not p.is_archived), history[0])
+        name = current.barangay.name if current.barangay else "—"
+        # Active view = current plan not archived; Archived view = all archived.
+        if bool(current.is_archived) != show_archived:
+            continue
+        if barangay_id and bid != barangay_id:
+            continue
+        if status_filter and pdash.plan_status(current) != status_filter:
+            continue
+        # Search: barangay name or the file name of any of its plans.
+        if needle and needle not in name.lower() and not any(
+            needle in (p.file_name or "").lower() for p in history
+        ):
+            continue
+        groups.append((name, bid, current, history))
+    groups.sort(key=lambda g: g[0].lower())
+
+    page_obj = paginate(groups, parse_page(page), parse_per_page(per_page))
+
+    # Review history (newest first) only for the barangays on this page.
+    page_plan_ids = [p.id for _, _, _, history in page_obj.items for p in history]
+    reviewed_at = _plan_review_times(db, page_plan_ids)
+
+    view_rows, history_data = [], {}
+    for name, bid, r, history in page_obj.items:
+        status_value = pdash.plan_status(r)
         view_rows.append({
             "id": r.id,
-            "barangay": r.barangay.name,
+            "barangay_id": bid,
+            "barangay": name,
             "file_name": r.file_name,
             "file_path": r.file_path,
             "reason": r.reason,
-            "status_value": r.status.value if r.status else "",
-            "status_label": PLANNING_STATUS_LABELS.get(
-                r.status.value if r.status else "", "—"
-            ),
+            "status_value": status_value,
+            "status_label": PLANNING_STATUS_LABELS.get(status_value, "—"),
             "is_archived": r.is_archived,
             "is_hardcopy_received": r.is_hardcopy_received,
             "created_at": r.created_at,
+            "plan_count": len(history),
         })
+        history_data[str(bid)] = {
+            "barangay": name,
+            "plans": [
+                {
+                    "file_name": p.file_name or "—",
+                    "status": pdash.plan_status(p),
+                    "status_label": PLANNING_STATUS_LABELS.get(pdash.plan_status(p), "—"),
+                    "archived": bool(p.is_archived),
+                    "reason": (p.reason or "").strip() or "—",
+                    "uploaded": _short_pht_date(p.created_at),
+                    "reviewed": _to_pht(reviewed_at[p.id]) if p.id in reviewed_at else "—",
+                    "view_url": f"/admin/planning/{p.id}/view",
+                    "current": p.id == r.id,
+                }
+                for p in history
+            ],
+        }
+    page_obj.items = view_rows
 
-    page_obj = paginate(view_rows, parse_page(page), parse_per_page(per_page))
-    base_query = build_base_query({"q": q or "", "barangay_id": barangay_id or "", "status": status or ""})
+    base_query = build_base_query({
+        "q": q or "", "barangay_id": barangay_id or "", "status": status or "",
+        "archived": "1" if show_archived else "",
+    })
 
     barangays = db.query(Barangay).order_by(Barangay.name).all()
 
@@ -2642,7 +2680,7 @@ def planning(
             "user": user,
             "active_nav": "planning",
             "edit_mode": True,
-            "plannings": page_obj.items,
+            "plannings": view_rows,
             "page_obj": page_obj,
             "base_query": base_query,
             "barangays": barangays,
@@ -2651,6 +2689,7 @@ def planning(
             "f_status": status,
             "f_barangay_id": barangay_id or "",
             "show_archived": show_archived,
+            "history_data": history_data,
             "error": None,
         },
     )
@@ -2710,6 +2749,8 @@ def planning_details(
             "active_nav": "planning",
             "plan": plan,
             "status_label": PLANNING_STATUS_LABELS.get(status_value, "—"),
+            # approved / returned: the review decision is final
+            "is_final": status_value in ("approved", "rejected"),
         },
     )
 
@@ -2753,6 +2794,20 @@ def planning_archive_toggle(
     p = db.query(Planning).filter(Planning.id == planning_id).first()
     if not p:
         return RedirectResponse(url="/admin/planning", status_code=302)
+
+    # A review decision is final: only a pending plan can be approved or returned.
+    current = pdash.plan_status(p)
+    if current == "approved":
+        return RedirectResponse(
+            url="/admin/planning?error=" + quote_plus("This plan is already approved and can no longer be changed."),
+            status_code=302,
+        )
+    if current == "rejected":
+        return RedirectResponse(
+            url="/admin/planning?error=" + quote_plus(
+                "This plan was already returned. The barangay needs to upload a revised plan."),
+            status_code=302,
+        )
 
     try:
         new_status = PlanningStatus(status) # ActivityStatus(status) in the activity route
@@ -2829,6 +2884,8 @@ def get_activities(
     plan_id: int,
     request: Request,
     db: Session = Depends(get_db),
+    page: Optional[str] = None,
+    per_page: Optional[str] = None,
 ):
     user = require_role(request, ["admin"])
 
@@ -2841,6 +2898,9 @@ def get_activities(
 
     # All activities (finished ones too), by date with undated last.
     activities = pdash.activities_for_plans(db, [plan.id])
+    page_obj = paginate(
+        pdash.admin_activity_rows(activities), parse_page(page), parse_per_page(per_page)
+    )
 
     return templates.TemplateResponse(
         request=request,
@@ -2849,61 +2909,116 @@ def get_activities(
             "user": user,
             "active_nav": "planning",
             "plan": plan,
-            "rows": pdash.admin_activity_rows(activities),
+            "rows": page_obj.items,
+            "page_obj": page_obj,
             "error": request.query_params.get("error"),
+            "success": request.query_params.get("success"),
         },
     )
 
+def latest_proof(db: Session, activity_id: int):
+    """The most recent ActivityProof of an activity, or None."""
+    return (
+        db.query(ActivityProof)
+        .filter(ActivityProof.activity_id == activity_id)
+        .order_by(ActivityProof.id.desc())
+        .first()
+    )
+
+
+PROOF_OPEN_FAILED = "The proof file could not be opened. Please try again."
+
+
+def proof_pdf_response(document):
+    """Stream a proof PDF inline under its original file name, or None when
+    the stored file cannot be fetched (the caller redirects with a message).
+    Shared by the Admin and BDRRMO "View proof" routes."""
+    try:
+        response = download_file(document.file_path)
+    except Exception:
+        return None
+    name = document.file_name or "proof.pdf"
+    ascii_name = re.sub(r'[^A-Za-z0-9._ -]', "_", name).strip() or "proof.pdf"
+    return StreamingResponse(
+        response["Body"],
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition":
+                f'inline; filename="{ascii_name}"; filename*=UTF-8''{quote(name)}',
+        },
+    )
+
+
 @router.get("/activities/{activity_id}/proof")
-async def view_proof_document( 
+async def view_proof_document(
     activity_id: int,
     request: Request,
-    db: Session = Depends(get_db), 
+    db: Session = Depends(get_db),
 ):
     user = require_role(request, ["admin"])
     if isinstance(user, RedirectResponse):
         return user
-    
-    # Retrieve the document from your database
-    document = db.query(ActivityProof).filter(ActivityProof.activity_id == activity_id).first()
 
+    activity = db.query(Activity).filter(Activity.id == activity_id).first()
+    if not activity:
+        return RedirectResponse(url="/admin/planning?error=" + quote_plus("Proof not found"), status_code=302)
+    back = f"/admin/planning/activities/{activity.planning_id}"
+
+    document = latest_proof(db, activity_id)
     if not document:
-        return RedirectResponse(url="/admin/planning", status_code=302)
+        return RedirectResponse(url=f"{back}?error=" + quote_plus("No proof uploaded yet"), status_code=302)
 
-    response = download_file(document.file_path)
-
-    return StreamingResponse(
-        response["Body"],
-        media_type=response.get(
-            "ContentType",
-            "application/octet-stream"
-        ),
-        headers={
-            "Content-Disposition": "inline"
-        }
+    return proof_pdf_response(document) or RedirectResponse(
+        url=f"{back}?error=" + quote_plus(PROOF_OPEN_FAILED), status_code=302
     )
 
 @router.post("/activities/{activity_id}/status")
-async def change_status_activity( 
+async def change_status_activity(
     activity_id: int,
     request: Request,
     status: str = Form(...),
     reason: str = Form(""),
-    db: Session = Depends(get_db), 
+    page: str = Form(""),
+    per_page: str = Form(""),
+    db: Session = Depends(get_db),
 ):
     user = require_role(request, ["admin"])
     if isinstance(user, RedirectResponse):
         return user
-    
+
     activity = db.query(Activity).filter(Activity.id == activity_id).first()
 
     if not activity:
         return RedirectResponse(url="/admin/planning", status_code=302)
 
-    activity.status = status
-    activity.reason = reason
+    def back(**message):
+        """Back to this plan's activities page, same page of the list, on this row."""
+        params = {}
+        if per_page:
+            params["per_page"] = parse_per_page(per_page)
+        if page:
+            params["page"] = parse_page(page)
+        params.update(message)
+        return RedirectResponse(
+            url=f"/admin/planning/activities/{activity.planning_id}?{urlencode(params)}#activity-{activity.id}",
+            status_code=302,
+        )
 
-    if status == "rejected":
+    # Only a proof awaiting review can be approved or returned.
+    if not activity.is_proof_submitted or activity.status == ActivityStatus.approved:
+        return back(error="There is no proof to review for this activity.")
+    try:
+        new_status = ActivityStatus(status)
+    except ValueError:
+        return back(error="Invalid status")
+    if new_status == ActivityStatus.rejected and not reason.strip():
+        return back(error="Please give a reason")
+
+    status = new_status.value
+    activity.status = new_status
+    activity.reason = reason.strip()
+
+    if new_status == ActivityStatus.rejected:
         activity.is_proof_submitted = False
 
     verb = status
@@ -2914,10 +3029,9 @@ async def change_status_activity(
 
     db.commit()
 
-    return RedirectResponse(
-        url=f"/admin/planning?success={activity.title}+marked+{status}",
-        status_code=302,
-    )
+    if new_status == ActivityStatus.rejected:
+        return back(success=f"Proof for {activity.title} returned to the BDRRMO.")
+    return back(success=f"Proof for {activity.title} approved.")
 
 def planning_ai_summary(extracted_data):
     # Optional AI summary — never blocks the flow.

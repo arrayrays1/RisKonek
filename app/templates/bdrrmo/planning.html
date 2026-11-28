@@ -1,14 +1,12 @@
 {% extends "admin/base.html" %}
-{% from "shared/_pagination.html" import pager %}
+{% from "shared/_pagination.html" import rk_pager %}
 
 {% block title %}Planning — RisKonek{% endblock %}
 
 {% set active_nav = 'planning' %}
 
 {% block head_extra %}
-<style nonce="{{ request.state.csp_nonce }}">
-    #header { margin: 0; color: #167736; font-size: 40px;}
-</style>
+<link rel="stylesheet" href="/static/css/rk-dashboard.css">
 {% endblock %}
 
 {% macro status_pill(v, label) -%}
@@ -23,191 +21,271 @@
     {% endif %}
 {%- endmacro %}
 
+{# 4-step BDRRM Plan progress (same macro in planning_preview.html and
+   planning_activities_review.html). current: 1-4, or 5 = all completed. #}
+{% macro plan_stepper(current) -%}
+<ol class="rk-stepper" aria-label="BDRRM Plan submission progress">
+{% for icon, label in [('bi-cloud-arrow-up', 'Upload your BDRRM Plan'), ('bi-file-earmark-text', 'Review plan'), ('bi-file-earmark-check', 'Submit'), ('bi-clock-history', 'Wait for CDRRMO approval')] %}
+{% set state = 'done' if loop.index < current else ('current' if loop.index == current else 'todo') %}
+    <li class="rk-step rk-step-{{ state }}"{% if state == 'current' %} aria-current="step"{% endif %}>
+        <span class="rk-step-dot" aria-hidden="true"><i class="bi {{ icon }}"></i></span>
+        <span class="rk-step-label">{{ label }}{% if state == 'done' %}<span class="visually-hidden"> (completed)</span>{% endif %}</span>
+    </li>
+{% endfor %}
+</ol>
+{%- endmacro %}
+
 {% block content %}
-<div class="d-flex justify-content-between align-items-start page-header">
-    <div>
-        <h1 id="header">BDRRM Plan</h1>
-        <p>In compliance with RA 10121, please submit your updated BDRRM Plan</p>
-    </div>
-</div>
+{% set plan_kind = plan_banner.kind if plan_banner else 'none' %}
+{% set upload_error = request.query_params.get('error') %}
+{# An ?error= on an open upload is shown as the "Upload failed" box; any other
+   error (e.g. a pending/approved plan blocking the upload) keeps the alert. #}
+{% set show_upload_error = upload_error and barangay and not upload_blocked %}
 
 {% if request.query_params.get('success') %}
-<div class="alert alert-success alert-dismissible fade show">
-    <i class="bi bi-check-circle-fill me-1"></i>
+<div class="alert alert-success alert-dismissible fade show mb-4" role="status">
+    <i class="bi bi-check-circle-fill me-1" aria-hidden="true"></i>
     {{ request.query_params.get('success') }}
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
 </div>
 {% endif %}
-{% if request.query_params.get('error') %}
-<div class="alert alert-danger alert-dismissible fade show">
-    <i class="bi bi-exclamation-triangle-fill me-1"></i>
-    {{ request.query_params.get('error') }}
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+{% if upload_error and not show_upload_error %}
+<div class="alert alert-danger alert-dismissible fade show mb-4" role="status">
+    <i class="bi bi-exclamation-triangle-fill me-1" aria-hidden="true"></i>
+    {{ upload_error }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
 </div>
 {% endif %}
 
-{% if not_submitted %}
-<div class="alert alert-warning alert-dismissible fade show">
-    <i class="bi bi-exclamation-triangle-fill me-1"></i>
-    Your bdrrm plan              
-        <b>{{not_submitted}}</b>
-        is approved, you may now proceed to the cdrrm research and planning office to submit your hardcopy
-    
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-</div>
-{% endif %}
+<!-- ── BDRRM Plan card: header, progress stepper, current state ───── -->
+<section class="rk-plan-card mb-4" aria-labelledby="header">
+    <div class="rk-plan-head">
+        <h1 id="header" class="rk-plan-title">BDRRM Plan</h1>
+        <p>In compliance with RA 10121, please submit your updated BDRRM Plan.</p>
+        {% if plan_template_url %}
+        <p>Not sure what to upload?
+            <a href="{{ plan_template_url }}" target="_blank" rel="noopener" class="rk-plan-link">View the template here<span class="visually-hidden"> (opens in a new tab)</span></a>.
+        </p>
+        {% endif %}
+    </div>
 
 {% if not barangay %}
-<div class="alert alert-warning">
-    <i class="bi bi-exclamation-triangle-fill me-1"></i>
-    No barangay is currently assigned to your account. Please contact the CDRRMO Admin.
-</div>
+    <div class="alert alert-warning mb-0">
+        <i class="bi bi-exclamation-triangle-fill me-1" aria-hidden="true"></i>
+        No barangay is currently assigned to your account. Please contact the CDRRMO Admin.
+    </div>
+</section>
 {% else %}
 
-<!-- ── Submit a disaster / risk report (TR-BDR-01/02) ──────────── -->
-<div class="dash-card mb-4">
-    <div class="card-title-row">
-        <i class="bi bi-plus-circle rk-text-green"></i>
-        <h6>Submit Planning</h6>
+    {% if plan_kind == 'pending' %}
+        {{ plan_stepper(4) }}
+    {% elif plan_kind in ('approved', 'received') %}
+        {{ plan_stepper(5) }}
+    {% elif plan_kind == 'returned' and not show_upload_error %}
+        <div id="plan-stepper-result">{{ plan_stepper(5) }}</div>
+        <div id="plan-stepper-upload" hidden>{{ plan_stepper(1) }}</div>
+    {% else %}
+        {{ plan_stepper(1) }}
+    {% endif %}
+
+    {% if plan_kind == 'pending' %}
+    <div class="rk-plan-panel rk-plan-result" role="status">
+        {% if plan_flower_url %}
+        <img src="{{ plan_flower_url }}" alt="" class="rk-plan-flower" width="72" height="72">
+        {% endif %}
+        <h2 class="rk-plan-result-title">Your BDRRM Plan is successfully submitted!</h2>
+        <p class="rk-plan-muted">Please wait for the CDRRMO to review your plan.<br>
+            You may view the status of your plan here.</p>
+        <a href="/bdrrmo/planning/{{ current_plan_id }}/details" class="btn-rk">View my upload</a>
     </div>
-    <form method="POST" action="/bdrrmo/planning" class="row g-3" data-validate
-          data-loading-text="Reading the plan and preparing the summary…"
-          data-confirm='Submit this planning for your barangay?' enctype="multipart/form-data">
+
+    {% elif plan_kind in ('approved', 'received') %}
+    <div class="rk-plan-panel rk-plan-result" role="status">
+        <p class="rk-plan-result-label">Submission result:</p>
+        <p class="rk-plan-verdict rk-plan-verdict-ok">APPROVED</p>
+        {% if plan_decided_at %}<p class="rk-plan-when">at {{ plan_decided_at }}</p>{% endif %}
+        <p>Your BDRRM Plan <strong>{{ plan_banner.file_name }}</strong> is approved by the
+            CDRRMO Research and Planning Office.</p>
+        {% if plan_kind == 'received' %}
+        <p>Your hard copy was received on {{ plan_banner.received_on }}.</p>
+        {% else %}
+        <p>You may now submit the hard copy of your plan to the CDRRMO Research and Planning Office.</p>
+        {% endif %}
+    </div>
+
+    {% else %}
+    {% if plan_kind == 'returned' %}
+    {% set reasons = (plan_banner.reason or '').splitlines() | map('trim') | select | list %}
+    <div class="rk-plan-panel rk-plan-result" role="status">
+        <p class="rk-plan-result-label">Submission result:</p>
+        <p class="rk-plan-verdict rk-plan-verdict-bad">DECLINED</p>
+        {% if plan_decided_at %}<p class="rk-plan-when">at {{ plan_decided_at }}</p>{% endif %}
+        <p>Your BDRRM Plan <strong>{{ plan_banner.file_name }}</strong> was declined by the
+            CDRRMO Research and Planning Office for the following reasons:</p>
+        {% if reasons %}
+        <ul class="rk-plan-reasons">
+            {% for line in reasons %}<li>{{ line }}</li>{% endfor %}
+        </ul>
+        {% else %}
+        <p class="rk-plan-muted">No reason was given.</p>
+        {% endif %}
+        {% if not show_upload_error %}
+        <button type="button" class="btn-rk" id="plan-resubmit-btn"
+                aria-controls="plan-upload-panel" aria-expanded="false">
+            <i class="bi bi-file-earmark-arrow-up" aria-hidden="true"></i> Click here to resubmit
+        </button>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <div class="rk-plan-panel" id="plan-upload-panel"
+         {% if plan_kind == 'returned' and not show_upload_error %}hidden{% endif %}>
+        {% if show_upload_error %}
+        <div class="rk-upload-error" role="alert">
+            <i class="bi bi-x-circle-fill rk-upload-error-icon" aria-hidden="true"></i>
+            <div>
+                <p class="rk-upload-error-title">Upload failed</p>
+                <p>We could not upload your file.</p>
+                <p class="rk-upload-error-msg">{{ upload_error }}</p>
+                <button type="button" class="btn btn-outline-danger btn-sm js-plan-browse">
+                    Choose another file
+                </button>
+            </div>
+        </div>
+        {% endif %}
+        <form method="POST" action="/bdrrmo/planning" id="plan-upload-form"
+              data-validate
+              data-loading-text="Reading the plan and preparing the summary…"
+              data-confirm='Submit this planning for your barangay?'
+              enctype="multipart/form-data">
             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
-        <div class="col-12">
-            <label class="form-label small fw-semibold mb-1">Planning File</label>
-            <input type="file" name="file" class="form-control"
-                   accept=".pdf" required>
-            <div class="form-text">Supported: PDF only</div>
-        </div>
-        <div class="col-12">
-            <button type="submit" class="btn-rk btn-sm">
-                <i class="bi bi-send"></i> Submit Planning
-            </button>
-            <span class="text-muted small ms-2">
-                Saved against your barangay and your account; appears in the history below.
-            </span>
-        </div>
-    </form>
-</div>
+            <div class="rk-dropzone" id="plan-dropzone">
+                <i class="bi bi-upload rk-dropzone-icon" aria-hidden="true"></i>
+                <p class="rk-dropzone-title">Drag and drop to upload your file</p>
+                <p class="rk-dropzone-hint" id="plan-file-hint">Supported format: PDF up to {{ max_upload_mb }} MB</p>
+                <label for="planning-file" class="visually-hidden">BDRRM Plan file (PDF)</label>
+                <input type="file" name="file" id="planning-file" class="visually-hidden"
+                       accept=".pdf,application/pdf" required tabindex="-1"
+                       aria-describedby="plan-file-hint">
+                <button type="button" class="btn-rk js-plan-browse" id="plan-browse-btn"
+                        aria-describedby="plan-file-hint">Browse my files</button>
+            </div>
+        </form>
+    </div>
+    {% endif %}
+</section>
+{% endif %}
+
+{% if barangay %}
+{% set filters_active = f_q or f_status or show_archived %}
 
 <!-- ── Filters (auto-apply) ───────────────────────────────────── -->
-<div class="dash-card mb-3">
-    <form method="GET" action="/bdrrmo/planning" class="row g-2 align-items-end js-live-filter">
-        <div class="col-md-7">
-            <label class="form-label small fw-semibold mb-1">Search</label>
-            <input type="text" name="q" value="{{ f_q }}" class="form-control form-control-sm"
-                   placeholder="Search file name…" autocomplete="off">
-        </div>
-        <div class="col-md-2">
-            <label class="form-label small fw-semibold mb-1">Status</label>
-            <select name="status" class="form-select form-select-sm">
-                <option value="">All status</option>
-                {% for s, label in status_choices %}
-                <option value="{{ s }}" {% if f_status == s %}selected{% endif %}>{{ label }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="col-md-2">
-            <label class="form-label small fw-semibold mb-1">View</label>
-            <select name="archived" class="form-select form-select-sm">
-                <option value=""  {% if not show_archived %}selected{% endif %}>Active</option>
-                <option value="1" {% if show_archived %}selected{% endif %}>Archived</option>
-            </select>
-        </div>
-        <div class="col-md-1 d-grid">
-            <a href="/bdrrmo/planning" class="btn btn-outline-secondary btn-sm" title="Reset filters">
-                <i class="bi bi-x-circle"></i>
-            </a>
-        </div>
-    </form>
-</div>
-
-<div class="dash-card overflow-hidden p-0">
-    <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
-            <thead class="rk-bg-soft">
-                <tr class="rk-th-soft">
-                    <th class="px-3 py-3">File name</th>
-                    <th class="py-3">Status</th>
-                    <th class="py-3 text-end px-3">Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for planning in plannings %}
-                <tr class="rk-fs-13">
-                    <td class="px-3">{{ planning.file_name }}</td>
-                    <td>{{ status_pill(planning.status_value, planning.status_label) }}</td>
-                    <td class="text-end px-3">
-                    {% if not planning.is_archived %}
-                        <a
-                            href="/bdrrmo/planning/{{ planning.id }}/details"
-                            class="btn btn-outline-primary btn-sm"
-                        >
-                            <i class="bi bi-eye"></i>
-                            View
-                        </a>
-                        <a
-                            href="planning/activities/{{ planning.id }}"
-                            class="btn btn-outline-primary btn-sm"
-                        >
-                            <i class="bi bi-eye"></i>
-                            View Activities
-                        </a>
-                        {% if planning.status_value == "approved" %}
-                        <a
-                            href="planning/{{ planning.id }}/review"
-                            class="btn btn-outline-primary btn-sm"
-                        >
-                            <i class="bi bi-eye"></i>
-                            View Summary
-                        </a>
-                        {% endif %}
-                        {% if planning.status_value == "rejected" %}
-                        <button type="button" class="btn btn-outline-primary btn-sm"
-                            data-bs-toggle="modal" data-bs-target="#reasonModal-{{ planning.id }}">
-                            <i class="bi bi-eye"></i> View Reason
-                        </button>
-                        {% endif %}
-                        <form method="POST" action="/bdrrmo/planning/{{ planning.id }}/archive" class="d-inline"
-                              data-confirm='Archive {{ planning.name }}?'>
-                            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
-                            <button type="submit" class="btn btn-outline-warning btn-sm">
-                                <i class="bi bi-archive"></i>
-                            </button>
-                        </form>
-                    {% else %}
-                        {% if planning.status_value == "rejected" %}
-                        <button type="button" class="btn btn-outline-primary btn-sm"
-                            data-bs-toggle="modal" data-bs-target="#reasonModal-{{ planning.id }}">
-                            <i class="bi bi-eye"></i> View Reason
-                        </button>
-                        {% endif %}
-                        <form method="POST" action="/bdrrmo/planning/{{ planning.id }}/archive" class="d-inline">
-                            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
-                            <button type="submit" class="btn btn-outline-success btn-sm">
-                                <i class="bi bi-arrow-counterclockwise"></i> Restore
-                            </button>
-                        </form>
-                    {% endif %}
-                    </td>
-                </tr>
-                {% else %}
-                <tr><td colspan="6" class="text-center text-muted py-4">
-                    {% if f_q or f_disaster_type or f_severity %}
-                    No plannings match your filters.
-                    <a href="/bdrrmo/planning" class="ms-2">Clear filters</a>
-                    {% else %}
-                    No submitted plannings for this barangay yet.
-                    {% endif %}
-                </td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
+<form method="GET" action="/bdrrmo/planning" class="rk-filter-bar js-live-filter" role="search">
+    <div class="rk-filter-search">
+        <label for="pl-q" class="visually-hidden">Search file name</label>
+        <i class="bi bi-search" aria-hidden="true"></i>
+        <input type="text" id="pl-q" name="q" value="{{ f_q }}" class="form-control"
+               placeholder="Search file name…" autocomplete="off">
     </div>
+    <div class="rk-filter-select">
+        <label for="pl-status" class="visually-hidden">Status</label>
+        <select id="pl-status" name="status" class="form-select">
+            <option value="">All status</option>
+            {% for s, label in status_choices %}
+            <option value="{{ s }}" {% if f_status == s %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="rk-filter-select">
+        <label for="pl-view" class="visually-hidden">View</label>
+        <select id="pl-view" name="archived" class="form-select">
+            <option value=""  {% if not show_archived %}selected{% endif %}>Active</option>
+            <option value="1" {% if show_archived %}selected{% endif %}>Archived</option>
+        </select>
+    </div>
+    <a href="/bdrrmo/planning" class="rk-clear-filters">
+        <span class="rk-funnel-x" aria-hidden="true"><i class="bi bi-funnel-fill"></i><i class="bi bi-x-circle-fill"></i></span>
+        Clear filters
+    </a>
+</form>
+
+<div class="rk-table-card">
+    <table class="rk-table">
+        <thead>
+            <tr>
+                <th scope="col">File name</th>
+                <th scope="col">Status</th>
+                <th scope="col">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for planning in plannings %}
+            <tr>
+                <td>{{ planning.file_name }}</td>
+                <td>{{ status_pill(planning.status_value, planning.status_label) }}</td>
+                <td>
+                <div class="rk-table-actions">
+                {% if not planning.is_archived %}
+                    <a href="/bdrrmo/planning/{{ planning.id }}/details" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-eye"></i> View
+                    </a>
+                    <a href="planning/activities/{{ planning.id }}" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-eye"></i> View Activities
+                    </a>
+                    {% if planning.status_value == "approved" %}
+                    <a href="planning/{{ planning.id }}/review" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-eye"></i> View Summary
+                    </a>
+                    {% endif %}
+                    {% if planning.status_value == "rejected" %}
+                    <button type="button" class="btn btn-outline-primary btn-sm"
+                        data-bs-toggle="modal" data-bs-target="#reasonModal-{{ planning.id }}">
+                        <i class="bi bi-eye"></i> View Reason
+                    </button>
+                    {% endif %}
+                    {# Only returned plans can be archived (enforced server-side). #}
+                    {% if planning.status_value == "rejected" %}
+                    <form method="POST" action="/bdrrmo/planning/{{ planning.id }}/archive"
+                          data-confirm='Archive {{ planning.file_name }}?'>
+                        <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+                        <button type="submit" class="btn btn-outline-warning btn-sm"
+                                aria-label="Archive {{ planning.file_name }}">
+                            <i class="bi bi-archive" aria-hidden="true"></i>
+                        </button>
+                    </form>
+                    {% endif %}
+                {% else %}
+                    {% if planning.status_value == "rejected" %}
+                    <button type="button" class="btn btn-outline-primary btn-sm"
+                        data-bs-toggle="modal" data-bs-target="#reasonModal-{{ planning.id }}">
+                        <i class="bi bi-eye"></i> View Reason
+                    </button>
+                    {% endif %}
+                    <form method="POST" action="/bdrrmo/planning/{{ planning.id }}/archive">
+                        <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+                        <button type="submit" class="btn btn-outline-success btn-sm">
+                            <i class="bi bi-arrow-counterclockwise"></i> Restore
+                        </button>
+                    </form>
+                {% endif %}
+                </div>
+                </td>
+            </tr>
+            {% else %}
+            <tr class="rk-table-empty"><td colspan="3">
+                {% if filters_active %}
+                No records found.
+                <a href="/bdrrmo/planning" class="ms-1">Clear filters</a>
+                {% else %}
+                No submitted plannings for this barangay yet.
+                {% endif %}
+            </td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
 </div>
 
-{{ pager(page_obj, "/bdrrmo/planning", base_query) }}
+{{ rk_pager(page_obj, "/bdrrmo/planning", base_query, "Planning pages") }}
 
 {% endif %}
 
@@ -230,4 +308,66 @@
   </div>
 </div>
 {% endfor %}
+
+<script nonce="{{ request.state.csp_nonce }}">
+(function () {
+    var form = document.getElementById('plan-upload-form');
+    var input = document.getElementById('planning-file');
+    var zone = document.getElementById('plan-dropzone');
+    if (!form || !input || !zone) return;
+
+    // requestSubmit() fires the form's submit handlers, so the existing
+    // confirm + loading state run exactly as with the old submit button.
+    function send() {
+        if (!input.files || !input.files.length) return;
+        if (form.requestSubmit) form.requestSubmit(); else form.submit();
+    }
+
+    document.querySelectorAll('.js-plan-browse').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            input.value = '';            // picking the same file again still fires change
+            input.click();
+        });
+    });
+    input.addEventListener('change', send);
+
+    ['dragenter', 'dragover'].forEach(function (ev) {
+        zone.addEventListener(ev, function (e) {
+            e.preventDefault();
+            zone.classList.add('is-dragover');
+        });
+    });
+    ['dragleave', 'dragend'].forEach(function (ev) {
+        zone.addEventListener(ev, function (e) {
+            if (ev === 'dragleave' && zone.contains(e.relatedTarget)) return;
+            zone.classList.remove('is-dragover');
+        });
+    });
+    zone.addEventListener('drop', function (e) {
+        e.preventDefault();
+        zone.classList.remove('is-dragover');
+        var files = e.dataTransfer && e.dataTransfer.files;
+        if (!files || !files.length) return;
+        var dt = new DataTransfer();
+        dt.items.add(files[0]);          // one plan per upload
+        input.files = dt.files;
+        send();
+    });
+
+    // Declined plan: "Click here to resubmit" reveals the drop zone and
+    // moves the stepper back to step 1.
+    var resubmit = document.getElementById('plan-resubmit-btn');
+    if (resubmit) {
+        resubmit.addEventListener('click', function () {
+            document.getElementById('plan-upload-panel').hidden = false;
+            var done = document.getElementById('plan-stepper-result');
+            var step1 = document.getElementById('plan-stepper-upload');
+            if (done && step1) { done.hidden = true; step1.hidden = false; }
+            resubmit.setAttribute('aria-expanded', 'true');
+            resubmit.hidden = true;
+            document.getElementById('plan-browse-btn').focus();
+        });
+    }
+})();
+</script>
 {% endblock %}

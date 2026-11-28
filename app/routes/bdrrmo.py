@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select, func
 from sqlalchemy.orm import joinedload
 from datetime import datetime, date, timezone, timedelta
-from urllib.parse import quote_plus
+from urllib.parse import quote_plus, urlencode
 from typing import Optional
 import json
 import uuid
@@ -28,7 +28,7 @@ from app.utils.pagination import (
     paginate, parse_per_page, parse_page, build_base_query,
 )
 # Reuse the Week 4 barangay-profile helper for the population view.
-from app.routes.admin import _vulnerable_percent
+from app.routes.admin import _vulnerable_percent, latest_proof, proof_pdf_response, PROOF_OPEN_FAILED
 from app.services import plan_dashboard as pdash
 # Reuse the Week 6 / 8.1 ETL building blocks rather than rebuilding them —
 # the same upload validation, extraction, strict matcher and resolve-or-create
@@ -185,6 +185,7 @@ def profile(request: Request, db: Session = Depends(get_db)):
         "today": today,
         "today_label": pdash.long_date(today),
         "plan": None,
+        "plan_banner": None,
     }
 
     plan = pdash.latest_plan_for_barangay(db, barangay.id) if barangay else None
@@ -200,6 +201,7 @@ def profile(request: Request, db: Session = Depends(get_db)):
         context.update({
             "plan": plan,
             "plan_status": pdash.plan_status(plan),
+            "plan_banner": plan_banner(plan),
             "cards": pdash.activity_cards(activities),
             "upcoming": upcoming,
             "upcoming_end": today + timedelta(days=pdash.UPCOMING_DAYS - 1),
@@ -1590,7 +1592,12 @@ def _facility_map_json(f: Facility, own_barangay_id: int) -> dict:
 
 
 @router.get("/facilities", response_class=HTMLResponse)
-def facilities(request: Request, db: Session = Depends(get_db)):
+def facilities(
+    request: Request,
+    db: Session = Depends(get_db),
+    page: Optional[str] = None,
+    per_page: Optional[str] = None,
+):
     user, barangay = _resolve_scope(request, db)
     if isinstance(user, RedirectResponse):
         return user
@@ -1645,6 +1652,13 @@ def facilities(request: Request, db: Session = Depends(get_db)):
         "archived": archived_count,
     }
 
+    # The table is paginated; `facilities` stays the full list because the
+    # ?edit= modal looks the facility up there (it may be on another page).
+    page_obj = paginate(rows, parse_page(page), parse_per_page(per_page))
+    base_query = build_base_query({
+        "scope": "city" if citywide else "", "archived": "1" if show_archived else "",
+    })
+
     return templates.TemplateResponse(
         request=request,
         name="bdrrmo/facilities.html",
@@ -1653,6 +1667,9 @@ def facilities(request: Request, db: Session = Depends(get_db)):
             "active_nav": "bdrrmo_facilities",
             "barangay": barangay,
             "facilities": rows,
+            "table_rows": page_obj.items,
+            "page_obj": page_obj,
+            "base_query": base_query,
             "map_facilities": [
                 _facility_map_json(f, barangay.id if barangay else None)
                 for f in active_facilities
@@ -2391,6 +2408,8 @@ def contact_directory(
     )
     context["user"] = user
     context["barangay"] = barangay
+    # Edit Contact modal: pre-filled from the user's OWN barangay only.
+    context["can_edit_contacts"] = barangay is not None
     return templates.TemplateResponse(
         request=request, name="shared/contact_directory.html", context=context,
     )
@@ -2422,6 +2441,9 @@ def contacts(request: Request, db: Session = Depends(get_db)):
     )
 
 
+_CONTACTS_RETURN_PAGES = ("/bdrrmo/directory", "/bdrrmo/contacts")
+
+
 @router.post("/contacts")
 def contacts_update(
     request: Request,
@@ -2431,13 +2453,16 @@ def contacts_update(
     chairperson_name: str = Form(""),
     chairperson_contact: str = Form(""),
     emergency_contacts: str = Form(""),
+    next: str = Form(""),
 ):
     user, barangay = _resolve_scope(request, db)
     if isinstance(user, RedirectResponse):
         return user
+    # Where to land afterwards: only these two pages; anything else is ignored.
+    back = next if next in _CONTACTS_RETURN_PAGES else "/bdrrmo/contacts"
     if not barangay:
         return RedirectResponse(
-            url="/bdrrmo/contacts?error=No+barangay+is+assigned+to+your+account",
+            url=f"{back}?error=No+barangay+is+assigned+to+your+account",
             status_code=302,
         )
 
@@ -2453,7 +2478,7 @@ def contacts_update(
         f"BDRRMO updated contact details for {barangay.name}",
     )
     return RedirectResponse(
-        url="/bdrrmo/contacts?success=Contact+details+updated", status_code=302
+        url=f"{back}?success=Contact+details+updated", status_code=302
     )
 
 FOOD_TYPE_LABELS = {
@@ -2502,11 +2527,59 @@ def resources_list(
     archived: Optional[str] = None,
     page: Optional[str] = None,
     per_page: Optional[str] = None,
+    edit: Optional[str] = None,
 ):
     user, barangay = _resolve_scope(request, db)
     if isinstance(user, RedirectResponse):
         return user
 
+    # ?open=add / ?edit=<id> open the Add/Edit modal on load (old form URLs
+    # redirect here). Edit only ever pre-fills the user's OWN resource.
+    modal = None
+    error = None
+    if barangay and request.query_params.get("open") == "add":
+        modal = _resource_modal("add")
+    elif barangay and edit:
+        r = _own_resource(db, barangay, int(edit)) if edit.isdigit() else None
+        if r:
+            modal = _resource_modal("edit", r.id, _resource_form_values(r))
+        else:
+            error = "Resource not found"
+
+    return _render_resources_list(
+        request, db, user, barangay,
+        q=q, category=category, food_type=food_type, alert=alert,
+        archived=archived, page=page, per_page=per_page,
+        modal=modal, error=error,
+    )
+
+
+def _resource_form_values(r) -> dict:
+    """A resource's current values in the shape the Add/Edit modal fills in."""
+    return {
+        "name": r.name or "",
+        "category": r.category.value if r.category else "",
+        "food_type": r.food_type or "",
+        "quantity": "",
+        "unit": r.unit or "",
+        "restock_threshold": "" if r.restock_threshold is None else str(r.restock_threshold),
+        "storage_location": r.storage_location or "",
+        "is_perishable": bool(r.is_perishable),
+        "expiry_date": r.expiry_date.strftime("%Y-%m-%d") if r.expiry_date else "",
+    }
+
+
+def _resource_modal(mode, resource_id=None, values=None, error=None) -> dict:
+    """State for the Add/Edit Resource modal, rendered as JSON for the page
+    script: which mode, which resource, the values to fill in and an error."""
+    return {"mode": mode, "id": resource_id, "values": values or {}, "error": error}
+
+
+def _render_resources_list(request, db, user, barangay, *, q=None, category=None,
+                           food_type=None, alert=None, archived=None, page=None,
+                           per_page=None, modal=None, error=None):
+    """The Resources list page. Also used by the Add/Edit POST routes to
+    re-render the page with the modal open when validation fails."""
     query = db.query(Resource)
     show_archived = (archived == "1")
     query = query.filter(Resource.is_archived == show_archived, Resource.barangay_id == user['barangay_id'])
@@ -2541,7 +2614,7 @@ def resources_list(
             "category": r.category.value if r.category else "",
             "category_label": r.category.value.title() if r.category else "—",
             "food_type": r.food_type or "",
-            "food_type_label": FOOD_TYPE_LABELS.get(r.food_type or "", ""),
+            "food_type_label": FOOD_TYPE_LABELS.get(r.food_type, "") if r.food_type else "",
             "is_perishable": r.is_perishable,
             "quantity": r.quantity or 0,
             "unit": r.unit or "",
@@ -2551,6 +2624,8 @@ def resources_list(
             "is_archived": r.is_archived,
             "alert": _resource_alert(r),
             "last_updated": r.last_updated,
+            # Pre-fill values for the Edit modal (rendered as JSON).
+            "form": _resource_form_values(r),
         })
 
     page_obj = paginate(view_rows, parse_page(page), parse_per_page(per_page))
@@ -2580,27 +2655,70 @@ def resources_list(
             "show_archived": show_archived,
             # Default + max for the stock modal's date-time field (PHT).
             "now_local": datetime.now(_PHT).strftime("%Y-%m-%dT%H:%M"),
+            "resource_modal": modal,
+            # {id: current values} for the Edit buttons on this page.
+            "resource_edit_data": {row["id"]: row["form"] for row in page_obj.items},
+            "page_error": error,
         },
     )
 
-@router.get("/resources/new", response_class=HTMLResponse)
+def _no_barangay_redirect():
+    return RedirectResponse(
+        url="/bdrrmo/resources?error=No+barangay+is+assigned+to+your+account",
+        status_code=302,
+    )
+
+
+def _resource_not_found():
+    return RedirectResponse(
+        url="/bdrrmo/resources?error=Resource+not+found", status_code=302
+    )
+
+
+def _own_resource(db, barangay, resource_id):
+    """A resource of the current BDRRMO's OWN barangay, or None. Every
+    edit / stock / archive route loads through this, so changing the id in
+    the URL can never reach another barangay's resource."""
+    if not barangay:
+        return None
+    return db.query(Resource).filter(
+        Resource.id == resource_id,
+        Resource.barangay_id == barangay.id,
+    ).first()
+
+
+def _parse_whole_number(raw, label, required):
+    """(value, error) for a whole-number form field (>= 0). Read as text so a
+    blank or bad value becomes a message in the modal, not a 422 page."""
+    s = (raw or "").strip()
+    if not s:
+        return (None, f"{label} is required.") if required else (0, None)
+    if not s.isdigit():
+        return None, f"{label} must be a whole number (0 or more)."
+    return int(s), None
+
+
+def _submitted_resource_values(name, category, food_type, is_perishable, quantity,
+                               unit, storage_location, restock_threshold, expiry_date) -> dict:
+    """What the user typed, to put back into the modal after an error."""
+    return {
+        "name": name or "", "category": category or "", "food_type": food_type or "",
+        "quantity": quantity or "", "unit": unit or "",
+        "restock_threshold": restock_threshold or "",
+        "storage_location": storage_location or "",
+        "is_perishable": bool(is_perishable), "expiry_date": expiry_date or "",
+    }
+
+
+# Old form pages: kept as URLs, now open the modal on the list page.
+@router.get("/resources/new")
 def resource_new_form(request: Request, db: Session = Depends(get_db)):
-    user, _ = _resolve_scope(request, db)
+    user, barangay = _resolve_scope(request, db)
     if isinstance(user, RedirectResponse):
         return user
-    return templates.TemplateResponse(
-        request=request,
-        name="bdrrmo/resource_form.html",
-        context={
-            "user": user,
-            "active_nav": "resources",
-            "edit_mode": False,
-            "target": None,
-            "categories": [c.value for c in ResourceCategory],
-            "food_types": [(v, FOOD_TYPE_LABELS[v]) for v in FOOD_TYPE_CHOICES],
-            "error": None,
-        },
-    )
+    if not barangay:
+        return _no_barangay_redirect()
+    return RedirectResponse(url="/bdrrmo/resources?open=add", status_code=302)
 
 def _parse_date_or_none(s: Optional[str]):
     if not s:
@@ -2614,33 +2732,30 @@ def _parse_date_or_none(s: Optional[str]):
 def resource_create(
     request: Request,
     db: Session = Depends(get_db),
-    name: str = Form(...),
-    category: str = Form(...),
+    name: str = Form(""),
+    category: str = Form(""),
     food_type: str = Form(""),
     is_perishable: Optional[str] = Form(None),
-    quantity: int = Form(0),
+    quantity: str = Form(""),
     unit: str = Form(""),
     storage_location: str = Form(""),
-    restock_threshold: int = Form(0),
+    restock_threshold: str = Form(""),
     expiry_date: str = Form(""),
 ):
-    user, _ = _resolve_scope(request, db)
+    user, barangay = _resolve_scope(request, db)
     if isinstance(user, RedirectResponse):
         return user
+    if not barangay:
+        return _no_barangay_redirect()
 
     def render_error(msg):
-        return templates.TemplateResponse(
-            request=request,
-            name="bdrrmo/resource_form.html",
-            context={
-                "user": user,
-                "active_nav": "resources",
-                "edit_mode": False,
-                "target": None,
-                "categories": [c.value for c in ResourceCategory],
-                "food_types": [(v, FOOD_TYPE_LABELS[v]) for v in FOOD_TYPE_CHOICES],
-                "error": msg,
-            },
+        values = _submitted_resource_values(
+            name, category, food_type, is_perishable, quantity, unit,
+            storage_location, restock_threshold, expiry_date,
+        )
+        return _render_resources_list(
+            request, db, user, barangay,
+            modal=_resource_modal("add", None, values, msg),
         )
 
     name = name.strip()
@@ -2648,6 +2763,12 @@ def resource_create(
         return render_error("Resource name is required.")
     if category not in {c.value for c in ResourceCategory}:
         return render_error("Invalid category.")
+    qty, err = _parse_whole_number(quantity, "Initial quantity", required=True)
+    if err:
+        return render_error(err)
+    threshold, err = _parse_whole_number(restock_threshold, "Restock threshold", required=True)
+    if err:
+        return render_error(err)
 
     perish = bool(is_perishable)
     exp = _parse_date_or_none(expiry_date) if perish else None
@@ -2660,14 +2781,14 @@ def resource_create(
 
     r = Resource(
         name=name,
-        barangay_id=user['barangay_id'],
+        barangay_id=barangay.id,
         category=ResourceCategory(category),
         food_type=food_type_value,
         is_perishable=perish,
-        quantity=max(0, quantity or 0),
+        quantity=qty,
         unit=unit.strip() or None,
         storage_location=storage_location.strip() or None,
-        restock_threshold=max(0, restock_threshold or 0),
+        restock_threshold=threshold,
         expiry_date=exp,
         is_archived=False,
         updated_by=user["id"],
@@ -2686,29 +2807,18 @@ def resource_create(
         status_code=302,
     )
 
-@router.get("/resources/{resource_id}/edit", response_class=HTMLResponse)
+@router.get("/resources/{resource_id}/edit")
 def resource_edit_form(resource_id: int, request: Request, db: Session = Depends(get_db)):
-    user, _ = _resolve_scope(request, db)
+    user, barangay = _resolve_scope(request, db)
     if isinstance(user, RedirectResponse):
         return user
 
-    r = db.query(Resource).filter(Resource.id == resource_id).first()
+    # Ownership is checked here too, so an old link never reveals whether
+    # another barangay's id exists.
+    r = _own_resource(db, barangay, resource_id)
     if not r:
-        return RedirectResponse(url="/admin/resources", status_code=302)
-
-    return templates.TemplateResponse(
-        request=request,
-        name="bdrrmo/resource_form.html",
-        context={
-            "user": user,
-            "active_nav": "resources",
-            "edit_mode": True,
-            "target": r,
-            "categories": [c.value for c in ResourceCategory],
-            "food_types": [(v, FOOD_TYPE_LABELS[v]) for v in FOOD_TYPE_CHOICES],
-            "error": None,
-        },
-    )
+        return _resource_not_found()
+    return RedirectResponse(url=f"/bdrrmo/resources?edit={r.id}", status_code=302)
 
 
 @router.post("/resources/{resource_id}/edit")
@@ -2716,22 +2826,41 @@ def resource_edit(
     resource_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    name: str = Form(...),
-    category: str = Form(...),
+    name: str = Form(""),
+    category: str = Form(""),
     food_type: str = Form(""),
     is_perishable: Optional[str] = Form(None),
     unit: str = Form(""),
     storage_location: str = Form(""),
-    restock_threshold: int = Form(0),
+    restock_threshold: str = Form(""),
     expiry_date: str = Form(""),
 ):
-    user, _ = _resolve_scope(request, db)
+    user, barangay = _resolve_scope(request, db)
     if isinstance(user, RedirectResponse):
         return user
 
-    r = db.query(Resource).filter(Resource.id == resource_id).first()
+    r = _own_resource(db, barangay, resource_id)
     if not r:
-        return RedirectResponse(url="/bdrrmo/resources", status_code=302)
+        return _resource_not_found()
+
+    def render_error(msg):
+        values = _submitted_resource_values(
+            name, category, food_type, is_perishable, "", unit,
+            storage_location, restock_threshold, expiry_date,
+        )
+        return _render_resources_list(
+            request, db, user, barangay,
+            modal=_resource_modal("edit", r.id, values, msg),
+        )
+
+    # Same required-field checks as Add; shown in the modal, nothing saved.
+    if not name.strip():
+        return render_error("Resource name is required.")
+    if category not in {c.value for c in ResourceCategory}:
+        return render_error("Invalid category.")
+    new_thr, err = _parse_whole_number(restock_threshold, "Restock threshold", required=True)
+    if err:
+        return render_error(err)
 
     # Quantity is intentionally not editable here — use Add/Deduct Stock so
     # every quantity change is auditable with before/after numbers.
@@ -2772,7 +2901,6 @@ def resource_edit(
         changes.append(f"storage_location: '{r.storage_location or ''}' → '{new_loc or ''}'")
         r.storage_location = new_loc
 
-    new_thr = max(0, restock_threshold or 0)
     if new_thr != (r.restock_threshold or 0):
         changes.append(f"restock_threshold: {r.restock_threshold or 0} → {new_thr}")
         r.restock_threshold = new_thr
@@ -2837,13 +2965,13 @@ def resource_stock_change(
     deployed_to: str = Form(""),
     occurred_at: str = Form(""),
 ):
-    user, _ = _resolve_scope(request, db)
+    user, barangay = _resolve_scope(request, db)
     if isinstance(user, RedirectResponse):
         return user
 
-    r = db.query(Resource).filter(Resource.id == resource_id).first()
+    r = _own_resource(db, barangay, resource_id)
     if not r:
-        return RedirectResponse(url="/bdrrmo/resources", status_code=302)
+        return _resource_not_found()
 
     if action not in ("add", "deduct"):
         return RedirectResponse(
@@ -2851,7 +2979,7 @@ def resource_stock_change(
         )
     if not amount or amount <= 0:
         return RedirectResponse(
-            url=f"/bdrrmo/resources/{resource_id}/edit?error=Amount+must+be+positive",
+            url="/bdrrmo/resources?error=Amount+must+be+positive",
             status_code=302,
         )
 
@@ -2872,7 +3000,7 @@ def resource_stock_change(
     else:
         if amount > before:
             return RedirectResponse(
-                url=f"/bdrrmo/resources/{resource_id}/edit?error=Cannot+deduct+more+than+current+stock",
+                url="/bdrrmo/resources?error=Cannot+deduct+more+than+current+stock",
                 status_code=302,
             )
         after = before - amount
@@ -2904,13 +3032,13 @@ def resource_archive_toggle(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    user, _ = _resolve_scope(request, db)
+    user, barangay = _resolve_scope(request, db)
     if isinstance(user, RedirectResponse):
         return user
 
-    r = db.query(Resource).filter(Resource.id == resource_id).first()
+    r = _own_resource(db, barangay, resource_id)
     if not r:
-        return RedirectResponse(url="/bdrrmo/resources", status_code=302)
+        return _resource_not_found()
 
     r.is_archived = not bool(r.is_archived)
     r.updated_by = user["id"]
@@ -2994,10 +3122,68 @@ def equipment_list(
     archived: Optional[str] = None,
     page: Optional[str] = None,
     per_page: Optional[str] = None,
+    edit: Optional[str] = None,
 ):
     user, barangay = _resolve_scope(request, db)
     if isinstance(user, RedirectResponse):
         return user
+
+    # ?open=add / ?edit=<id> open the Add/Edit modal on load (old form URLs
+    # redirect here). Edit only ever pre-fills the user's OWN equipment.
+    modal = None
+    error = None
+    if barangay and request.query_params.get("open") == "add":
+        modal = _equipment_modal("add")
+    elif barangay and edit:
+        e = _own_bdrrmo_equipment(db, barangay, int(edit)) if edit.isdigit() else None
+        if e:
+            modal = _equipment_modal("edit", e.id, _equipment_form_values(e))
+        else:
+            error = "Equipment not found"
+
+    return _render_equipment_list(
+        request, db, user, barangay,
+        q=q, equipment_type=equipment_type, status=status, archived=archived,
+        page=page, per_page=per_page, modal=modal, error=error,
+    )
+
+
+def _own_bdrrmo_equipment(db, barangay, equipment_id):
+    """An equipment unit of the current BDRRMO's OWN barangay, or None."""
+    if not barangay:
+        return None
+    return db.query(Equipment).filter(
+        Equipment.id == equipment_id,
+        Equipment.barangay_id == barangay.id,
+    ).first()
+
+
+def _equipment_not_found():
+    return RedirectResponse(
+        url="/bdrrmo/equipment_bdrrmo?error=Equipment+not+found", status_code=302
+    )
+
+
+def _equipment_form_values(e) -> dict:
+    """A unit's current values in the shape the Add/Edit modal fills in."""
+    return {
+        "name": e.name or "",
+        "equipment_type": e.equipment_type.value if e.equipment_type else "",
+        "plate_or_serial": e.plate_or_serial or "",
+    }
+
+
+def _equipment_modal(mode, equipment_id=None, values=None, error=None) -> dict:
+    """State for the Add/Edit Equipment modal, rendered as JSON for the page
+    script: which mode, which unit, the values to fill in and an error."""
+    return {"mode": mode, "id": equipment_id, "values": values or {}, "error": error}
+
+
+def _render_equipment_list(request, db, user, barangay, *, q=None, equipment_type=None,
+                           status=None, archived=None, page=None, per_page=None,
+                           modal=None, error=None):
+    """The Vehicle & Equipment list page. Also used by the Add/Edit POST
+    routes to re-render the page with the modal open when validation fails."""
 
     query = db.query(Equipment)
     show_archived = (archived == "1")
@@ -3034,9 +3220,9 @@ def equipment_list(
                 e.status.value if e.status else "", "—"
             ),
             "plate_or_serial": e.plate_or_serial or "—",
-            "assigned": e.assigned_to_user.username if e.assigned_to_user else "—",
-            "last_inspected": e.last_inspected,
             "is_archived": e.is_archived,
+            # Pre-fill values for the Edit modal (rendered as JSON).
+            "form": _equipment_form_values(e),
             "repair_reminder": reminder["state"] if reminder else None,
         })
 
@@ -3087,59 +3273,39 @@ def equipment_list(
             "show_archived": show_archived,
             # Default + max for the status modal's date-time field (PHT).
             "now_local": datetime.now(_PHT).strftime("%Y-%m-%dT%H:%M"),
+            "equipment_modal": modal,
+            # {id: current values} for the Edit buttons on this page.
+            "equipment_edit_data": {row["id"]: row["form"] for row in page_obj.items},
+            "page_error": error,
         },
     )
 
-@router.get("/equipment_bdrrmo/new", response_class=HTMLResponse)
+
+# Old form pages: kept as URLs, now open the modal on the list page.
+@router.get("/equipment_bdrrmo/new")
 def equipment_new_form(request: Request, db: Session = Depends(get_db)):
     user, barangay = _resolve_scope(request, db)
     if isinstance(user, RedirectResponse):
         return user
-    return templates.TemplateResponse(
-        request=request,
-        name="bdrrmo/equipment_form.html",
-        context={
-            "user": user,
-            "active_nav": "equipment",
-            "edit_mode": False,
-            "target": None,
-            "barangay": barangay,
-            "types": [(t.value, EQUIPMENT_TYPE_LABELS.get(t.value, t.value.title()))
-                      for t in EquipmentType],
-            "status_choices": [(v, EQUIPMENT_STATUS_LABELS[v]) for v in EQUIPMENT_STATUS_CHOICES],
-            "error": None,
-        },
-    )
+    return RedirectResponse(url="/bdrrmo/equipment_bdrrmo?open=add", status_code=302)
 
 
 @router.post("/equipment_bdrrmo/new")
 def equipment_create(
     request: Request,
     db: Session = Depends(get_db),
-    name: str = Form(...),
-    equipment_type: str = Form(...),
-    status: str = Form("available"),
+    name: str = Form(""),
+    equipment_type: str = Form(""),
     plate_or_serial: str = Form(""),
-    last_inspected: str = Form(""),
 ):
-    user, _ = _resolve_scope(request, db)
+    user, barangay = _resolve_scope(request, db)
     if isinstance(user, RedirectResponse):
         return user
 
     def render_error(msg):
-        return templates.TemplateResponse(
-            request=request,
-            name="bdrrmo/equipment_form.html",
-            context={
-                "user": user,
-                "active_nav": "equipment",
-                "edit_mode": False,
-                "target": None,
-                "types": [(t.value, EQUIPMENT_TYPE_LABELS.get(t.value, t.value.title()))
-                          for t in EquipmentType],
-                "status_choices": [(v, EQUIPMENT_STATUS_LABELS[v]) for v in EQUIPMENT_STATUS_CHOICES],
-                "error": msg,
-            },
+        values = {"name": name, "equipment_type": equipment_type, "plate_or_serial": plate_or_serial}
+        return _render_equipment_list(
+            request, db, user, barangay, modal=_equipment_modal("add", None, values, msg),
         )
 
     name = name.strip()
@@ -3147,16 +3313,14 @@ def equipment_create(
         return render_error("Equipment name is required.")
     if equipment_type not in {t.value for t in EquipmentType}:
         return render_error("Invalid equipment type.")
-    if status not in {s.value for s in EquipmentStatus}:
-        status = "available"
 
+    # Status takes the model default (serviceable); later changes go through
+    # the audited status action. last_inspected is left unset.
     e = Equipment(
         name=name,
         barangay_id=user['barangay_id'],
         equipment_type=EquipmentType(equipment_type),
-        status=EquipmentStatus(status),
         plate_or_serial=plate_or_serial.strip() or None,
-        last_inspected=_parse_date_or_none(last_inspected),
         is_archived=False,
     )
     db.add(e)
@@ -3173,36 +3337,15 @@ def equipment_create(
         status_code=302,
     )
 
-@router.get("/equipment_bdrrmo/{equipment_id}/edit", response_class=HTMLResponse)
+@router.get("/equipment_bdrrmo/{equipment_id}/edit")
 def equipment_edit_form(equipment_id: int, request: Request, db: Session = Depends(get_db)):
-    user, _ = _resolve_scope(request, db)
+    user, barangay = _resolve_scope(request, db)
     if isinstance(user, RedirectResponse):
         return user
-    e = db.query(Equipment).filter(Equipment.id == equipment_id).first()
+    e = _own_bdrrmo_equipment(db, barangay, equipment_id)
     if not e:
-        return RedirectResponse(url="/bdrrmo/equipment_bdrrmo", status_code=302)
-
-    # Repair follow-up for this unit (most-relevant report, if any).
-    reminder = equipment_repair_reminders(db).get(e.id)
-    return templates.TemplateResponse(
-        request=request,
-        name="bdrrmo/equipment_form.html",
-        context={
-            "user": user,
-            "active_nav": "equipment",
-            "edit_mode": True,
-            "target": e,
-            "types": [(t.value, EQUIPMENT_TYPE_LABELS.get(t.value, t.value.title()))
-                      for t in EquipmentType],
-            "status_choices": [(v, EQUIPMENT_STATUS_LABELS[v]) for v in EQUIPMENT_STATUS_CHOICES],
-            "error": None,
-            "repair_reminder": reminder["state"] if reminder else None,
-            "repair_report": reminder["report"] if reminder else None,
-            "live_status_label": EQUIPMENT_STATUS_LABELS.get(
-                e.status.value if e.status else "", "—"
-            ),
-        },
-    )
+        return _equipment_not_found()
+    return RedirectResponse(url=f"/bdrrmo/equipment_bdrrmo?edit={e.id}", status_code=302)
 
 
 @router.post("/equipment_bdrrmo/{equipment_id}/edit")
@@ -3210,17 +3353,30 @@ def equipment_edit(
     equipment_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    name: str = Form(...),
-    equipment_type: str = Form(...),
+    name: str = Form(""),
+    equipment_type: str = Form(""),
     plate_or_serial: str = Form(""),
-    last_inspected: str = Form(""),
 ):
-    user, _ = _resolve_scope(request, db)
+    user, barangay = _resolve_scope(request, db)
     if isinstance(user, RedirectResponse):
         return user
-    e = db.query(Equipment).filter(Equipment.id == equipment_id).first()
+    # Own barangay only: the modal never shows, and this never saves,
+    # another barangay's unit.
+    e = _own_bdrrmo_equipment(db, barangay, equipment_id)
     if not e:
-        return RedirectResponse(url="/bdrrmo/equipment_bdrrmo", status_code=302)
+        return _equipment_not_found()
+
+    def render_error(msg):
+        values = {"name": name, "equipment_type": equipment_type, "plate_or_serial": plate_or_serial}
+        return _render_equipment_list(
+            request, db, user, barangay, modal=_equipment_modal("edit", e.id, values, msg),
+        )
+
+    # Same required-field checks as Add; shown in the modal, nothing saved.
+    if not name.strip():
+        return render_error("Equipment name is required.")
+    if equipment_type not in {t.value for t in EquipmentType}:
+        return render_error("Invalid equipment type.")
 
     # Status is changed via the dedicated status-change action so the
     # audit log captures it as a status transition, not a generic edit.
@@ -3239,11 +3395,7 @@ def equipment_edit(
         changes.append(f"plate_or_serial: '{e.plate_or_serial or ''}' → '{new_ps or ''}'")
         e.plate_or_serial = new_ps
 
-    new_insp = _parse_date_or_none(last_inspected)
-    if new_insp != e.last_inspected:
-        changes.append(f"last_inspected: {e.last_inspected} → {new_insp}")
-        e.last_inspected = new_insp
-
+    # last_inspected is not edited here; the stored value is kept as is.
     db.commit()
 
     if changes:
@@ -3418,6 +3570,62 @@ PLANNING_STATUS_LABELS = {
 
 PLANNING_STATUS_CHOICES = ["pending", "approved", "rejected"]
 
+# ── One BDRRM Plan per barangay ──────────────────────────────────────
+# A barangay's "current plan" is its latest non-archived Planning row
+# (pdash.latest_plan_for_barangay). A pending or approved current plan blocks
+# any new upload; no plan, or a returned (rejected) one, allows it.
+UPLOAD_BLOCKING_STATUSES = ("pending", "approved")
+
+
+def barangay_upload_block(db, barangay_id):
+    """The plan that blocks a new upload for this barangay, or None."""
+    if not barangay_id:
+        return None
+    plan = pdash.latest_plan_for_barangay(db, barangay_id)
+    if plan and pdash.plan_status(plan) in UPLOAD_BLOCKING_STATUSES:
+        return plan
+    return None
+
+
+def _upload_block_message(plan) -> str:
+    if pdash.plan_status(plan) == "approved":
+        return (f"Your BDRRM Plan '{plan.file_name}' is already approved. "
+                "A new plan cannot be uploaded.")
+    return ("Your BDRRM Plan is already submitted for review by the Research and "
+            "Planning Office. A new plan cannot be uploaded while it is pending.")
+
+
+def _upload_blocked_redirect(plan, draft_id: Optional[str] = None):
+    """Refuse an upload step: drop the (now unusable) draft and go back to
+    the Planning page with the blocking reason."""
+    if draft_id:
+        delete_temporary_draft(draft_id)
+    return RedirectResponse(
+        url="/bdrrmo/planning?error=" + quote_plus(_upload_block_message(plan)),
+        status_code=302,
+    )
+
+
+def _plan_date_label(d) -> str:
+    return f"{d:%B} {d.day}, {d.year}" if d else ""
+
+
+def plan_banner(plan):
+    """What the Planning page and dashboard say about the current plan:
+    None (no plan) or a dict the bdrrmo/_plan_banner.html macro renders."""
+    if not plan:
+        return None
+    status = pdash.plan_status(plan)
+    banner = {"file_name": plan.file_name, "kind": status}
+    if status == "approved":
+        if plan.is_hardcopy_received:
+            banner["kind"] = "received"
+            banner["received_on"] = _plan_date_label(plan.hardcopy_received_date)
+    elif status == "rejected":
+        banner["kind"] = "returned"
+        banner["reason"] = (plan.reason or "").strip()
+    return banner
+
 @router.get("/planning", response_class=HTMLResponse)
 def planning(
     request: Request,              
@@ -3459,12 +3667,47 @@ def planning(
             "created_at": r.created_at,
         })
 
-    rows_not_submitted = []
-    for r in query.filter(Planning.is_hardcopy_received == False, Planning.status == "approved"):
-        rows_not_submitted.append({
-            "id": r.id,
-            "file_name": r.file_name,
-        })
+    current_plan = pdash.latest_plan_for_barangay(db, barangay.id) if barangay else None
+    banner = plan_banner(current_plan)
+
+    # ── Plan card extras (read-only; no DB change) ──────────────────
+    from sqlalchemy import or_
+    from app.models import AuditLog
+    from app.routes.uploads import _max_upload_bytes
+
+    # When the Admin approved / returned the current plan: the latest audit
+    # entry about this plan naming that decision. Left out if none is found.
+    decided_at = None
+    if banner and banner["kind"] in ("approved", "received", "returned"):
+        words = ("%approved%",) if banner["kind"] != "returned" \
+            else ("%rejected%", "%returned%", "%declined%")
+        entry = (
+            db.query(AuditLog)
+            .filter(
+                AuditLog.target_id == current_plan.id,
+                AuditLog.target_table.ilike("%plan%"),
+                or_(*[col.ilike(w) for w in words
+                      for col in (AuditLog.action, AuditLog.description)]),
+            )
+            .order_by(AuditLog.timestamp.desc(), AuditLog.id.desc())
+            .first()
+        )
+        if entry and entry.timestamp:
+            t = entry.timestamp
+            decided_at = (f"{t:%B} {t.day}, {t.year} - "
+                          f"{t.strftime('%I').lstrip('0')}:{t:%M %p}")
+
+    max_mb = _max_upload_bytes() / (1024 * 1024)
+    max_upload_mb = int(max_mb) if max_mb == int(max_mb) else round(max_mb, 1)
+
+    static_dir = Path(__file__).resolve().parent.parent / "static"
+    template_url = "/static/docs/bdrrm-plan-template.pdf" \
+        if (static_dir / "docs" / "bdrrm-plan-template.pdf").is_file() else None
+    flower_url = next(
+        (f"/static/img/plan-flower.{ext}" for ext in ("svg", "png")
+         if (static_dir / "img" / f"plan-flower.{ext}").is_file()),
+        None,
+    )
 
     page_obj = paginate(rows, parse_page(page), parse_per_page(per_page))
     base_query = build_base_query({"q": q or "", "status": status or ""})
@@ -3480,7 +3723,13 @@ def planning(
             "plannings": page_obj.items,
             "page_obj": page_obj,
             "base_query": base_query,
-            "not_submitted": filenames_to_paragraph(rows_not_submitted),
+            "plan_banner": banner,
+            "upload_blocked": bool(banner) and banner["kind"] != "returned",
+            "current_plan_id": current_plan.id if current_plan else None,
+            "plan_decided_at": decided_at,
+            "max_upload_mb": max_upload_mb,
+            "plan_template_url": template_url,
+            "plan_flower_url": flower_url,
             "status_choices": [(v, PLANNING_STATUS_LABELS[v]) for v in PLANNING_STATUS_CHOICES],
             "f_q": q or "",
             "f_status": status,
@@ -3513,6 +3762,9 @@ async def planning_upload_submit(
             status_code=302,
         )
 
+    blocking = barangay_upload_block(db, barangay.id)
+    if blocking:
+        return _upload_blocked_redirect(blocking)
 
     draft_id = str(uuid.uuid4())
 
@@ -3584,6 +3836,10 @@ def planning_preview(
     if isinstance(user, RedirectResponse):
         return user
 
+    blocking = barangay_upload_block(db, barangay.id)
+    if blocking:
+        return _upload_blocked_redirect(blocking, draft_id)
+
     return templates.TemplateResponse(
         request=request,
         name="bdrrmo/planning_preview.html",
@@ -3634,9 +3890,13 @@ def planning_preview_extract(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    user, _, draft = _resolve_draft(request, db, draft_id)
+    user, barangay, draft = _resolve_draft(request, db, draft_id)
     if isinstance(user, RedirectResponse):
         return user
+
+    blocking = barangay_upload_block(db, barangay.id)
+    if blocking:
+        return _upload_blocked_redirect(blocking, draft_id)
 
     review_url = f"/bdrrmo/planning/review/{draft_id}"
 
@@ -3750,6 +4010,34 @@ def planning_archive_toggle(
     p = _get_planning_owned_upload(db, planning_id, barangay)
     if not p:
         return RedirectResponse(url="/bdrrmo/planning?error=Plan+not+found", status_code=302)
+
+    status = pdash.plan_status(p)
+    if not p.is_archived:
+        # Archiving a pending/approved plan would hide it and unblock a
+        # second upload, so only returned plans can be archived.
+        if status != "rejected":
+            return RedirectResponse(
+                url="/bdrrmo/planning?error=" + quote_plus(
+                    "Only returned plans can be archived. A pending or approved "
+                    "BDRRM Plan stays active."
+                ),
+                status_code=302,
+            )
+    else:
+        # Restoring must not leave the barangay with two active plans, nor put
+        # a returned plan ahead of the pending/approved one.
+        blocking = barangay_upload_block(db, barangay.id)
+        if blocking and (
+            status in UPLOAD_BLOCKING_STATUSES
+            or (p.created_at and blocking.created_at and p.created_at > blocking.created_at)
+        ):
+            return RedirectResponse(
+                url="/bdrrmo/planning?archived=1&error=" + quote_plus(
+                    f"This plan cannot be restored while your BDRRM Plan "
+                    f"'{blocking.file_name}' is {pdash.plan_status(blocking)}."
+                ),
+                status_code=302,
+            )
 
     p.is_archived = not bool(p.is_archived)
     db.commit()
@@ -3870,6 +4158,10 @@ def review_activities(
             status_code=302,
         )
 
+    blocking = barangay_upload_block(db, barangay.id)
+    if blocking:
+        return _upload_blocked_redirect(blocking, draft_id)
+
     return templates.TemplateResponse(
         request=request,
         name="bdrrmo/planning_activities_review.html",
@@ -3929,6 +4221,12 @@ async def save_confirmed_activities(
             url="/bdrrmo/planning?error=Draft+not+found",
             status_code=302,
         )
+
+    # Checked again here: the draft may have been started before another
+    # plan of this barangay was submitted.
+    blocking = barangay_upload_block(db, barangay.id)
+    if blocking:
+        return _upload_blocked_redirect(blocking, draft_id)
 
     permanent_path = None
 
@@ -4034,6 +4332,8 @@ def get_activities(
     plan_id: int,
     request: Request,
     db: Session = Depends(get_db),
+    page: Optional[str] = None,
+    per_page: Optional[str] = None,
 ):
     user, barangay = _resolve_scope(request, db)
 
@@ -4055,6 +4355,7 @@ def get_activities(
     rows = pdash.bdrrmo_activity_rows(
         activities, plan, pdash.rescheduled_counts(db, [a.id for a in activities])
     )
+    page_obj = paginate(rows, parse_page(page), parse_per_page(per_page))
 
     return templates.TemplateResponse(
         request=request,
@@ -4064,7 +4365,8 @@ def get_activities(
             "active_nav": "planning",
             "barangay": barangay,
             "plan": plan,
-            "rows": rows,
+            "rows": page_obj.items,
+            "page_obj": page_obj,
             "today": date.today(),
             "error": request.query_params.get("error"),
             "success": request.query_params.get("success"),
@@ -4161,12 +4463,76 @@ async def activity_schedule(
             url=f"{back}?error=Date+not+saved,+try+again", status_code=302
         )
 
+@router.get("/activities/{activity_id}/proof")
+async def activity_proof_view(
+    request: Request,
+    activity_id: int,
+    db: Session = Depends(get_db),
+):
+    """Open the latest proof PDF of one of the user's own activities.
+    Read-only: nothing is written to the database."""
+    user, barangay = _resolve_scope(request, db)
+    if isinstance(user, RedirectResponse):
+        return user
+    if not barangay:
+        return RedirectResponse(
+            url="/bdrrmo/planning?error=No+barangay+is+assigned+to+your+account",
+            status_code=302,
+        )
+
+    a = (
+        db.query(Activity)
+        .join(Planning, Activity.planning_id == Planning.id)
+        .filter(Activity.id == activity_id, Planning.barangay_id == barangay.id)
+        .first()
+    )
+    if not a:
+        return RedirectResponse(url="/bdrrmo/planning?error=Proof+not+found", status_code=302)
+    back = f"/bdrrmo/planning/activities/{a.planning_id}"
+
+    document = latest_proof(db, a.id)
+    if not document:
+        return RedirectResponse(url=f"{back}?error=No+proof+uploaded+yet", status_code=302)
+
+    return proof_pdf_response(document) or RedirectResponse(
+        url=f"{back}?error=" + quote_plus(PROOF_OPEN_FAILED), status_code=302
+    )
+
+
+def _proof_back(a, page: str = "", per_page: str = "", **message):
+    """Back to the activity's plan activities page, same page of the list,
+    scrolled to its row, with a success / error message."""
+    params = {}
+    if per_page:
+        params["per_page"] = parse_per_page(per_page)
+    if page:
+        params["page"] = parse_page(page)
+    params.update(message)
+    query = ("?" + urlencode(params)) if params else ""
+    return RedirectResponse(
+        url=f"/bdrrmo/planning/activities/{a.planning_id}{query}#activity-{a.id}",
+        status_code=302,
+    )
+
+
+def _owned_activity_for_proof(db, barangay, activity_id):
+    """The user's own activity (by barangay), or None."""
+    return (
+        db.query(Activity)
+        .join(Planning, Activity.planning_id == Planning.id)
+        .filter(Activity.id == activity_id, Planning.barangay_id == barangay.id)
+        .first()
+    )
+
+
 @router.post("/activities/{activity_id}/submit")
 async def activity_proof_submit(
     request: Request,
     activity_id: int,
     db: Session = Depends(get_db),
     file: UploadFile = File(...),
+    page: str = Form(""),
+    per_page: str = Form(""),
 ):
     user, barangay = _resolve_scope(request, db)
     if isinstance(user, RedirectResponse):
@@ -4177,31 +4543,20 @@ async def activity_proof_submit(
             status_code=302,
         )
 
-    original_name = file.filename
-    ext = _ext_of(original_name)
-    if ext != ".pdf":
-        return RedirectResponse(
-            url="/bdrrmo/planning?error=Unsupported+file+type.+Allowed:+PDF",
-            status_code=302,
-        )
-
-    a = (
-    db.query(Activity)
-    .join(Planning, Activity.planning_id == Planning.id)
-    .filter(Activity.id == activity_id, Planning.barangay_id == barangay.id)
-    .first()
-    )
+    a = _owned_activity_for_proof(db, barangay, activity_id)
     if not a:
         return RedirectResponse(url="/bdrrmo/planning?error=Activity+not+found", status_code=302)
-    
+
+    def back(**message):
+        return _proof_back(a, page, per_page, **message)
+
+    if _ext_of(file.filename) != ".pdf":
+        return back(error="Unsupported file type. Allowed: PDF")
+
     p = db.query(Planning).filter(Planning.id == a.planning_id).first()
 
     if p.status != "approved":
-        return RedirectResponse(
-            url="/bdrrmo/planning?error=Plan+not+approved+yet",
-            status_code=302,
-        )
-        
+        return back(error="Plan not approved yet")
 
     try:
         stored_name = _safe_filename(file.filename)
@@ -4231,17 +4586,13 @@ async def activity_proof_submit(
 
         db.commit()
 
-        return RedirectResponse(
-            url=f"/bdrrmo/planning", status_code=302
-        )
+        return back(success=f"Proof for {a.title} uploaded. It is now awaiting review.")
     
     except Exception as e:
         print(e)
         db.rollback()
 
-        return RedirectResponse(
-            url=f"/bdrrmo/planning?error=File+not+saved,+try+again", status_code=302
-        )
+        return back(error="File not saved, try again")
 
 @router.post("/activities/{activity_id}/retry")
 async def activity_proof_retry(
@@ -4249,6 +4600,8 @@ async def activity_proof_retry(
     activity_id: int,
     db: Session = Depends(get_db),
     file: UploadFile = File(...),
+    page: str = Form(""),
+    per_page: str = Form(""),
 ):
     user, barangay = _resolve_scope(request, db)
     if isinstance(user, RedirectResponse):
@@ -4259,31 +4612,20 @@ async def activity_proof_retry(
             status_code=302,
         )
 
-    original_name = file.filename
-    ext = _ext_of(original_name)
-    if ext != ".pdf":
-        return RedirectResponse(
-            url="/bdrrmo/planning?error=Unsupported+file+type.+Allowed:+PDF",
-            status_code=302,
-        )
-
-    a = (
-    db.query(Activity)
-    .join(Planning, Activity.planning_id == Planning.id)
-    .filter(Activity.id == activity_id, Planning.barangay_id == barangay.id)
-    .first()
-    )
+    a = _owned_activity_for_proof(db, barangay, activity_id)
     if not a:
         return RedirectResponse(url="/bdrrmo/planning?error=Activity+not+found", status_code=302)
-    
+
+    def back(**message):
+        return _proof_back(a, page, per_page, **message)
+
+    if _ext_of(file.filename) != ".pdf":
+        return back(error="Unsupported file type. Allowed: PDF")
+
     p = db.query(Planning).filter(Planning.id == a.planning_id).first()
 
     if p.status != "approved":
-        return RedirectResponse(
-            url="/bdrrmo/planning?error=Plan+not+approved+yet",
-            status_code=302,
-        )
-        
+        return back(error="Plan not approved yet")
 
     try:
         stored_name = _safe_filename(file.filename)
@@ -4294,7 +4636,7 @@ async def activity_proof_retry(
             folder="documents"
         )
 
-        activity_proof = db.query(ActivityProof).filter(ActivityProof.activity_id == activity_id).first()
+        activity_proof = latest_proof(db, a.id)  # the same row "View proof" opens
 
         activity_proof.file_name = file.filename
         activity_proof.file_path = file_key
@@ -4309,17 +4651,13 @@ async def activity_proof_retry(
 
         db.commit()
 
-        return RedirectResponse(
-            url=f"/bdrrmo/planning", status_code=302
-        )
+        return back(success=f"Proof for {a.title} re-uploaded. It is now awaiting review.")
     
     except Exception as e:
         print(e)
         db.rollback()
 
-        return RedirectResponse(
-            url=f"/bdrrmo/planning?error=File+not+saved,+try+again", status_code=302
-        )
+        return back(error="File not saved, try again")
 
     
 def planning_ai_summary(stored_path, file_name):

@@ -91,6 +91,7 @@ body {
 .sidebar-brand .brand-sub {
   color: rgba(68, 68, 68, 0.65);
   font-size: 11px;
+  overflow-wrap: anywhere;   /* "Barangay Portal · <long barangay name>" */
 }
 
 .sidebar-toggle {
@@ -524,20 +525,6 @@ html.rk-no-anim .main-content {
 }
 
 /* Rounded search bar used in list/filter toolbars */
-.search-bar-rk .input-group-text {
-  background: white;
-  border-right: 0;
-  border-radius: 10px 0 0 10px;
-}
-.search-bar-rk input {
-  border-left: 0;
-  border-radius: 0 10px 10px 0;
-}
-.search-bar-rk input:focus {
-  box-shadow: none;
-  border-color: #ced4da;
-}
-
 /* Reusable alert / insight banner (amber notice strip) */
 .alert-banner {
   background: #fff8e1;
@@ -945,10 +932,6 @@ html.rk-no-anim .main-content {
 }
 
 /* Rounded control (e.g. filter selects) */
-.rk-radius-10 {
-  border-radius: 10px;
-}
-
 /* Scrollable panels (raw-text / preview tables) */
 .rk-mh-260 {
   max-height: 260px;
@@ -1953,7 +1936,10 @@ body.facility-location-picking .map-area .leaflet-container {
   width: 100%;
   padding: 10px 10px;
   justify-content: space-between;
+  align-items: center;
+  gap: 12px;
 }
+.main-header .logo-text-container { min-width: 0; }
 .main-body {
   padding: 24px;
 }
@@ -1968,20 +1954,6 @@ body.facility-location-picking .map-area .leaflet-container {
   font-size: 15px;
   font-weight: 700;
 }
-.barangay-text-container {
-  display: flex;
-  gap: 10px;
-  padding: 5px 10px;
-  border: 1px solid #167736;
-  border-radius: 10px;
-}
-.text-color {
-  color: #167736;
-}
-.barangay-text {
-  color: #5e5e5e;
-  font-weight: 500;
-}
 #cdrrmo-logo {
   height: 50px;
   width: 80px;
@@ -1991,3 +1963,380 @@ body.facility-location-picking .map-area .leaflet-container {
   color: #167736;
   font-size: 40px;
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   Shared list-page table style (filter bar · table card · pager)
+   Modelled on the Contact Directory. Markup:
+     <form class="rk-filter-bar js-live-filter"> … </form>
+     <div class="rk-table-card"><table class="rk-table"> … </table></div>
+     {{ rk_pager(page_obj, path, base_query) }}   (shared/_pagination.html)
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ── Filter bar ──────────────────────────────────────────────────── */
+.rk-filter-bar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  margin-bottom: 12px;
+}
+.rk-filter-bar .rk-filter-search { position: relative; flex: 1 1 260px; min-width: 200px; }
+.rk-filter-bar .rk-filter-search > .bi-search {
+  position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+  color: var(--rk-green); pointer-events: none;
+}
+.rk-filter-bar .rk-filter-search .form-control { padding-left: 34px; }
+.rk-filter-bar .rk-filter-select { flex: 0 1 180px; min-width: 140px; }
+.rk-filter-bar .form-control,
+.rk-filter-bar .form-select,
+.rk-filter-bar .rk-clear-filters {
+  height: 36px; border: 1px solid rgba(22, 119, 54, .35); border-radius: 8px;
+  font-size: 13px; background-color: #fff;
+}
+.rk-filter-bar .form-control:focus,
+.rk-filter-bar .form-select:focus {
+  border-color: var(--rk-green); box-shadow: 0 0 0 .2rem rgba(22, 119, 54, .15);
+}
+.rk-filter-bar .rk-clear-filters {
+  display: inline-flex; align-items: center; gap: 6px; padding: 0 12px;
+  color: #9b1c14; font-weight: 600; text-decoration: none; white-space: nowrap;
+}
+.rk-filter-bar .rk-clear-filters:hover,
+.rk-filter-bar .rk-clear-filters:focus { background: #fdf2f1; color: #9b1c14; }
+/* funnel with a small x badge (Bootstrap Icons has no funnel-x) */
+.rk-funnel-x { position: relative; display: inline-block; line-height: 1; }
+.rk-funnel-x .bi-x-circle-fill {
+  position: absolute; right: -4px; bottom: -3px; font-size: .6em;
+  background: #fff; border-radius: 50%;
+}
+@media (max-width: 575.98px) {
+  .rk-filter-bar .rk-filter-search,
+  .rk-filter-bar .rk-filter-select { flex: 1 1 100%; }
+}
+
+/* ── Table card ──────────────────────────────────────────────────── */
+.rk-table-card {
+  background: #fff; border: 1px solid rgba(22, 119, 54, .25); border-radius: 12px;
+  box-shadow: none; overflow-x: auto;
+}
+
+/* ── Table ───────────────────────────────────────────────────────── */
+.rk-table {
+  width: 100%; min-width: 640px; margin: 0; border-collapse: collapse;
+  font-size: 13px; color: var(--rk-text); font-variant-numeric: tabular-nums;
+}
+.rk-table th,
+.rk-table td { text-align: left; vertical-align: middle; border: 0; }
+.rk-table thead th {
+  padding: 14px 16px 12px; background: transparent;
+  color: var(--rk-green); font-size: 12px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .04em; white-space: nowrap;
+  border-bottom: 1px solid #dfeadb;
+}
+.rk-table tbody td { height: 56px; padding: 8px 16px; border-bottom: 1px solid #eef1ee; }
+.rk-table tbody tr:last-child td { border-bottom: 0; }
+.rk-table tbody tr:hover td { background: #f6fbf4; }
+.rk-table tbody tr.rk-table-empty:hover td { background: transparent; }
+.rk-table .rk-table-empty td { color: var(--rk-muted); }
+/* Action buttons/forms in a cell: one wrapping row, left-aligned. */
+.rk-table .rk-table-actions {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+}
+.rk-table .rk-table-actions form { display: inline-flex; margin: 0; }
+
+/* Date-range filters: a short visible label beside each date input. */
+.rk-filter-bar .rk-filter-date { display: flex; align-items: center; gap: 6px; flex: 0 1 auto; }
+.rk-filter-bar .rk-filter-date label {
+  margin: 0; font-size: 12px; font-weight: 600; color: var(--rk-muted); white-space: nowrap;
+}
+.rk-filter-bar .rk-filter-date .form-control { width: 150px; }
+
+/* Table inside an existing card (dashboard, profile tabs): same header/row
+   style, no extra border; scrolls sideways when narrow. */
+.rk-table-scroll { overflow-x: auto; }
+.rk-table-scroll .rk-table { min-width: 520px; }
+
+/* Group heading row inside a table (e.g. audit trail day labels). */
+.rk-table tbody tr.rk-table-group td {
+  height: auto; padding: 8px 16px; background: #f6faf4;
+  color: var(--rk-muted); font-size: 12px; font-weight: 600;
+}
+.rk-table tbody tr.rk-table-group:hover td { background: #f6faf4; }
+
+/* ── Numbered pagination footer ──────────────────────────────────── */
+.rk-pagination {
+  display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center;
+  gap: 8px; margin-top: 12px; padding: 0 4px;
+}
+.rk-pagination .rk-pagination-summary { font-size: 13px; color: var(--rk-muted); }
+.rk-pagination ul { display: flex; align-items: center; gap: 4px; list-style: none; margin: 0; padding: 0; }
+.rk-pagination li > a,
+.rk-pagination li > span {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 30px; height: 30px; padding: 0 6px; border-radius: 999px;
+  font-size: 13px; font-weight: 600; color: #374151; text-decoration: none;
+}
+.rk-pagination li > a:hover,
+.rk-pagination li > a:focus { background: #eefbe8; color: var(--rk-green); }
+.rk-pagination .rk-page-current { background: var(--rk-green); color: #fff; }
+.rk-pagination .rk-page-off { color: #c3c8cf; }
+/* The shared activity_actions() macro right-aligns its buttons for cards;
+   inside the shared table everything is left-aligned. */
+.rk-table .rkd-actions { justify-content: flex-start; }
+
+/* ══════════════════════════════════════════════════════════════════
+   BDRRMO Planning: plan card, 4-step stepper, drop zone, results
+   (bdrrmo/planning.html, planning_preview.html,
+    planning_activities_review.html)
+   Spacing scale: multiples of 8px. 24px between sections and above a
+   card's main button, 8px between a heading and its sub-text,
+   24-32px card padding (16px on phones).
+   ══════════════════════════════════════════════════════════════════ */
+
+/* Preview / Review pages: title, stepper, content, 24px apart. */
+.rk-plan-page { display: flex; flex-direction: column; gap: 24px; }
+.rk-plan-page > * { margin-top: 0; margin-bottom: 0; }
+.rk-plan-page .page-header { margin: 0; }
+.rk-plan-page .page-header p { margin: 8px 0 0; }
+.rk-plan-hint { margin: 0 0 16px; font-size: 14px; }
+
+/* Preview: PDF panel and summary panel share one top edge and gap. */
+.rk-plan-preview .row { --bs-gutter-x: 24px; --bs-gutter-y: 24px; align-items: flex-start; }
+.rk-plan-preview .row > * > :first-child { margin-top: 0; }
+
+.rk-plan-card {
+  background: #fff; border: 1px solid #cfe6d4; border-radius: var(--rk-radius);
+  padding: 32px;
+}
+.rk-plan-card-compact { padding: 24px; }
+.rk-plan-head { text-align: center; margin-bottom: 24px; }
+.rk-plan-head p { margin: 0; font-size: 15px; line-height: 1.6; color: var(--rk-text); }
+#header.rk-plan-title {
+  margin: 0 0 8px; color: var(--rk-green); font-size: 2.5rem; font-weight: 800;
+  line-height: 1.15; text-transform: uppercase; letter-spacing: .5px;
+}
+.rk-plan-link { color: var(--rk-green); font-weight: 700; }
+.rk-plan-link:hover, .rk-plan-link:focus { color: var(--rk-green-dark); }
+
+/* Buttons in the plan cards: never underlined, always a visible focus ring. */
+.rk-plan-card .btn-rk {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 10px 24px; font-size: 15px; font-weight: 600; line-height: 1.4;
+}
+.rk-plan-card a.btn-rk,
+.rk-plan-card a.btn-rk:hover,
+.rk-plan-card a.btn-rk:focus,
+.rk-plan-card a.btn-rk:active { text-decoration: none; color: #fff; }
+.rk-plan-card .btn-rk:focus-visible { outline: 3px solid #0b4f24; outline-offset: 2px; }
+
+/* Stepper: completed = filled, current = filled + ring, future = outlined.
+   Equal columns; labels wrap and stay centred under their icons. */
+.rk-stepper {
+  --rk-step-dot: 48px;
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+  max-width: 680px; margin: 0 auto 24px; padding: 8px 0 0; list-style: none;
+}
+.rk-plan-card-compact .rk-stepper { margin-bottom: 0; }
+.rk-step {
+  position: relative; display: flex; flex-direction: column; align-items: center;
+  gap: 8px; min-width: 0; padding: 0 8px; text-align: center;
+}
+.rk-step + .rk-step::before {            /* line from the previous step */
+  content: ""; position: absolute; z-index: 0;
+  top: calc(var(--rk-step-dot) / 2 - 1.5px); right: 50%; width: 100%; height: 3px;
+  background: #cfe6d4;
+}
+.rk-step-done + .rk-step::before { background: var(--rk-green); }
+.rk-step-dot {
+  position: relative; z-index: 1; flex: none; display: flex; align-items: center; justify-content: center;
+  width: var(--rk-step-dot); height: var(--rk-step-dot); border-radius: 50%;
+  background: #fff; border: 2px solid #9cc9a8; color: #4f7a5c; font-size: 22px;
+}
+.rk-step-done .rk-step-dot,
+.rk-step-current .rk-step-dot { background: var(--rk-green); border-color: var(--rk-green); color: #fff; }
+.rk-step-current .rk-step-dot { box-shadow: 0 0 0 3px #fff, 0 0 0 5px var(--rk-green); }
+.rk-step-label {
+  display: block; max-width: 100%; font-size: 14px; font-weight: 600; line-height: 1.35;
+  color: #4b5563; overflow-wrap: break-word;
+}
+.rk-step-current .rk-step-label { color: var(--rk-green); font-weight: 700; }
+
+/* Inner panel holding the drop zone or the submission result. */
+.rk-plan-panel { border: 1px solid #b9dcc2; border-radius: var(--rk-radius); padding: 16px; }
+.rk-plan-panel + .rk-plan-panel { margin-top: 24px; }
+.rk-plan-panel[hidden] { display: none; }
+
+.rk-dropzone {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 48px 24px; text-align: center;
+  background: #eefbe8; border: 2px dashed #6fb282; border-radius: 10px;
+  transition: background-color .15s, border-color .15s;
+}
+.rk-dropzone.is-dragover { background: #dcf5d0; border-color: var(--rk-green); }
+.rk-dropzone-icon { font-size: 40px; color: var(--rk-green); line-height: 1; margin-bottom: 8px; }
+.rk-dropzone-title { margin: 0; font-size: 16px; font-weight: 700; color: #374151; }
+.rk-dropzone-hint { margin: 0; font-size: 14px; color: #4b5563; }
+.rk-dropzone .btn-rk { margin-top: 16px; }   /* + 8px gap = 24px */
+
+.rk-upload-error {
+  display: flex; gap: 16px; align-items: flex-start; margin-bottom: 16px; padding: 16px 24px;
+  background: #fef3f2; border: 1px solid #fecdca; border-radius: 10px; color: #4b1d18;
+}
+.rk-upload-error p { margin: 0 0 8px; font-size: 14px; }
+.rk-upload-error-icon { font-size: 24px; color: #b42318; line-height: 1; }
+.rk-upload-error .rk-upload-error-title { margin-bottom: 8px; font-size: 16px; font-weight: 700; color: #b42318; }
+.rk-upload-error .rk-upload-error-msg { margin-bottom: 16px; font-weight: 600; }
+
+/* Result cards (submitted / approved / declined): centred, 8px rhythm,
+   24px above the main button. */
+.rk-plan-result {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 32px 24px; text-align: center;
+}
+.rk-plan-result > * { margin: 0; }
+.rk-plan-result p { font-size: 15px; line-height: 1.6; max-width: 60ch; }
+.rk-plan-result .btn-rk { margin-top: 16px; }  /* + 8px gap = 24px */
+.rk-plan-result-title { color: var(--rk-green); font-size: 1.75rem; font-weight: 800; line-height: 1.25; }
+.rk-plan-muted { color: #4b5563; }
+.rk-plan-result .rk-plan-result-label { color: var(--rk-green); font-size: 1.5rem; font-weight: 700; line-height: 1.25; }
+.rk-plan-result .rk-plan-verdict {
+  padding: 0 32px; border-radius: 10px; font-size: 2.25rem; font-weight: 800;
+  letter-spacing: .5px; line-height: 1.4;
+}
+.rk-plan-verdict-ok { color: var(--rk-green); background: #e8f5ec; }
+.rk-plan-verdict-bad { color: #b42318; background: #fef3f2; }
+.rk-plan-result .rk-plan-when { color: #4b5563; font-size: 14px; font-weight: 600; margin-bottom: 16px; }
+.rk-plan-reasons { padding-left: 24px; text-align: left; font-size: 15px; line-height: 1.6; }
+
+/* Pending: the flower turns slowly and endlessly while the plan waits. */
+.rk-plan-flower { display: block; margin: 0 auto 8px; animation: rk-plan-flower-spin 6s linear infinite; }
+@keyframes rk-plan-flower-spin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .rk-plan-flower { animation: none; }
+  .rk-dropzone { transition: none; }
+}
+
+@media (max-width: 575.98px) {
+  .rk-plan-card, .rk-plan-card-compact { padding: 16px; }
+  #header.rk-plan-title { font-size: 2rem; }
+  .rk-stepper { --rk-step-dot: 40px; }
+  .rk-step { padding: 0 4px; }
+  .rk-step-dot { font-size: 18px; }
+  .rk-plan-panel { padding: 8px; }
+  .rk-plan-result { padding: 24px 16px; }
+  .rk-plan-result-title { font-size: 1.5rem; }
+  .rk-plan-result .rk-plan-result-label { font-size: 1.25rem; }
+  .rk-plan-result .rk-plan-verdict { font-size: 1.75rem; padding: 0 16px; }
+  .rk-plan-card .btn-rk { width: 100%; }
+  .rk-dropzone { padding: 32px 16px; }
+  .rk-upload-error { padding: 16px; gap: 8px; }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Accessibility options (header menu in admin/base.html)
+   Each toggle adds a class on <html>; saved in localStorage "rk_a11y".
+   ══════════════════════════════════════════════════════════════════ */
+.rk-a11y { position: relative; flex: none; }
+.rk-a11y-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 16px; border: 1px solid var(--rk-green); border-radius: 10px;
+  background: #fff; color: var(--rk-green); font-size: 15px; font-weight: 700; line-height: 1.4;
+}
+.rk-a11y-btn .bi { font-size: 20px; line-height: 1; }
+.rk-a11y-btn:hover, .rk-a11y-btn[aria-expanded="true"] { background: #eefbe8; }
+.rk-a11y-btn:focus-visible,
+.rk-a11y-panel button:focus-visible { outline: 3px solid #0b4f24; outline-offset: 2px; }
+
+.rk-a11y-panel {
+  position: absolute; top: calc(100% + 8px); right: 0; z-index: 1040;
+  width: 280px; max-width: calc(100vw - 24px); padding: 16px;
+  background: #fff; border: 1px solid #b9dcc2; border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .12);
+}
+.rk-a11y-panel[hidden] { display: none; }
+.rk-a11y-title { margin: 0 0 8px; font-size: 15px; font-weight: 700; color: var(--rk-text); }
+.rk-a11y-opt {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  margin-top: 8px; padding: 10px 12px; border: 1px solid #dfeadb; border-radius: 10px;
+  background: #fff; color: var(--rk-text); font-size: 15px; font-weight: 600; text-align: left;
+}
+.rk-a11y-opt .bi { font-size: 18px; color: var(--rk-green); }
+.rk-a11y-opt:hover { background: #f6faf4; }
+.rk-a11y-label { flex: 1; }
+/* On/off switch drawn with CSS; the state itself is aria-pressed. */
+.rk-a11y-switch {
+  position: relative; flex: none; width: 36px; height: 20px; border-radius: 999px;
+  background: #c3c8cf; transition: background-color .15s;
+}
+.rk-a11y-switch::after {
+  content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px;
+  border-radius: 50%; background: #fff; transition: transform .15s;
+}
+.rk-a11y-opt[aria-pressed="true"] { border-color: var(--rk-green); background: #eefbe8; }
+.rk-a11y-opt[aria-pressed="true"] .rk-a11y-switch { background: var(--rk-green); }
+.rk-a11y-opt[aria-pressed="true"] .rk-a11y-switch::after { transform: translateX(16px); }
+.rk-a11y-reset {
+  display: inline-flex; align-items: center; gap: 8px; margin-top: 16px; padding: 8px 12px;
+  border: 1px solid #6c757d; border-radius: 10px; background: #fff;
+  color: #374151; font-size: 14px; font-weight: 600;
+}
+.rk-a11y-reset:hover { background: #f4f6f9; }
+
+/* Phones: icon-only button (the label stays as its accessible name). */
+@media (max-width: 575.98px) {
+  .rk-a11y-btn { padding: 8px 10px; }
+  .rk-a11y-btn span {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+  }
+  .rk-a11y-panel { position: fixed; top: 72px; right: 12px; }
+}
+
+/* Larger text: page content at 125% (the layout itself is unchanged). */
+html.a11y-text-lg .main-body { zoom: 1.25; }
+
+/* High contrast: darker text, borders and focus rings. */
+html.a11y-contrast { --rk-text: #000; --rk-muted: #1f2937; }
+html.a11y-contrast body,
+html.a11y-contrast .main-body { color: #000; background: #fff; }
+html.a11y-contrast .text-muted,
+html.a11y-contrast .form-text,
+html.a11y-contrast .text-secondary,
+html.a11y-contrast .sidebar-brand .brand-sub { color: #1f2937 !important; }
+html.a11y-contrast a:not(.btn):not(.btn-rk):not(.nav-item-link) { color: #0b4f24; }
+html.a11y-contrast .form-control,
+html.a11y-contrast .form-select,
+html.a11y-contrast .rk-table-card,
+html.a11y-contrast .dash-card,
+html.a11y-contrast .rk-plan-card,
+html.a11y-contrast .rk-plan-panel,
+html.a11y-contrast .card { border-color: #1f2937 !important; }
+html.a11y-contrast :focus-visible { outline: 3px solid #000 !important; outline-offset: 2px; }
+
+/* Stop animations: no CSS animation or transition anywhere. */
+html.a11y-reduce-motion *,
+html.a11y-reduce-motion *::before,
+html.a11y-reduce-motion *::after {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}
+
+/* Underline links (buttons styled as links are left alone). */
+html.a11y-underline a:not(.btn):not(.btn-rk):not(.nav-item-link),
+html.a11y-underline a:not(.btn):not(.btn-rk):not(.nav-item-link):hover { text-decoration: underline !important; }
+
+/* ══════════════════════════════════════════════════════════════════
+   Admin Planning list: green outline row actions, final lock,
+   review-history badges (admin/planning.html)
+   ══════════════════════════════════════════════════════════════════ */
+.btn-outline-rk {
+  color: var(--rk-green); background: #fff; border: 1px solid var(--rk-green);
+}
+.btn-outline-rk:hover, .btn-outline-rk:focus-visible {
+  color: #fff; background: var(--rk-green); border-color: var(--rk-green);
+}
+.btn-outline-rk:focus-visible { outline: 3px solid rgba(22, 119, 54, .35); outline-offset: 1px; }
+.rk-final-lock { color: #4b5563; font-size: 13px; }
+.rk-badge-current {
+  display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 700;
+  color: #fff; background: var(--rk-green); vertical-align: middle;
+}
+.status-pill.rk-pill-archived { background: #f3f4f6; color: #374151; border: 1px solid #d1d5db; }

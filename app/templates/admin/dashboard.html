@@ -32,9 +32,9 @@
     </div>
     <div class="col">
         {# Same numbers as the "Accomplishment report review" chart (admin_proof_review). #}
-        {% set ar_total = proof_review.pending + proof_review.approved %}
+        {% set ar_total = proof_review.pie.total %}
         {{ stat('Pending AR Review', proof_review.pending, 'amber', 'clipboard-check',
-                (proof_review.approved ~ ' of ' ~ ar_total ~ ' Reviewed') if ar_total else 'No reports submitted yet') }}
+                (proof_review.reviewed ~ ' of ' ~ ar_total ~ ' Reviewed') if ar_total else 'No reports submitted yet') }}
     </div>
 </div>
 
@@ -44,8 +44,7 @@
         <div class="rkd-card">
             <h2 class="rkd-card-title">Barangays with submitted BDRRM Plans</h2>
             <p class="rkd-card-note">
-                Latest plan per barangay: {{ plan_pie.pie.total }} approved or pending ·
-                {{ pc.returned }} returned and {{ pc.no_plan }} not submitted are not shown
+                Latest plan per barangay · {{ pc.no_plan }} not submitted {{ 'is' if pc.no_plan == 1 else 'are' }} not shown
             </p>
             {{ pie_block('plansPie', plan_pie.pie, 'barangays') }}
 
@@ -56,7 +55,7 @@
                 <div class="rkd-row">
                     <span>{{ r.barangay }}</span>
                     <span class="d-flex align-items-center gap-2">
-                        {{ plan_pill(r.status) }}
+                        {% if r.status == 'rejected' %}{{ pill('returned', 'Rejected') }}{% else %}{{ plan_pill(r.status) }}{% endif %}
                         <a href="/admin/planning/activities/{{ r.plan_id }}" class="rkd-icon-link"
                            aria-label="View activities of {{ r.barangay }}'s plan"><i class="bi bi-eye" aria-hidden="true"></i></a>
                     </span>
@@ -73,7 +72,7 @@
         <div class="rkd-card">
             <h2 class="rkd-card-title">Accomplishment report review</h2>
             <p class="rkd-card-note">
-                {{ proof_review.pie.total }} proofs submitted for activities of approved plans · returned proofs are not counted
+                {{ proof_review.pie.total }} proofs submitted for activities of approved plans
             </p>
             {{ pie_block('proofsPie', proof_review.pie, 'reports', 'Nothing to review') }}
 
@@ -84,8 +83,10 @@
                 <div class="rkd-row">
                     <span>{{ r.barangay }}</span>
                     <span class="d-flex align-items-center gap-2">
-                        {% if r.pending %}
-                        {{ pill('pending', r.pending ~ ' pending · ' ~ r.approved ~ '/' ~ r.submitted ~ ' approved') }}
+                        {% if r.pending or r.rejected %}
+                        {{ pill('pending', (r.pending ~ ' pending · ' if r.pending else '')
+                                           ~ (r.rejected ~ ' rejected · ' if r.rejected else '')
+                                           ~ r.approved ~ '/' ~ r.submitted ~ ' approved') }}
                         {% else %}
                         {{ pill('approved', r.approved ~ '/' ~ r.submitted ~ ' approved') }}
                         {% endif %}
@@ -172,10 +173,13 @@
                 Pending plans and proofs awaiting review, oldest first{% if needs_review.total > needs_review.rows | length %} · showing {{ needs_review.rows | length }} of {{ needs_review.total }}{% endif %}
             </p>
             {% if needs_review.rows %}
-            <div class="table-responsive">
-                <table class="rkd-table">
+            <div class="rk-table-scroll">
+                <table class="rk-table">
                     <thead>
-                        <tr><th>Barangay</th><th>Item</th><th>Submitted</th><th>Status</th><th></th></tr>
+                        <tr>
+                            <th scope="col">Barangay</th><th scope="col">Item</th><th scope="col">Submitted</th>
+                            <th scope="col">Status</th><th scope="col"><span class="visually-hidden">Action</span></th>
+                        </tr>
                     </thead>
                     <tbody>
                         {% for i in needs_review.rows %}
@@ -184,7 +188,7 @@
                             <td>{{ i.item }}</td>
                             <td class="text-nowrap">{{ fmt_date(i.submitted) or '—' }}</td>
                             <td>{{ pill(i.pill_class, i.pill) }}</td>
-                            <td class="text-end"><a href="{{ i.url }}" class="rkd-link">Review</a></td>
+                            <td><a href="{{ i.url }}" class="rkd-link">Review</a></td>
                         </tr>
                         {% endfor %}
                     </tbody>
