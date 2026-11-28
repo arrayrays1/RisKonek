@@ -32,9 +32,9 @@
     </div>
     <div class="col">
         {# Same numbers as the "Accomplishment report review" chart (admin_proof_review). #}
-        {% set ar_total = proof_review.pending + proof_review.approved %}
+        {% set ar_total = proof_review.pie.total %}
         {{ stat('Pending AR Review', proof_review.pending, 'amber', 'clipboard-check',
-                (proof_review.approved ~ ' of ' ~ ar_total ~ ' Reviewed') if ar_total else 'No reports submitted yet') }}
+                (proof_review.reviewed ~ ' of ' ~ ar_total ~ ' Reviewed') if ar_total else 'No reports submitted yet') }}
     </div>
 </div>
 
@@ -72,7 +72,7 @@
         <div class="rkd-card">
             <h2 class="rkd-card-title">Accomplishment report review</h2>
             <p class="rkd-card-note">
-                {{ proof_review.pie.total }} proofs submitted for activities of approved plans · returned proofs are not counted
+                {{ proof_review.pie.total }} proofs submitted for activities of approved plans
             </p>
             {{ pie_block('proofsPie', proof_review.pie, 'reports', 'Nothing to review') }}
 
@@ -83,8 +83,10 @@
                 <div class="rkd-row">
                     <span>{{ r.barangay }}</span>
                     <span class="d-flex align-items-center gap-2">
-                        {% if r.pending %}
-                        {{ pill('pending', r.pending ~ ' pending · ' ~ r.approved ~ '/' ~ r.submitted ~ ' approved') }}
+                        {% if r.pending or r.rejected %}
+                        {{ pill('pending', (r.pending ~ ' pending · ' if r.pending else '')
+                                           ~ (r.rejected ~ ' rejected · ' if r.rejected else '')
+                                           ~ r.approved ~ '/' ~ r.submitted ~ ' approved') }}
                         {% else %}
                         {{ pill('approved', r.approved ~ '/' ~ r.submitted ~ ' approved') }}
                         {% endif %}

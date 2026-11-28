@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select, func
 from sqlalchemy.orm import joinedload
 from datetime import datetime, date, timezone, timedelta
-from urllib.parse import quote_plus
+from urllib.parse import quote_plus, urlencode
 from typing import Optional
 import json
 import uuid
@@ -28,7 +28,7 @@ from app.utils.pagination import (
     paginate, parse_per_page, parse_page, build_base_query,
 )
 # Reuse the Week 4 barangay-profile helper for the population view.
-from app.routes.admin import _vulnerable_percent
+from app.routes.admin import _vulnerable_percent, latest_proof, proof_pdf_response, PROOF_OPEN_FAILED
 from app.services import plan_dashboard as pdash
 # Reuse the Week 6 / 8.1 ETL building blocks rather than rebuilding them —
 # the same upload validation, extraction, strict matcher and resolve-or-create
@@ -3670,6 +3670,45 @@ def planning(
     current_plan = pdash.latest_plan_for_barangay(db, barangay.id) if barangay else None
     banner = plan_banner(current_plan)
 
+    # ── Plan card extras (read-only; no DB change) ──────────────────
+    from sqlalchemy import or_
+    from app.models import AuditLog
+    from app.routes.uploads import _max_upload_bytes
+
+    # When the Admin approved / returned the current plan: the latest audit
+    # entry about this plan naming that decision. Left out if none is found.
+    decided_at = None
+    if banner and banner["kind"] in ("approved", "received", "returned"):
+        words = ("%approved%",) if banner["kind"] != "returned" \
+            else ("%rejected%", "%returned%", "%declined%")
+        entry = (
+            db.query(AuditLog)
+            .filter(
+                AuditLog.target_id == current_plan.id,
+                AuditLog.target_table.ilike("%plan%"),
+                or_(*[col.ilike(w) for w in words
+                      for col in (AuditLog.action, AuditLog.description)]),
+            )
+            .order_by(AuditLog.timestamp.desc(), AuditLog.id.desc())
+            .first()
+        )
+        if entry and entry.timestamp:
+            t = entry.timestamp
+            decided_at = (f"{t:%B} {t.day}, {t.year} - "
+                          f"{t.strftime('%I').lstrip('0')}:{t:%M %p}")
+
+    max_mb = _max_upload_bytes() / (1024 * 1024)
+    max_upload_mb = int(max_mb) if max_mb == int(max_mb) else round(max_mb, 1)
+
+    static_dir = Path(__file__).resolve().parent.parent / "static"
+    template_url = "/static/docs/bdrrm-plan-template.pdf" \
+        if (static_dir / "docs" / "bdrrm-plan-template.pdf").is_file() else None
+    flower_url = next(
+        (f"/static/img/plan-flower.{ext}" for ext in ("svg", "png")
+         if (static_dir / "img" / f"plan-flower.{ext}").is_file()),
+        None,
+    )
+
     page_obj = paginate(rows, parse_page(page), parse_per_page(per_page))
     base_query = build_base_query({"q": q or "", "status": status or ""})
 
@@ -3686,6 +3725,11 @@ def planning(
             "base_query": base_query,
             "plan_banner": banner,
             "upload_blocked": bool(banner) and banner["kind"] != "returned",
+            "current_plan_id": current_plan.id if current_plan else None,
+            "plan_decided_at": decided_at,
+            "max_upload_mb": max_upload_mb,
+            "plan_template_url": template_url,
+            "plan_flower_url": flower_url,
             "status_choices": [(v, PLANNING_STATUS_LABELS[v]) for v in PLANNING_STATUS_CHOICES],
             "f_q": q or "",
             "f_status": status,
@@ -4419,12 +4463,76 @@ async def activity_schedule(
             url=f"{back}?error=Date+not+saved,+try+again", status_code=302
         )
 
+@router.get("/activities/{activity_id}/proof")
+async def activity_proof_view(
+    request: Request,
+    activity_id: int,
+    db: Session = Depends(get_db),
+):
+    """Open the latest proof PDF of one of the user's own activities.
+    Read-only: nothing is written to the database."""
+    user, barangay = _resolve_scope(request, db)
+    if isinstance(user, RedirectResponse):
+        return user
+    if not barangay:
+        return RedirectResponse(
+            url="/bdrrmo/planning?error=No+barangay+is+assigned+to+your+account",
+            status_code=302,
+        )
+
+    a = (
+        db.query(Activity)
+        .join(Planning, Activity.planning_id == Planning.id)
+        .filter(Activity.id == activity_id, Planning.barangay_id == barangay.id)
+        .first()
+    )
+    if not a:
+        return RedirectResponse(url="/bdrrmo/planning?error=Proof+not+found", status_code=302)
+    back = f"/bdrrmo/planning/activities/{a.planning_id}"
+
+    document = latest_proof(db, a.id)
+    if not document:
+        return RedirectResponse(url=f"{back}?error=No+proof+uploaded+yet", status_code=302)
+
+    return proof_pdf_response(document) or RedirectResponse(
+        url=f"{back}?error=" + quote_plus(PROOF_OPEN_FAILED), status_code=302
+    )
+
+
+def _proof_back(a, page: str = "", per_page: str = "", **message):
+    """Back to the activity's plan activities page, same page of the list,
+    scrolled to its row, with a success / error message."""
+    params = {}
+    if per_page:
+        params["per_page"] = parse_per_page(per_page)
+    if page:
+        params["page"] = parse_page(page)
+    params.update(message)
+    query = ("?" + urlencode(params)) if params else ""
+    return RedirectResponse(
+        url=f"/bdrrmo/planning/activities/{a.planning_id}{query}#activity-{a.id}",
+        status_code=302,
+    )
+
+
+def _owned_activity_for_proof(db, barangay, activity_id):
+    """The user's own activity (by barangay), or None."""
+    return (
+        db.query(Activity)
+        .join(Planning, Activity.planning_id == Planning.id)
+        .filter(Activity.id == activity_id, Planning.barangay_id == barangay.id)
+        .first()
+    )
+
+
 @router.post("/activities/{activity_id}/submit")
 async def activity_proof_submit(
     request: Request,
     activity_id: int,
     db: Session = Depends(get_db),
     file: UploadFile = File(...),
+    page: str = Form(""),
+    per_page: str = Form(""),
 ):
     user, barangay = _resolve_scope(request, db)
     if isinstance(user, RedirectResponse):
@@ -4435,31 +4543,20 @@ async def activity_proof_submit(
             status_code=302,
         )
 
-    original_name = file.filename
-    ext = _ext_of(original_name)
-    if ext != ".pdf":
-        return RedirectResponse(
-            url="/bdrrmo/planning?error=Unsupported+file+type.+Allowed:+PDF",
-            status_code=302,
-        )
-
-    a = (
-    db.query(Activity)
-    .join(Planning, Activity.planning_id == Planning.id)
-    .filter(Activity.id == activity_id, Planning.barangay_id == barangay.id)
-    .first()
-    )
+    a = _owned_activity_for_proof(db, barangay, activity_id)
     if not a:
         return RedirectResponse(url="/bdrrmo/planning?error=Activity+not+found", status_code=302)
-    
+
+    def back(**message):
+        return _proof_back(a, page, per_page, **message)
+
+    if _ext_of(file.filename) != ".pdf":
+        return back(error="Unsupported file type. Allowed: PDF")
+
     p = db.query(Planning).filter(Planning.id == a.planning_id).first()
 
     if p.status != "approved":
-        return RedirectResponse(
-            url="/bdrrmo/planning?error=Plan+not+approved+yet",
-            status_code=302,
-        )
-        
+        return back(error="Plan not approved yet")
 
     try:
         stored_name = _safe_filename(file.filename)
@@ -4489,17 +4586,13 @@ async def activity_proof_submit(
 
         db.commit()
 
-        return RedirectResponse(
-            url=f"/bdrrmo/planning", status_code=302
-        )
+        return back(success=f"Proof for {a.title} uploaded. It is now awaiting review.")
     
     except Exception as e:
         print(e)
         db.rollback()
 
-        return RedirectResponse(
-            url=f"/bdrrmo/planning?error=File+not+saved,+try+again", status_code=302
-        )
+        return back(error="File not saved, try again")
 
 @router.post("/activities/{activity_id}/retry")
 async def activity_proof_retry(
@@ -4507,6 +4600,8 @@ async def activity_proof_retry(
     activity_id: int,
     db: Session = Depends(get_db),
     file: UploadFile = File(...),
+    page: str = Form(""),
+    per_page: str = Form(""),
 ):
     user, barangay = _resolve_scope(request, db)
     if isinstance(user, RedirectResponse):
@@ -4517,31 +4612,20 @@ async def activity_proof_retry(
             status_code=302,
         )
 
-    original_name = file.filename
-    ext = _ext_of(original_name)
-    if ext != ".pdf":
-        return RedirectResponse(
-            url="/bdrrmo/planning?error=Unsupported+file+type.+Allowed:+PDF",
-            status_code=302,
-        )
-
-    a = (
-    db.query(Activity)
-    .join(Planning, Activity.planning_id == Planning.id)
-    .filter(Activity.id == activity_id, Planning.barangay_id == barangay.id)
-    .first()
-    )
+    a = _owned_activity_for_proof(db, barangay, activity_id)
     if not a:
         return RedirectResponse(url="/bdrrmo/planning?error=Activity+not+found", status_code=302)
-    
+
+    def back(**message):
+        return _proof_back(a, page, per_page, **message)
+
+    if _ext_of(file.filename) != ".pdf":
+        return back(error="Unsupported file type. Allowed: PDF")
+
     p = db.query(Planning).filter(Planning.id == a.planning_id).first()
 
     if p.status != "approved":
-        return RedirectResponse(
-            url="/bdrrmo/planning?error=Plan+not+approved+yet",
-            status_code=302,
-        )
-        
+        return back(error="Plan not approved yet")
 
     try:
         stored_name = _safe_filename(file.filename)
@@ -4552,7 +4636,7 @@ async def activity_proof_retry(
             folder="documents"
         )
 
-        activity_proof = db.query(ActivityProof).filter(ActivityProof.activity_id == activity_id).first()
+        activity_proof = latest_proof(db, a.id)  # the same row "View proof" opens
 
         activity_proof.file_name = file.filename
         activity_proof.file_path = file_key
@@ -4567,17 +4651,13 @@ async def activity_proof_retry(
 
         db.commit()
 
-        return RedirectResponse(
-            url=f"/bdrrmo/planning", status_code=302
-        )
+        return back(success=f"Proof for {a.title} re-uploaded. It is now awaiting review.")
     
     except Exception as e:
         print(e)
         db.rollback()
 
-        return RedirectResponse(
-            url=f"/bdrrmo/planning?error=File+not+saved,+try+again", status_code=302
-        )
+        return back(error="File not saved, try again")
 
     
 def planning_ai_summary(stored_path, file_name):

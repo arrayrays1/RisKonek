@@ -9,6 +9,13 @@
 {% macro activity_actions(row) -%}
 {% set a = row.activity %}
 <div class="rkd-actions">
+    {% if row.state != 'none' %}
+    {# a proof file exists: awaiting review, approved or returned #}
+    <a href="/bdrrmo/activities/{{ a.id }}/proof" target="_blank" rel="noopener"
+       class="btn btn-outline-secondary btn-sm" aria-label="View proof for {{ a.title }}">
+        <i class="bi bi-eye" aria-hidden="true"></i> View proof
+    </a>
+    {% endif %}
     {% if row.can_set_date %}
     <button type="button" class="btn btn-outline-secondary btn-sm"
             data-bs-toggle="modal" data-bs-target="#scheduleModal-{{ a.id }}">
@@ -35,7 +42,8 @@
 </div>
 {%- endmacro %}
 
-{% macro activity_modals(row, today, csrf_token) -%}
+{# page_obj (optional): keeps the paginated activities list on the same page after an upload. #}
+{% macro activity_modals(row, today, csrf_token, page_obj=None) -%}
 {% set a = row.activity %}
 {% if row.can_set_date %}
 <div class="modal fade" id="scheduleModal-{{ a.id }}" tabindex="-1" aria-hidden="true">
@@ -79,6 +87,10 @@
   <div class="modal-dialog">
     <form method="POST" action="/bdrrmo/activities/{{ a.id }}/submit" enctype="multipart/form-data" class="modal-content" data-validate>
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        {% if page_obj %}
+        <input type="hidden" name="page" value="{{ page_obj.page }}">
+        <input type="hidden" name="per_page" value="{{ page_obj.size_value }}">
+        {% endif %}
       <div class="modal-header">
         <h6 class="modal-title">Proof Submission</h6>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -103,6 +115,10 @@
   <div class="modal-dialog">
     <form method="POST" action="/bdrrmo/activities/{{ a.id }}/retry" enctype="multipart/form-data" class="modal-content" data-validate>
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        {% if page_obj %}
+        <input type="hidden" name="page" value="{{ page_obj.page }}">
+        <input type="hidden" name="per_page" value="{{ page_obj.size_value }}">
+        {% endif %}
       <div class="modal-header">
         <h6 class="modal-title">Re-upload Proof</h6>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>

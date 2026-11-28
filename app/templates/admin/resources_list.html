@@ -1,10 +1,15 @@
 {% extends "admin/base.html" %}
 {% from "shared/_pagination.html" import rk_pager %}
 {% from "shared/_table.html" import clear_filters %}
+{% from "shared/_dashboard.html" import stat %}
 
 {% block title %}Resources Module — RisKonek{% endblock %}
 
 {% set active_nav = 'resources' %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="/static/css/rk-dashboard.css">
+{% endblock %}
 
 {% macro alert_pill(a) -%}
     {% if a == 'expired' %}
@@ -41,52 +46,16 @@
 </div>
 {% endif %}
 
-<!-- ── Summary cards ──────────────────────────────────────────── -->
-<div class="row g-3 mb-3">
-    <div class="col-md-3">
-        <div class="stat-card d-flex justify-content-between align-items-center">
-            <div>
-                <div class="stat-label">Total Active Items</div>
-                <div class="stat-value">{{ summary.total }}</div>
-            </div>
-            <div class="stat-icon rk-tint-green-rk">
-                <i class="bi bi-box-seam"></i>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="stat-card d-flex justify-content-between align-items-center">
-            <div>
-                <div class="stat-label">Low Stock</div>
-                <div class="stat-value">{{ summary.low_stock }}</div>
-            </div>
-            <div class="stat-icon rk-tint-amber">
-                <i class="bi bi-exclamation-triangle"></i>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="stat-card d-flex justify-content-between align-items-center">
-            <div>
-                <div class="stat-label">Near Expiry (≤ 30d)</div>
-                <div class="stat-value">{{ summary.near_expiry }}</div>
-            </div>
-            <div class="stat-icon rk-tint-amber">
-                <i class="bi bi-clock-history"></i>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="stat-card d-flex justify-content-between align-items-center">
-            <div>
-                <div class="stat-label">Expired</div>
-                <div class="stat-value">{{ summary.expired }}</div>
-            </div>
-            <div class="stat-icon rk-tint-red">
-                <i class="bi bi-x-octagon"></i>
-            </div>
-        </div>
-    </div>
+<!-- ── Summary cards (shared dashboard stat cards; whole active inventory) ── -->
+<div class="row row-cols-1 row-cols-sm-2 row-cols-lg-4 g-3 mb-3">
+    <div class="col">{{ stat('Total Active Items', summary.total, 'neutral', 'box-seam',
+                             ('item' if summary.total == 1 else 'items') ~ ' in the inventory') }}</div>
+    <div class="col">{{ stat('Low Stock', summary.low_stock, 'neutral', 'exclamation-triangle',
+                             'at or below restock level') }}</div>
+    <div class="col">{{ stat('Near Expiry', summary.near_expiry, 'neutral', 'clock-history',
+                             'expiring within 30 days') }}</div>
+    <div class="col">{{ stat('Expired', summary.expired, 'neutral', 'x-octagon',
+                             'past their expiry date') }}</div>
 </div>
 
 {% set alert_total = summary.low_stock + summary.near_expiry + summary.expired %}

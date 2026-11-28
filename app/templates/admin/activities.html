@@ -24,10 +24,16 @@
     </a>
 </div>
 
+{% if success %}
+<div class="alert alert-success alert-dismissible fade show" role="status">
+    <i class="bi bi-check-circle-fill me-1" aria-hidden="true"></i>{{ success }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+</div>
+{% endif %}
 {% if error %}
-<div class="alert alert-danger alert-dismissible fade show">
-    <i class="bi bi-exclamation-triangle-fill me-1"></i>{{ error | replace('+', ' ') }}
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+<div class="alert alert-danger alert-dismissible fade show" role="alert">
+    <i class="bi bi-exclamation-triangle-fill me-1" aria-hidden="true"></i>{{ error }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
 </div>
 {% endif %}
 
@@ -45,7 +51,7 @@
         <tbody>
             {% for row in rows %}
             {% set a = row.activity %}
-            <tr>
+            <tr id="activity-{{ a.id }}">
                 <td>{{ a.title }}</td>
                 <td>
                     {% if a.start_date %}{{ fmt_date(a.start_date) }}{% else %}<span class="rkd-unscheduled">Not yet scheduled</span>{% endif %}
@@ -95,6 +101,9 @@
   <div class="modal-dialog">
     <form method="POST" action="/admin/activities/{{ a.id }}/status" class="modal-content" data-validate>
         <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+        {# keep the list on the same page after the redirect #}
+        <input type="hidden" name="page" value="{{ page_obj.page }}">
+        <input type="hidden" name="per_page" value="{{ page_obj.size_value }}">
       <div class="modal-header">
         <h6 class="modal-title">Review proof</h6>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>

@@ -6,6 +6,10 @@
 
 {% set active_nav = 'equipment' %}
 
+{% block head_extra %}
+<link rel="stylesheet" href="/static/css/rk-dashboard.css">
+{% endblock %}
+
 {% macro status_pill(v, label) -%}
     {% if v in ('available', 'serviceable') %}
         <span class="status-pill status-operational">{{ label }}</span>
@@ -44,17 +48,20 @@
 {% endif %}
 
 <!-- ── Summary cards ──────────────────────────────────────────── -->
-<div class="row g-3 mb-3">
-
-    {% for vehicle in vehicles %}
-        <div class="col-md-3">
-            <div class="stat-card d-flex justify-content-between align-items-center">
-                <div>
-                    <div class="stat-label">{{ vehicle.equipment_name }}</div>
-                    <div class="stat-value">{{ vehicle.total }}</div>
-                </div>
+<div class="row row-cols-1 row-cols-sm-3 g-3 mb-3">
+    {% for v in vehicles %}
+    <div class="col">
+        <a href="{{ v.href }}" class="rk-stat-card rk-stat-neutral rk-stat-link{% if v.selected %} is-selected{% endif %}"
+           aria-label="Show {{ v.plural }} ({{ v.total }})"{% if v.selected %} aria-current="true"{% endif %}>
+            <i class="bi bi-{{ v.icon }} rk-stat-icon" aria-hidden="true"></i>
+            <div class="rk-stat-text">
+                <div class="rk-stat-label">{{ v.label }}</div>
+                <div class="rk-stat-value">{{ v.total }}</div>
+                <div class="rk-stat-sub">{{ 'unit' if v.total == 1 else 'units' }} across all barangays</div>
+                {% if v.selected %}<div class="rk-stat-selected"><i class="bi bi-check-circle-fill" aria-hidden="true"></i> Showing in table</div>{% endif %}
             </div>
-        </div>
+        </a>
+    </div>
     {% endfor %}
 </div>
 

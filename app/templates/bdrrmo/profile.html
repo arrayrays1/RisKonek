@@ -104,7 +104,7 @@
     <div class="col-lg-6">
         <div class="rkd-card">
             <h2 class="rkd-card-title">Accomplishment reports</h2>
-            <p class="rkd-card-note">All {{ c.total }} activities of this plan · submitted = proof sent and not returned</p>
+            <p class="rkd-card-note">All {{ c.total }} activities of this plan · submitted = awaiting review or approved · rejected = returned, not re-uploaded yet</p>
             {{ pie_block('proofPie', proofs.pie, 'activities', 'No activities yet') }}
             <div class="rkd-rows">
                 <div class="rkd-row">

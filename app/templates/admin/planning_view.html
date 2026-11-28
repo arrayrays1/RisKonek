@@ -20,6 +20,12 @@
             <strong>{{ plan.file_name }}</strong>
             · {{ plan.barangay.name if plan.barangay else '—' }}
             · {{ status_label }}
+            {% if is_final %}
+            <span class="badge text-bg-light border d-inline-flex align-items-center gap-1 ms-1" title="Decision is final">
+                <i class="bi bi-lock-fill" aria-hidden="true"></i> Final<span class="visually-hidden">: </span>
+                <span class="fw-normal text-muted">Decision is final</span>
+            </span>
+            {% endif %}
             · uploaded {{ plan.created_at | pht }}
         </p>
     </div>

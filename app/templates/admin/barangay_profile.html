@@ -1,6 +1,6 @@
 {% extends "admin/base.html" %}
 {% from "shared/_plan_preview.html" import plan_preview_styles, plan_preview %}
-{% from "shared/_dashboard.html" import fmt_date, pill, plan_pill %}
+{% from "shared/_dashboard.html" import fmt_date, pill, plan_pill, stat %}
 
 {% block title %}{{ barangay.name }} — Barangay Profile{% endblock %}
 
@@ -14,8 +14,6 @@
         flex-wrap: wrap;
     }
     .profile-header h1 { margin: 0; }
-    .trend-up    { color: #c0392b; }
-    .trend-stable { color: #6c757d; }
 
     .nav-tabs-clean { border-bottom: 1px solid #e5e7eb; gap: 4px; }
     .nav-tabs-clean .nav-link {
@@ -61,67 +59,17 @@
     </div>
 </div>
 
-<!-- ── Headline cards ─────────────────────────────────────────── -->
-<div class="row g-3 mb-4">
-
-    <div class="col-md-3">
-        <div class="stat-card">
-            <div class="d-flex justify-content-between align-items-start">
-                <div class="stat-label">Total Population</div>
-                <div class="stat-icon rk-tint-blue">
-                    <i class="bi bi-people-fill"></i>
-                </div>
-            </div>
-            <div class="stat-value">{{ "{:,}".format(total_population) }}</div>
-            <div class="stat-change text-muted">
-                {{ "{:,}".format(households) }} households
-            </div>
-        </div>
-    </div>
-
-    <div class="col-md-3">
-        <div class="stat-card">
-            <div class="d-flex justify-content-between align-items-start">
-                <div class="stat-label">Vulnerable %</div>
-                <div class="stat-icon rk-tint-orange">
-                    <i class="bi bi-exclamation-triangle-fill"></i>
-                </div>
-            </div>
-            <div class="stat-value">{{ vulnerable_pct }}%</div>
-            <div class="stat-change text-muted">Elderly, PWDs, Children</div>
-        </div>
-    </div>
-
-    <div class="col-md-3">
-        <div class="stat-card">
-            <div class="d-flex justify-content-between align-items-start">
-                <div class="stat-label">Flood Risk Trend</div>
-                <div class="stat-icon rk-tint-red">
-                    <i class="bi bi-graph-up-arrow"></i>
-                </div>
-            </div>
-            <div class="stat-value {{ 'trend-up' if flood_trend == 'Increasing' else 'trend-stable' }}">
-                {{ flood_trend }}
-            </div>
-            <div class="stat-change text-muted">Last 12 months vs prior</div>
-        </div>
-    </div>
-
-    <div class="col-md-3">
-        <div class="stat-card">
-            <div class="d-flex justify-content-between align-items-start">
-                <div class="stat-label">Fire Risk Trend</div>
-                <div class="stat-icon rk-tint-amber">
-                    <i class="bi bi-fire"></i>
-                </div>
-            </div>
-            <div class="stat-value {{ 'trend-up' if fire_trend == 'Increasing' else 'trend-stable' }}">
-                {{ fire_trend }}
-            </div>
-            <div class="stat-change text-muted">Last 12 months vs prior</div>
-        </div>
-    </div>
-
+<!-- ── Headline cards (shared dashboard stat style) ─────────── -->
+{% set T = activity_cards.total %}
+<div class="row row-cols-1 row-cols-md-2 row-cols-lg-4 g-3 mb-4">
+    <div class="col">{{ stat('Total Population', "{:,}".format(total_population), 'neutral', 'people-fill',
+                             "{:,}".format(households) ~ (' household' if households == 1 else ' households')) }}</div>
+    <div class="col">{{ stat('Vulnerable %', "%.1f" | format(vulnerable_pct) ~ '%', 'amber', 'exclamation-triangle',
+                             'Elderly, PWDs, Children') }}</div>
+    <div class="col">{{ stat('Activities', T, 'neutral', 'list-ul',
+                             'total in this plan' if plan else 'no plan submitted yet') }}</div>
+    <div class="col">{{ stat('Accomplishment Report', proofs.submitted, 'green', 'clipboard-check',
+                             (proofs.submitted ~ ' of ' ~ T ~ ' uploaded') if plan else 'no plan submitted yet') }}</div>
 </div>
 
 <!-- ── Tabs (open tab kept in the URL hash) ───────────────────── -->

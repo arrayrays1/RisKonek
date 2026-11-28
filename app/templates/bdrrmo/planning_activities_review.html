@@ -19,7 +19,10 @@
         background: #fff; border-radius: 12px 12px 0 0;
     }
     .ar-toolbar.is-stuck { border-radius: 0; box-shadow: 0 2px 6px rgba(0, 0, 0, .08); }
-    .ar-count { font-size: 13px; font-weight: 600; color: var(--rk-muted); }
+    .ar-count {
+        display: inline-flex; align-items: center; min-height: 31px;
+        font-size: 14px; font-weight: 600; color: var(--rk-muted);
+    }
     .rk-table .ar-col-num { width: 3.5rem; }
     .rk-table .ar-col-date { width: 12rem; }
     .rk-table .ar-col-actions { width: 6rem; }
@@ -31,8 +34,23 @@
 </style>
 {% endblock %}
 
+{# 4-step BDRRM Plan progress (same macro in planning_preview.html and
+   planning_activities_review.html). current: 1-4, or 5 = all completed. #}
+{% macro plan_stepper(current) -%}
+<ol class="rk-stepper" aria-label="BDRRM Plan submission progress">
+{% for icon, label in [('bi-cloud-arrow-up', 'Upload your BDRRM Plan'), ('bi-file-earmark-text', 'Review plan'), ('bi-file-earmark-check', 'Submit'), ('bi-clock-history', 'Wait for CDRRMO approval')] %}
+{% set state = 'done' if loop.index < current else ('current' if loop.index == current else 'todo') %}
+    <li class="rk-step rk-step-{{ state }}"{% if state == 'current' %} aria-current="step"{% endif %}>
+        <span class="rk-step-dot" aria-hidden="true"><i class="bi {{ icon }}"></i></span>
+        <span class="rk-step-label">{{ label }}{% if state == 'done' %}<span class="visually-hidden"> (completed)</span>{% endif %}</span>
+    </li>
+{% endfor %}
+</ol>
+{%- endmacro %}
+
 {% block content %}
-<div class="d-flex justify-content-between align-items-start page-header">
+<div class="rk-plan-page">
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 page-header">
     <div>
         <h1 id="header">Review Activities</h1>
     </div>
@@ -44,6 +62,10 @@
             Back
         </a>
     </div>
+</div>
+
+<div class="rk-plan-card rk-plan-card-compact">
+    {{ plan_stepper(2) }}
 </div>
 
 {% if error %}
@@ -63,7 +85,7 @@
 <form method="POST" action="/bdrrmo/activities/save/{{ draft_id }}" id="activitiesForm">
     <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
 
-    <div class="form-text mb-2">
+    <div class="form-text rk-plan-hint">
         <i class="bi bi-info-circle" aria-hidden="true"></i> Activity date: Optional. You can set it later.
     </div>
 
@@ -121,6 +143,7 @@
         </div>
     </div>
 </form>
+</div>{# /.rk-plan-page #}
 
 {# Blank row cloned by "Add activity"; __i__ becomes the next free index. #}
 <template id="ar-row-template">

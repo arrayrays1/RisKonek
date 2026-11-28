@@ -283,29 +283,40 @@ def admin_plan_pie(latest: dict, limit: int = 5) -> dict:
 
 
 def admin_proof_review(activities, limit: int = 5) -> dict:
-    """Submitted proofs only: approved vs pending review, then per barangay."""
+    """Proofs of activities of approved plans: approved / pending review /
+    rejected (returned, not re-uploaded yet), then per barangay."""
+    bucket = {PROOF_APPROVED: "approved", PROOF_AWAITING: "pending", PROOF_RETURNED: "rejected"}
     per_plan = {}
     for a in activities:
-        state = proof_state(a)
-        if state not in (PROOF_APPROVED, PROOF_AWAITING):
+        key = bucket.get(proof_state(a))
+        if key is None:
             continue
         p = a.planning
         row = per_plan.setdefault(p.id, {
             "barangay": p.barangay.name if p.barangay else "—", "plan_id": p.id,
-            "pending": 0, "approved": 0,
+            "pending": 0, "approved": 0, "rejected": 0,
         })
-        row["pending" if state == PROOF_AWAITING else "approved"] += 1
+        row[key] += 1
     rows = list(per_plan.values())
     for r in rows:
-        r["submitted"] = r["pending"] + r["approved"]
-    rows.sort(key=lambda r: (-r["pending"], r["barangay"].lower()))
+        r["submitted"] = r["pending"] + r["approved"] + r["rejected"]
+    # pending first, then rejected, then all approved
+    rows.sort(key=lambda r: (0 if r["pending"] else 1 if r["rejected"] else 2,
+                             -r["pending"], -r["rejected"], r["barangay"].lower()))
     approved = sum(r["approved"] for r in rows)
     pending = sum(r["pending"] for r in rows)
+    rejected = sum(r["rejected"] for r in rows)
     return {
-        # the "Proofs awaiting review" card reads these same two numbers
+        # the "Pending AR Review" card reads these same numbers
         "approved": approved,
         "pending": pending,
-        "pie": pie(("Approved", approved, "green"), ("Pending review", pending, "yellow")),
+        "rejected": rejected,
+        "reviewed": approved + rejected,
+        "pie": pie(
+            ("Approved", approved, "green"),
+            ("Pending review", pending, "yellow"),
+            ("Rejected", rejected, "red"),
+        ),
         "rows": rows[:limit],
         "total_rows": len(rows),
     }
@@ -430,12 +441,19 @@ def bdrrmo_timing_pie(activities, today: date) -> dict:
 
 
 def bdrrmo_proof_pie(activities) -> dict:
-    """Submitted (is_proof_submitted) vs none yet, plus the review outcome counts."""
+    """Submitted (awaiting review + approved) / Rejected (returned, re-upload
+    due) / None yet, over all activities, plus the review outcome counts.
+    The three slices add up to len(activities) and match the rows below."""
     cards = activity_cards(activities)
-    submitted = sum(1 for a in activities if a.is_proof_submitted)
+    sent = cards["approved"] + cards["awaiting"]
     return {
-        "pie": pie(("Submitted", submitted, "green"), ("None yet", len(activities) - submitted, "yellow")),
-        "submitted": submitted,  # also the "Accomplishment Report" card number
+        "pie": pie(
+            ("Submitted", sent, "green"),
+            ("Rejected", cards["returned"], "red"),
+            ("None yet", len(activities) - sent - cards["returned"], "yellow"),
+        ),
+        # the "Accomplishment Report" card number (unchanged)
+        "submitted": sum(1 for a in activities if a.is_proof_submitted),
         "approved": cards["approved"],
         "awaiting": cards["awaiting"],
         "returned": cards["returned"],

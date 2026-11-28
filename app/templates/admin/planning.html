@@ -21,7 +21,7 @@
 <div class="d-flex justify-content-between align-items-start page-header">
     <div>
         <h1 id="header">Planning</h1>
-        <p>Historical submitted planning of all barangays.</p>
+        <p>Each barangay's current BDRRM Plan. Use <strong>Review history</strong> to see all of its uploads.</p>
     </div>
 </div>
 
@@ -46,10 +46,10 @@
 <!-- ── Filters (auto-apply) ───────────────────────────────────── -->
 <form method="GET" action="/admin/planning" class="rk-filter-bar js-live-filter" role="search">
     <div class="rk-filter-search">
-        <label for="pl-q" class="visually-hidden">Search file name</label>
+        <label for="pl-q" class="visually-hidden">Search barangay or file name</label>
         <i class="bi bi-search" aria-hidden="true"></i>
         <input type="text" id="pl-q" name="q" value="{{ f_q }}" class="form-control"
-               placeholder="Search file name…" autocomplete="off">
+               placeholder="Search barangay or file name…" autocomplete="off">
     </div>
     <div class="rk-filter-select">
         <label for="pl-status" class="visually-hidden">Status</label>
@@ -97,36 +97,46 @@
             <tr>
                 <td>{{ planning.barangay }}</td>
                 <td>{{ planning.file_name }}</td>
-                <td>{{ status_pill(planning.status_value, planning.status_label) }}</td>
+                <td>
+                    <span class="d-inline-flex align-items-center gap-1">
+                    {{ status_pill(planning.status_value, planning.status_label) }}
+                    {% if planning.status_value in ("approved", "rejected") %}
+                    <i class="bi bi-lock-fill rk-final-lock" aria-hidden="true" title="Decision is final"></i>
+                    <span class="visually-hidden">Decision is final</span>
+                    {% endif %}
+                    </span>
+                </td>
                 <td>
                 <div class="rk-table-actions">
                 {% if not planning.is_archived %}
+                    {% if planning.status_value not in ("approved", "rejected") %}
                     <button type="button" class="btn-soft rk-text-ok"
                             data-bs-toggle="modal" data-bs-target="#changeStatusModal-{{ planning.id }}">
                         <i class="bi bi-plus-slash-minus"></i> Change Status
                     </button>
-                    <a href="/admin/planning/{{ planning.id }}/details" class="btn btn-outline-primary btn-sm">
+                    {% endif %}
+                    <a href="/admin/planning/{{ planning.id }}/details" class="btn btn-outline-rk btn-sm">
                         <i class="bi bi-eye"></i> View
                     </a>
-                    <a href="planning/activities/{{ planning.id }}" class="btn btn-outline-primary btn-sm">
+                    <a href="/admin/planning/activities/{{ planning.id }}" class="btn btn-outline-rk btn-sm">
                         <i class="bi bi-eye"></i> View Activities
                     </a>
                     {% if planning.status_value == "approved" %}
                     {% if not planning.is_hardcopy_received %}
-                    <button type="button" class="btn btn-outline-primary btn-sm"
+                    <button type="button" class="btn btn-outline-rk btn-sm"
                         data-bs-toggle="modal" data-bs-target="#receivedModal-{{ planning.id }}">
                         <i class="bi bi-file-earmark-check"></i> Received
                     </button>
                     {% endif %}
                     {% endif %}
                     {% if planning.status_value == "rejected" %}
-                    <button type="button" class="btn btn-outline-primary btn-sm"
+                    <button type="button" class="btn btn-outline-rk btn-sm"
                         data-bs-toggle="modal" data-bs-target="#reasonModal-{{ planning.id }}">
                         <i class="bi bi-eye"></i> View Reason
                     </button>
                     {% endif %}
                     <form method="POST" action="/admin/planning/{{ planning.id }}/archive"
-                          data-confirm='Archive {{ planning.name }}?'>
+                          data-confirm='Archive {{ planning.file_name }}?'>
                         <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                         <button type="submit" class="btn btn-outline-warning btn-sm">
                             <i class="bi bi-archive"></i>
@@ -134,18 +144,23 @@
                     </form>
                 {% else %}
                     {% if planning.status_value == "rejected" %}
-                    <button type="button" class="btn btn-outline-primary btn-sm"
+                    <button type="button" class="btn btn-outline-rk btn-sm"
                         data-bs-toggle="modal" data-bs-target="#reasonModal-{{ planning.id }}">
                         <i class="bi bi-eye"></i> View Reason
                     </button>
                     {% endif %}
                     <form method="POST" action="/admin/planning/{{ planning.id }}/archive">
                         <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
-                        <button type="submit" class="btn btn-outline-success btn-sm">
+                        <button type="submit" class="btn btn-outline-rk btn-sm">
                             <i class="bi bi-arrow-counterclockwise"></i> Restore
                         </button>
                     </form>
                 {% endif %}
+                    <button type="button" class="btn btn-outline-rk btn-sm js-plan-history"
+                            data-barangay-id="{{ planning.barangay_id }}"
+                            aria-label="Review history for {{ planning.barangay }}">
+                        <i class="bi bi-clock-history" aria-hidden="true"></i> Review history
+                    </button>
                 </div>
                 </td>
             </tr>
@@ -155,7 +170,7 @@
                 No records found.
                 <a href="/admin/planning" class="ms-1">Clear filters</a>
                 {% else %}
-                No submitted plannings yet.
+                No barangay has submitted a plan yet.
                 {% endif %}
             </td></tr>
             {% endfor %}
@@ -167,6 +182,8 @@
 
 {% for r in plannings %}
 {% if not r.is_archived %}
+{# A review decision is final: only pending plans get the status modal. #}
+{% if r.status_value not in ("approved", "rejected") %}
 <div class="modal fade" id="changeStatusModal-{{ r.id }}" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog">
     <form method="POST" action="/admin/planning/{{ r.id }}/status" class="modal-content" data-validate>
@@ -201,6 +218,7 @@
     </form>
   </div>
 </div>
+{% endif %}
 {% endif %}
 
 <div class="modal fade" id="reasonModal-{{ r.id }}" tabindex="-1" aria-hidden="true">
@@ -243,6 +261,93 @@
   </div>
 </div>
 {% endfor %}
+
+<!-- ── Review history (one shared modal, filled from the JSON below) ── -->
+<div class="modal fade" id="planHistoryModal" tabindex="-1" aria-labelledby="planHistoryTitle" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title h6" id="planHistoryTitle">Review history</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="rk-table-card table-responsive mb-0">
+          <table class="rk-table">
+            <thead>
+              <tr>
+                <th scope="col">File name</th>
+                <th scope="col">Status</th>
+                <th scope="col">Reason</th>
+                <th scope="col">Uploaded</th>
+                <th scope="col">Reviewed</th>
+                <th scope="col">View file</th>
+              </tr>
+            </thead>
+            <tbody id="planHistoryBody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script type="application/json" id="planHistoryData" nonce="{{ request.state.csp_nonce }}">{{ history_data | tojson }}</script>
+
+<script nonce="{{ request.state.csp_nonce }}">
+(() => {
+    const data = JSON.parse(document.getElementById("planHistoryData").textContent || "{}");
+    const modalEl = document.getElementById("planHistoryModal");
+    const title = document.getElementById("planHistoryTitle");
+    const body = document.getElementById("planHistoryBody");
+    const PILL = { approved: "status-operational", pending: "status-maintenance", rejected: "status-unavailable" };
+
+    function el(tag, cls, text) {
+        const n = document.createElement(tag);
+        if (cls) n.className = cls;
+        if (text != null) n.textContent = text;
+        return n;
+    }
+
+    function fill(group) {
+        title.textContent = "Review history \u2013 Barangay " + group.barangay;
+        body.replaceChildren();
+        group.plans.forEach((p) => {
+            const tr = el("tr");
+            const name = el("td", null, p.file_name);
+            if (p.current) name.append(" ", el("span", "rk-badge-current", "Current"));
+            const st = el("td");
+            const wrap = el("span", "d-inline-flex flex-wrap align-items-center gap-1");
+            wrap.append(el("span", "status-pill " + (PILL[p.status] || ""), p.status_label));
+            if (p.archived) wrap.append(el("span", "status-pill rk-pill-archived", "Archived"));
+            st.append(wrap);
+            const view = el("td");
+            const a = el("a", "btn btn-outline-rk btn-sm text-nowrap");
+            a.href = p.view_url;
+            a.target = "_blank";
+            a.rel = "noopener";
+            a.setAttribute("aria-label", "View file " + p.file_name + " (opens in a new tab)");
+            const icon = el("i", "bi bi-box-arrow-up-right");
+            icon.setAttribute("aria-hidden", "true");
+            a.append(icon, " View");
+            view.append(a);
+            tr.append(name, st, el("td", null, p.reason), el("td", "text-nowrap", p.uploaded),
+                      el("td", "text-nowrap", p.reviewed), view);
+            body.append(tr);
+        });
+    }
+
+    document.querySelectorAll(".js-plan-history").forEach((btn) => {
+        btn.addEventListener("click", () => {
+            const group = data[btn.dataset.barangayId];
+            if (!group) return;
+            fill(group);
+            bootstrap.Modal.getOrCreateInstance(modalEl).show(btn);
+        });
+    });
+})();
+</script>
 
 <script nonce="{{ request.state.csp_nonce }}">
 document.querySelectorAll(".status-select").forEach((select) => {

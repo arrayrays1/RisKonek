@@ -24,16 +24,16 @@
 </div>
 
 {% if error %}
-<div class="alert alert-danger alert-dismissible fade show">
-    <i class="bi bi-exclamation-triangle-fill me-1"></i>{{ error | replace('+', ' ') }}
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+<div class="alert alert-danger alert-dismissible fade show" role="alert">
+    <i class="bi bi-exclamation-triangle-fill me-1" aria-hidden="true"></i>{{ error }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
 </div>
 {% endif %}
 
 {% if success %}
-<div class="alert alert-success alert-dismissible fade show">
-    <i class="bi bi-check-circle-fill me-1"></i>{{ success | replace('+', ' ') }}
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+<div class="alert alert-success alert-dismissible fade show" role="status">
+    <i class="bi bi-check-circle-fill me-1" aria-hidden="true"></i>{{ success }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
 </div>
 {% endif %}
 
@@ -50,7 +50,7 @@
         <tbody>
             {% for row in rows %}
             {% set a = row.activity %}
-            <tr>
+            <tr id="activity-{{ a.id }}">
                 <td>
                     {{ a.title }}
                     {% if row.rescheduled %}<span class="rkd-pill rkd-pill-muted ms-1">Rescheduled {{ row.rescheduled }}x</span>{% endif %}
@@ -71,7 +71,7 @@
 {{ rk_pager(page_obj, "/bdrrmo/planning/activities/" ~ plan.id, "", "Activity pages") }}
 
 {% for row in rows %}
-{{ activity_modals(row, today, request.session.get('csrf_token', '')) }}
+{{ activity_modals(row, today, request.session.get('csrf_token', ''), page_obj) }}
 {% endfor %}
 
 {% endblock %}

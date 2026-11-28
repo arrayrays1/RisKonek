@@ -1,10 +1,15 @@
 {% extends "admin/base.html" %}
 {% from "shared/_pagination.html" import rk_pager %}
 {% from "shared/_table.html" import clear_filters %}
+{% from "shared/_dashboard.html" import stat %}
 
 {% block title %}Login History — RisKonek{% endblock %}
 
 {% set active_nav = 'login_history' %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="/static/css/rk-dashboard.css">
+{% endblock %}
 
 {% block content %}
 <div class="page-header">
@@ -21,32 +26,15 @@
 </div>
 {% endif %}
 
-<!-- ── Summary ────────────────────────────────────────────────── -->
-<div class="row g-3 mb-3">
-    <div class="col-md-3">
-        <div class="stat-card d-flex justify-content-between align-items-center">
-            <div><div class="stat-label">Total Events</div><div class="stat-value">{{ summary.total }}</div></div>
-            <div class="stat-icon rk-tint-green-rk"><i class="bi bi-shield-lock"></i></div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="stat-card d-flex justify-content-between align-items-center">
-            <div><div class="stat-label">Successful Logins</div><div class="stat-value">{{ summary.success }}</div></div>
-            <div class="stat-icon rk-tint-green-alt"><i class="bi bi-box-arrow-in-right"></i></div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="stat-card d-flex justify-content-between align-items-center">
-            <div><div class="stat-label">Failed Attempts</div><div class="stat-value">{{ summary.failed }}</div></div>
-            <div class="stat-icon rk-tint-amber"><i class="bi bi-exclamation-triangle"></i></div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="stat-card d-flex justify-content-between align-items-center">
-            <div><div class="stat-label">Lockouts</div><div class="stat-value">{{ summary.locked }}</div></div>
-            <div class="stat-icon rk-tint-red"><i class="bi bi-lock"></i></div>
-        </div>
-    </div>
+<!-- ── Summary (shared dashboard stat cards; counts follow the filters) ── -->
+{% set n = summary.total %}
+{% set of_n = 'of ' ~ n ~ (' event' if n == 1 else ' events') %}
+<div class="row row-cols-1 row-cols-sm-2 row-cols-lg-4 g-3 mb-3">
+    <div class="col">{{ stat('Total Events', n, 'neutral', 'shield-lock',
+                             ('sign-in event' if n == 1 else 'sign-in events') ~ ' in this view') }}</div>
+    <div class="col">{{ stat('Successful Logins', summary.success, 'neutral', 'box-arrow-in-right', of_n) }}</div>
+    <div class="col">{{ stat('Failed Attempts', summary.failed, 'neutral', 'exclamation-triangle', of_n) }}</div>
+    <div class="col">{{ stat('Lockouts', summary.locked, 'neutral', 'lock', of_n) }}</div>
 </div>
 
 <!-- ── Filters (auto-apply) ───────────────────────────────────── -->
